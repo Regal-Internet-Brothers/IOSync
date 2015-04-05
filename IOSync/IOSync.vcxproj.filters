@@ -1,0 +1,141 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files\networking">
+      <UniqueIdentifier>{ade670a5-17e8-41a2-866e-22f21b68ce93}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\networking">
+      <UniqueIdentifier>{593bf89c-1489-403b-8da7-f958ff3ecfa7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\application">
+      <UniqueIdentifier>{89a4074e-1103-4216-ba9b-7d3f0b7da4e4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\application">
+      <UniqueIdentifier>{0498a4dc-3787-4022-a327-d1259489a070}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\libraries">
+      <UniqueIdentifier>{132cb05f-a1f5-428d-86c8-f3ea073baad9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\libraries\QuickSock">
+      <UniqueIdentifier>{15ea671c-4dea-4279-ad2c-5e3abe645f0c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\libraries">
+      <UniqueIdentifier>{dbbf5864-8e18-4509-aece-0776745f13ff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\libraries\QuickSock">
+      <UniqueIdentifier>{8951e14e-5ac1-42a2-8d30-4b7666d36ea6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\devices">
+      <UniqueIdentifier>{c08e976b-3840-4b3e-a8cd-90ac85d97ec4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\devices">
+      <UniqueIdentifier>{93cc315d-de9e-478c-af1b-786cdf3100f6}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\libraries\QuickSock\QuickSock.cpp">
+      <Filter>Source Files\libraries\QuickSock</Filter>
+    </ClCompile>
+    <ClCompile Include="src\networking\address.cpp">
+      <Filter>Source Files\networking</Filter>
+    </ClCompile>
+    <ClCompile Include="src\networking\messages.cpp">
+      <Filter>Source Files\networking</Filter>
+    </ClCompile>
+    <ClCompile Include="src\networking\networking.cpp">
+      <Filter>Source Files\networking</Filter>
+    </ClCompile>
+    <ClCompile Include="src\networking\packets.cpp">
+      <Filter>Source Files\networking</Filter>
+    </ClCompile>
+    <ClCompile Include="src\application\application.cpp">
+      <Filter>Source Files\application</Filter>
+    </ClCompile>
+    <ClCompile Include="src\iosync.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\devices\devices.cpp">
+      <Filter>Source Files\devices</Filter>
+    </ClCompile>
+    <ClCompile Include="src\devices\keyboard.cpp">
+      <Filter>Source Files\devices</Filter>
+    </ClCompile>
+    <ClCompile Include="src\exceptions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\networking\address.h">
+      <Filter>Header Files\networking</Filter>
+    </ClInclude>
+    <ClInclude Include="src\networking\networking.h">
+      <Filter>Header Files\networking</Filter>
+    </ClInclude>
+    <ClInclude Include="src\networking\packets.h">
+      <Filter>Header Files\networking</Filter>
+    </ClInclude>
+    <ClInclude Include="src\libraries\QuickSock\Exceptions.h">
+      <Filter>Header Files\libraries\QuickSock</Filter>
+    </ClInclude>
+    <ClInclude Include="src\libraries\QuickSock\QuickSock.h">
+      <Filter>Header Files\libraries\QuickSock</Filter>
+    </ClInclude>
+    <ClInclude Include="src\libraries\QuickSock\QuickTypes.h">
+      <Filter>Header Files\libraries\QuickSock</Filter>
+    </ClInclude>
+    <ClInclude Include="src\application\application.h">
+      <Filter>Header Files\application</Filter>
+    </ClInclude>
+    <ClInclude Include="src\iosync.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\networking\networkEngine.h">
+      <Filter>Header Files\networking</Filter>
+    </ClInclude>
+    <ClInclude Include="src\networking\player.h">
+      <Filter>Header Files\networking</Filter>
+    </ClInclude>
+    <ClInclude Include="src\networking\messages.h">
+      <Filter>Header Files\networking</Filter>
+    </ClInclude>
+    <ClInclude Include="src\networking\socket.h">
+      <Filter>Header Files\networking</Filter>
+    </ClInclude>
+    <ClInclude Include="src\devices\devices.h">
+      <Filter>Header Files\devices</Filter>
+    </ClInclude>
+    <ClInclude Include="src\devices\keyboard.h">
+      <Filter>Header Files\devices</Filter>
+    </ClInclude>
+    <ClInclude Include="src\platform.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\exceptions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\iosync_application_exceptions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\application\application_exceptions.h">
+      <Filter>Header Files\application</Filter>
+    </ClInclude>
+    <ClInclude Include="src\networking\reliablePacketManager.h">
+      <Filter>Header Files\networking</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

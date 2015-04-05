@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.31101.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "IOSync", "IOSync\IOSync.vcxproj", "{CDE4482F-4C0E-4884-AB16-24F4A8490768}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CDE4482F-4C0E-4884-AB16-24F4A8490768}.Debug|Win32.ActiveCfg = Debug|Win32
+		{CDE4482F-4C0E-4884-AB16-24F4A8490768}.Debug|Win32.Build.0 = Debug|Win32
+		{CDE4482F-4C0E-4884-AB16-24F4A8490768}.Release|Win32.ActiveCfg = Release|Win32
+		{CDE4482F-4C0E-4884-AB16-24F4A8490768}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,107 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\application\application.cpp" />
+    <ClCompile Include="src\devices\devices.cpp" />
+    <ClCompile Include="src\devices\keyboard.cpp" />
+    <ClCompile Include="src\exceptions.cpp" />
+    <ClCompile Include="src\iosync.cpp" />
+    <ClCompile Include="src\libraries\QuickSock\QuickSock.cpp" />
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\networking\address.cpp" />
+    <ClCompile Include="src\networking\messages.cpp" />
+    <ClCompile Include="src\networking\networking.cpp" />
+    <ClCompile Include="src\networking\packets.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\application\application.h" />
+    <ClInclude Include="src\application\application_exceptions.h" />
+    <ClInclude Include="src\iosync_application_exceptions.h" />
+    <ClInclude Include="src\devices\devices.h" />
+    <ClInclude Include="src\devices\keyboard.h" />
+    <ClInclude Include="src\exceptions.h" />
+    <ClInclude Include="src\iosync.h" />
+    <ClInclude Include="src\libraries\QuickSock\Exceptions.h" />
+    <ClInclude Include="src\libraries\QuickSock\QuickSock.h" />
+    <ClInclude Include="src\libraries\QuickSock\QuickTypes.h" />
+    <ClInclude Include="src\networking\address.h" />
+    <ClInclude Include="src\networking\messages.h" />
+    <ClInclude Include="src\networking\networkEngine.h" />
+    <ClInclude Include="src\networking\networking.h" />
+    <ClInclude Include="src\networking\packets.h" />
+    <ClInclude Include="src\networking\player.h" />
+    <ClInclude Include="src\networking\reliablePacketManager.h" />
+    <ClInclude Include="src\networking\socket.h" />
+    <ClInclude Include="src\platform.h" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{CDE4482F-4C0E-4884-AB16-24F4A8490768}</ProjectGuid>
+    <RootNamespace>IOSync</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>
+      </SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <SubSystem>
+      </SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
