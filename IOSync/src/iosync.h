@@ -45,6 +45,19 @@
 	#include <mutex>
 #endif
 
+// Output-stream macros:
+#define deviceNetInfoStream std::cout
+#define wdeviceNetInfoStream std::wcout
+
+#define deviceInfoStream std::cout
+#define wdeviceInfoStream std::wcout
+
+#define deviceNetInfo std::cout << "{NETWORK} {DEVICE}: " // networkInfo
+#define wdeviceNetInfo std::wcout << L"{NETWORK} {DEVICE}: "
+
+#define deviceInfo std::cout << "{DEVICE}: "
+#define wdeviceInfo std::wcout << L"{DEVICE}: "
+
 // Namespace(s):
 using namespace std;
 using namespace iosync::networking;
@@ -369,6 +382,30 @@ namespace iosync
 				static void executeAsyncApplication();
 			#endif
 
+			static inline nativePort portFromString(string portStr)
+			{
+				// Convert the port-string to lower-case.
+				transform(portStr.begin(), portStr.end(), portStr.begin(), tolower);
+
+				// Check if the user didn't request the default port:
+				if (portStr != "default" || portStr == "d")
+				{
+					// Convert the port-string into an integer.
+					return (nativePort)stoi(portStr);
+				}
+
+				return DEFAULT_PORT;
+			}
+
+			static inline nativePort portFromInput(istream& is)
+			{
+				string portStr;
+
+				is >> portStr;
+
+				return portFromString(portStr);
+			}
+
 			// Constructor(s):
 			iosync_application(rate updateRate = DEFAULT_UPDATERATE, OSINFO OSInfo=OSINFO());
 
@@ -408,6 +445,10 @@ namespace iosync
 			#endif
 
 			// Networking related:
+			inline bool networkingEnabled() const
+			{
+				return (network != nullptr);
+			}
 
 			// Serialization related:
 			// Nothing so far.
@@ -423,6 +464,8 @@ namespace iosync
 
 			// Call-backs:
 			void onNetworkConnected(networkEngine& engine) override;
+			void onNetworkClientConnected(networkEngine& engine, player& p) override;
+			void onNetworkClientTimedOut(networkEngine& engine, player& p) override;
 			void onNetworkClosed(networkEngine& engine) override;
 
 			nativeWindow getWindow() const override;

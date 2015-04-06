@@ -148,8 +148,6 @@ namespace iosync
 			// Store the start-position of the footer.
 			startPosition = socket.readOffset;
 
-			//cout << socket.readString() << endl;
-
 			isReliable = socket.readBool();
 			addressAvail = socket.readBool();
 
@@ -191,8 +189,6 @@ namespace iosync
 			// Local variable(s):
 			bool isReliable = (reliableIdentifier != PACKET_ID_UNRELIABLE);
 			bool addressAvail = (forceAddress || forwardAddress.isSet());
-
-			//socket.writeString("Hello world.");
 
 			// Write the packet-reliability state to the output.
 			socket.writeBool(isReliable);

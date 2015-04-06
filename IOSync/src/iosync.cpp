@@ -70,7 +70,7 @@ namespace iosync
 		#ifdef PLATFORM_WINDOWS
 			LRESULT CALLBACK __winnt__WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			{
-				//cout << "Message: " << msg << endl;
+				//networkLog << "Message: " << msg << endl;
 
 				switch(msg)
 				{
@@ -153,11 +153,11 @@ namespace iosync
 
 		void connectedDevices::destroyKeyboard()
 		{
-			cout << "Attempting to destroy keyboard device-instance..." << endl;
+			deviceInfo << "Attempting to destroy keyboard device-instance..." << endl;
 
 			delete keyboard; keyboard = nullptr;
 
-			cout << "Device-instance destroyed." << endl;
+			deviceInfo << "Device-instance destroyed." << endl;
 
 			return;
 		}
@@ -189,7 +189,7 @@ namespace iosync
 
 		bool connectedDevices::connectDevice(deviceType devType, iosync_application* program)
 		{
-			cout << "Connecting device (Type: " << isprint(devType) << ")..." << endl;
+			deviceInfo << "Connecting device (Type: " << isprint(devType) << ")..." << endl;
 
 			switch (devType)
 			{
@@ -211,23 +211,27 @@ namespace iosync
 
 		bool connectedDevices::disconnectDevice(deviceType devType, iosync_application* program)
 		{
-			cout << "Disconnecting device (Type: " << isprint(devType) << ")..." << endl;
-
-			switch (devType)
+			if (!program->networkingEnabled() || !program->network->hasRemoteConnection())
 			{
-				case DEVICE_TYPE_KEYBOARD:
-					if (!program->network->hasRemoteConnection())
-					{
+				deviceInfo << "Disconnecting device (Type: " << isprint(devType) << ")..." << endl;
+
+				switch (devType)
+				{
+					case DEVICE_TYPE_KEYBOARD:
 						if (!disconnectKeyboard())
 						{
 							return false;
 						}
-					}
 
-					break;
-				default:
-					// This device-type is not supported.
-					return false;
+						break;
+					default:
+						// This device-type is not supported.
+						return false;
+				}
+			}
+			else
+			{
+				deviceNetInfo << "Disconnection request rejected; other players may desire to use it." << endl;
 			}
 
 			// Return the default response.
@@ -236,41 +240,41 @@ namespace iosync
 
 		kbd* connectedDevices::connectKeyboard(iosync_application* program)
 		{
-			cout << "Attempting to create keyboard-instance..." << endl;
-
 			// Check if we need to create a new keyboard:
 			if (keyboard == nullptr)
 			{
-				cout << "Creating keyboard instance." << endl;
+				deviceInfo << "Attempting to create keyboard-instance..." << endl;
 
 				// Allocate a new keyboard on the heap.
 				keyboard = new kbd(program->allowDeviceDetection(), program->allowDeviceSimulation());
 
-				cout << "Keyboard instance created." << endl;
+				deviceInfo << "Keyboard-instance created." << endl;
 			}
 
 			if (keyboard->connected())
 			{
-				cout << "Keyboard already connected, continuing anyway." << endl;
+				deviceInfo << "Keyboard already connected, continuing anyway..." << endl;
 
 				return keyboard;
 			}
 
-			cout << "Attempting to connect keyboard..." << endl;
+			deviceInfo << "Attempting to connect keyboard-device..." << endl;
 
 			// Attempt to connect our keyboard:
 			if (!keyboard->connect())
 			{
-				cout << "Failed to connect keyboard, destroying device-instance..." << endl;
+				deviceInfo << "Failed to connect keyboard, destroying device-instance..." << endl;
 
 				// We couldn't connect it, destroy the object.
 				destroyKeyboard();
+
+				deviceInfo << "Device-instance destroyed." << endl;
 
 				// Tell the user we couldn't connect it.
 				return nullptr;
 			}
 
-			cout << "Keyboard connected." << endl;
+			deviceInfo << "Keyboard connected." << endl;
 
 			// Return the 'keyboard' object to the user.
 			return keyboard;
@@ -361,24 +365,24 @@ namespace iosync
 			switch (subMessageType)
 			{
 				case DEVICE_NETWORK_MESSAGE_CONNECT:
-					cout << "Discovered device-connection request, parsing..." << endl;
+					deviceNetInfo << "Discovered device-connection request, parsing..." << endl;
 
 					if (parseConnectMessage(program, socket, header, footer))
 					{
-						cout << "Parsing operations complete." << endl;
+						deviceNetInfo << "Parsing operations complete." << endl;
 
 						switch (program->mode)
 						{
 							case iosync_application::MODE_SERVER:
-								cout << "Sending device-connection notification to client..." << endl;
+								deviceNetInfo << "Sending device-connection notification to client..." << endl;
 
 								sendConnectMessage(*(program->network), socket, devType, DESTINATION_REPLY);
 
-								cout << "Sending operations complete." << endl;
+								deviceNetInfo << "Sending operations complete." << endl;
 
 								break;
 							case iosync_application::MODE_CLIENT:
-								cout << "Device connected successfully, as the remote host intended." << endl;
+								deviceNetInfo << "Device connected successfully, as the remote host intended." << endl;
 
 								break;
 						}
@@ -386,25 +390,25 @@ namespace iosync
 
 					break;
 				case DEVICE_NETWORK_MESSAGE_DISCONNECT:
-					cout << "Discovered device-disconnection request, parsing..." << endl;
+					deviceNetInfo << "Discovered device-disconnection request, parsing..." << endl;
 
 					if (parseDisconnectMessage(program, socket, header, footer))
 					{
-						cout << "Parsing operations complete." << endl;
+						deviceNetInfo << "Parsing operations complete." << endl;
 
 						switch (program->mode)
 						{
 							case iosync_application::MODE_SERVER:
-								cout << "Sending device-disconnection notification to clients..." << endl;
+								deviceNetInfo << "Sending device-disconnection notification to clients..." << endl;
 
 								// Tell everyone this device has been disconnected.
 								sendDisconnectMessage(*(program->network), socket, devType, DESTINATION_ALL);
 
-								cout << "Sending operations complete." << endl;
+								deviceNetInfo << "Sending operations complete." << endl;
 
 								break;
 							case iosync_application::MODE_CLIENT:
-								cout << "Device disconnected successfully, as the remote host intended." << endl;
+								deviceNetInfo << "Device disconnected successfully, as the remote host intended." << endl;
 
 								break;
 						}
@@ -702,22 +706,28 @@ namespace iosync
 	// Methods:
 	int iosync_application::execute(const addressPort port)
 	{
-		cout << "Opening server network (" << port << ")." << endl;
+		cout << "Attempting to open server network (" << port << ")..." << endl << endl;
 
 		// Allocate a new "networking engine".
-		auto engine = new serverNetworkEngine();
+		auto engine = new serverNetworkEngine(*this);
 
 		// Attempt to host using the port specified:
 		if (!engine->open(port))
 		{
+			cout << "Unable to open server network, cleaning up allocations..." << endl;
+
 			// Delete the "engine" we allocated.
 			delete engine;
+
+			cout << "Network-object deallocated." << endl;
 
 			return ERROR_HOSTING;
 		}
 
 		// Set the main "engine" instance to the one we allocated.
 		this->network = engine;
+
+		cout << "Server network started." << endl << endl;
 
 		// Execute the creation call-back.
 		onCreate(MODE_SERVER);
@@ -744,23 +754,49 @@ namespace iosync
 				string hostname = "127.0.0.1";
 				nativePort port = DEFAULT_PORT;
 
-				cout << "Mode: "; cin >> mode; //cout << endl;
+				string::size_type separatorPosition;
+
+				//cout << endl;
+
+				cout << "Application mode (" << MODE_CLIENT << " = Client, " << MODE_SERVER << " = Server): "; cin >> mode; //cout << endl;
 
 				switch (mode)
 				{
 					case MODE_CLIENT:
 						#ifndef IOSYNC_FAST_TESTMODE
-							cout << "Address: "; cin >> hostname; // cout << endl;
-							cout << "Port: "; cin >> port; // cout << endl;
+							cout << "Please supply a hostname: "; cin >> hostname; // cout << endl;
 
-							cout << "Username: "; wcin >> username; // cout << endl;
+							separatorPosition = hostname.find(networking::ADDRESS_SEPARATOR);
+
+							if (separatorPosition != string::npos && separatorPosition < hostname.length())
+							{
+								port = portFromString(hostname.substr(separatorPosition+1));
+
+								hostname = hostname.substr(0, separatorPosition);
+							}
+							else
+							{
+								string portStr;
+
+								cout << "Please supply a remote-port: ";
+								port = portFromInput(cin); // cout << endl;
+							}
+
+							cout << "Please enter a username (No spaces): "; wcin >> username; // cout << endl;
 						#endif
+
+						//clearConsole();
 
 						return execute(username, hostname, port);
 					case MODE_SERVER:
-						#ifndef IOSYNC_FAST_TESTMODE
-							cout << "Port: "; cin >> port; // cout << endl;
-						#endif
+						{
+							#ifndef IOSYNC_FAST_TESTMODE
+								cout << "Please enter a port to host with: ";
+								port = portFromInput(cin); // cout << endl;
+							#endif
+						}
+
+						//clearConsole();
 
 						return execute(port);
 				}
@@ -783,19 +819,25 @@ namespace iosync
 
 	int iosync_application::execute(wstring username, string remoteAddress, addressPort remotePort, addressPort localPort)
 	{
-		cout << "Opening client network (" << remoteAddress << ":" << remotePort << ")." << endl;
+		cout << "Attempting to opening client network (" << remoteAddress << networking::ADDRESS_SEPARATOR << remotePort << ")..." << endl << endl;
 
 		// Allocate a new "networking engine".
-		auto engine = new clientNetworkEngine(username);
+		auto engine = new clientNetworkEngine(*this, username);
 
 		// Attempt to connect to the address specified.
 		if (!engine->open(remoteAddress, remotePort, localPort))
 		{
+			cout << "Unable to open client network, cleaning up allocations..." << endl;
+
 			// Delete the "engine" we allocated.
 			delete engine;
 
+			cout << "Network-object deallocated." << endl;
+
 			return ERROR_CONNECTING;
 		}
+
+		//cout << "Preliminary processes complete, continuing..." << endl << endl;
 
 		// Set the main "engine" instance to the one we allocated.
 		this->network = engine;
@@ -884,7 +926,7 @@ namespace iosync
 			return;
 
 		// Manually close the network-engine.
-		network->close(this);
+		network->close();
 
 		delete network;
 		network = nullptr;
@@ -924,7 +966,7 @@ namespace iosync
 			}
 		}
 
-		network->update(this);
+		network->update();
 
 		return;
 	}
@@ -954,7 +996,7 @@ namespace iosync
 			{
 				TranslateMessage(&message);
 
-				//cout << "System Message: " << message.message << endl;
+				//networkLog << "System Message: " << message.message << endl;
 
 				switch (message.message)
 				{
@@ -1057,17 +1099,34 @@ namespace iosync
 	// Call-backs:
 	void iosync_application::onNetworkConnected(networkEngine& engine)
 	{
-		if (mode == MODE_CLIENT)
-		{
-			/* Handled through safe call-back messages now:
-				// Connect all virtual-devices.
-				devices.connect(this);
-			*/
+		/*
+			// Handled through safe call-back messages now:
 
-			// Tell the host to connect the devices we have.
-			// If they accept, we will receive messages to connect our devices.
-			devices.sendConnectMessages(engine, DESTINATION_HOST);
-		}
+			// Connect all virtual-devices.
+			devices.connect(this);
+		*/
+
+		// Tell the host to connect the devices we have.
+		// If they accept, we will receive messages to connect our devices.
+		devices.sendConnectMessages(engine, DESTINATION_HOST);
+
+		return;
+	}
+
+	void iosync_application::onNetworkClientConnected(networkEngine& engine, player& p)
+	{
+		wnetworkLog << "Player connected: " << p.name << endl;
+
+		networkLog << "Player address: "; p.outputAddressInfo(networkLogStream, true);
+
+		return;
+	}
+
+	void iosync_application::onNetworkClientTimedOut(networkEngine& engine, player& p)
+	{
+		wnetworkLog << "Player timed-out: " << p.name << endl;
+
+		networkLog << "Timed-out player's address: "; p.outputAddressInfo(networkLogStream, true);
 
 		return;
 	}

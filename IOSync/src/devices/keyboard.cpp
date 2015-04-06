@@ -74,7 +74,7 @@ namespace iosync
 
 				if (!registered)
 				{
-					cout << "Unable to register device(s): " << GetLastError() << endl;
+					clog << "Unable to register raw-device(s): " << GetLastError() << endl;
 				}
 
 				return registered;
@@ -96,7 +96,7 @@ namespace iosync
 				if (action.type == ACTION_TYPE_HIT && (GetAsyncKeyState(action.key) & 0x8000) > 0)
 					action.type = ACTION_TYPE_RELEASE;
 
-				//cout << "Simuating key: " << action.key << ", " << action.type << " -- wScan: " << deviceAction.ki.wScan << endl;
+				//deviceInfo << "Simuating key: " << action.key << ", " << action.type << " -- wScan: " << deviceAction.ki.wScan << endl;
 
 				nativeFlags extraFlags = 0;
 
@@ -207,26 +207,23 @@ namespace iosync
 		void keyboard::simulate(application* program)
 		{
 			/*
-			keyboardKey key = VK_UP;
+				keyboardKey key = VK_UP;
 
-			actionQueue.push_back(keyboardAction(key, ACTION_TYPE_DOWN));
-			simulateAction();
+				actionQueue.push_back(keyboardAction(key, ACTION_TYPE_DOWN));
+				simulateAction();
 
-			this_thread::sleep_for((milliseconds)4000);
+				this_thread::sleep_for((milliseconds)4000);
 
-			actionQueue.push_back(keyboardAction(key, ACTION_TYPE_HIT));
+				actionQueue.push_back(keyboardAction(key, ACTION_TYPE_HIT));
 
-			simulateAction();
+				simulateAction();
 
-			//cout << "Done." << endl;
+				deviceInfo << "Done." << endl;
 			*/
 
-			//if (testMode())
+			while (simulateAction())
 			{
-				while (simulateAction())
-				{
-					// Nothing so far.
-				}
+				// Nothing so far.
 			}
 
 			return;
@@ -304,7 +301,7 @@ namespace iosync
 
 				actionQueue.push_back(keyboardAction((keyboardKey)rawDevice->data.keyboard.VKey, actionType));
 
-				cout << "Detected key: " << rawDevice->data.keyboard.VKey << ", actionType: " << actionType << endl;
+				//deviceInfo << "Detected key: " << rawDevice->data.keyboard.VKey << ", actionType: " << actionType << endl;
 
 				return;
 			}

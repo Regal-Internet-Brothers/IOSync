@@ -230,7 +230,7 @@
 				#define htond(x) __arch__swab64(x)
 				#define ntohd(x) __arch__swab64(x)
 			#else
-				inline static QSOCK_FLOAT64 safe_swab64(QSOCK_FLOAT64 in)
+				static inline QSOCK_FLOAT64 safe_swab64(QSOCK_FLOAT64 in)
 				{
 					QSOCK_FLOAT64 out;
 
@@ -520,6 +520,11 @@ namespace quickLib
 				static inline nonNativeIP nativeToNonNativeIP(nonNativeIP input)
 				{
 					return input;
+				}
+
+				static inline nativeString representIP(nativeIP input)
+				{
+					return nativeToNonNativeIP(input);
 				}
 
 				// Constructors & Destructors:

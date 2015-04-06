@@ -127,7 +127,7 @@ namespace iosync
 					return !keyboardLinked();
 				}
 
-				inline static bool autoLinkKeyboard()
+				static inline bool autoLinkKeyboard()
 				{
 					if (keyboardUnlinked())
 						linkKeyboard();
@@ -144,7 +144,7 @@ namespace iosync
 					return false;
 				}
 
-				inline static bool autoUnlinkKeyboard()
+				static inline bool autoUnlinkKeyboard()
 				{
 					#ifdef KEYBOARD_ALLOW_UNLINK
 						if (globalDeviceCounter > 0 && keyboardLinked())
@@ -165,7 +165,7 @@ namespace iosync
 
 				// Call this when unsure of the states of active keyboard devices,
 				// but you want to make sure everything's cleaned up.
-				inline static bool cleanUp()
+				static inline bool cleanUp()
 				{
 					return autoUnlinkKeyboard();
 				}

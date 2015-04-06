@@ -9,6 +9,8 @@
 #include "../platform.h"
 #include "../networking/networking.h"
 
+#include <cstdio>
+
 #include <vector>
 #include <string>
 #include <codecvt>
@@ -24,6 +26,8 @@ namespace iosync
 		// Structures:
 		struct messageHeader;
 		struct messageFooter;
+
+		struct player;
 
 		// Classes:
 		class networkEngine;
@@ -80,14 +84,22 @@ namespace iosync
 			static std::wstring path;
 
 			// Functions:
-			string wideStringToDefault(const wstring wstr)
+			static inline string wideStringToDefault(const wstring wstr)
 			{
 				return stringConverter.to_bytes(wstr);
 			}
 
-			wstring defaultStringToWide(const string str)
+			static inline wstring defaultStringToWide(const string str)
 			{
 				return stringConverter.from_bytes(str);
+			}
+
+			static inline void clearConsole()
+			{
+				// System-dependent, but it works.
+				system("CLS");
+
+				return;
 			}
 
 			// Constructor(s):
@@ -117,7 +129,24 @@ namespace iosync
 			virtual bool parseNetworkMessage(QSocket& socket, const messageHeader& header, const messageFooter& footer);
 
 			// Call-backs:
+
+			/*
+				This is called every time a client attempts to connect
+				to a remote host, without receiving a preliminary error.
+				
+				This is not called when servers receive player join-requests.
+				For that behavior, please use 'onNetworkClientConnected'.
+			*/
+
 			virtual void onNetworkConnected(networkEngine& engine);
+
+			// This is called any time a client/player connects to the network.
+			virtual void onNetworkClientConnected(networkEngine& engine, player& p);
+
+			// This is called whenever a client times out.
+			virtual void onNetworkClientTimedOut(networkEngine& engine, player& p);
+
+			// This is called when a network-engine is closed.
 			virtual void onNetworkClosed(networkEngine& engine);
 
 			// Fields:

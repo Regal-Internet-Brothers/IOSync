@@ -32,6 +32,9 @@ namespace iosync
 			virtual void removeReliablePacket(packetID ID) override;
 			virtual bool hasPacket(packetID ID) const override;
 
+			// This command outputs address-information to the 'os' stream.
+			virtual void outputAddressInfo(ostream& os, bool endLine=true);
+
 			// This will return a blank address if a "virtual address" could not be found.
 			// This is implementation dependent, if you wish to
 			// supply a "virtual/forward" address, please override this.
@@ -67,6 +70,7 @@ namespace iosync
 			virtual ~indirect_player();
 
 			// Methods:
+			virtual void outputAddressInfo(ostream& os, bool endLine=true) override;
 
 			// This will supply 'realAddress' to those who
 			// request the "virtual" address of this 'player'.

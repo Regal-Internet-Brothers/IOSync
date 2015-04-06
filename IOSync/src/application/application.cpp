@@ -5,6 +5,7 @@
 //#include "../networking/networking.h"
 //#include "../networking/networkEngine.h"
 #include "../networking/messages.h"
+#include "../networking/player.h"
 
 // Standard library:
 #include <sstream>
@@ -142,6 +143,16 @@ namespace iosync
 	// Please implement this method as you see fit.
 
 	void application::onNetworkConnected(networkEngine& engine)
+	{
+		return;
+	}
+
+	void application::onNetworkClientConnected(networkEngine& engine, player& p)
+	{
+		return;
+	}
+
+	void application::onNetworkClientTimedOut(networkEngine& engine, player& p)
 	{
 		return;
 	}
