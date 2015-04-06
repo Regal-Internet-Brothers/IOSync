@@ -357,6 +357,11 @@ namespace iosync
 			return sendMessage(this->socket, destination, resetLength);
 		}
 
+		bool networkEngine::hasRemoteConnection() const
+		{
+			return true;
+		}
+
 		// Reliable message related:
 		bool networkEngine::onReliableMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer, application* program)
 		{
@@ -723,8 +728,6 @@ namespace iosync
 
 					updateSnapshot();
 
-					cout << "Confirmed." << endl;
-
 					program->onNetworkConnected(*this);
 
 					break;
@@ -771,6 +774,11 @@ namespace iosync
 		size_t clientNetworkEngine::sendMessage(QSocket& socket, address remote, bool resetLength)
 		{
 			return (size_t)socket.sendMsg(remote.IP, remote.port, resetLength);
+		}
+
+		bool clientNetworkEngine::hasRemoteConnection() const
+		{
+			return connected;
 		}
 
 		// Parsing/deserialization related:
@@ -882,6 +890,11 @@ namespace iosync
 				socket.flushOutput();
 
 			return sent;
+		}
+
+		bool serverNetworkEngine::hasRemoteConnection() const
+		{
+			return hasPlayers();
 		}
 
 		// Reliable message related:

@@ -96,16 +96,23 @@ namespace iosync
 				if (action.type == ACTION_TYPE_HIT && (GetAsyncKeyState(action.key) & 0x8000) > 0)
 					action.type = ACTION_TYPE_RELEASE;
 
+				//cout << "Simuating key: " << action.key << ", " << action.type << " -- wScan: " << deviceAction.ki.wScan << endl;
+
+				nativeFlags extraFlags = 0;
+
+				if ((action.key >= 33 && action.key <= 46) || (action.key >= 91 && action.key <= 93))
+					extraFlags = KEYEVENTF_EXTENDEDKEY; // |=
+
 				switch (action.type)
 				{
 					case ACTION_TYPE_HIT:
-						sendNativeKeyboardInput(&deviceAction, KEYEVENTF_SCANCODE|KEYEVENTF_EXTENDEDKEY);
+						sendNativeKeyboardInput(&deviceAction, KEYEVENTF_SCANCODE|extraFlags); // KEYEVENTF_EXTENDEDKEY
 					case ACTION_TYPE_RELEASE:
-						sendNativeKeyboardInput(&deviceAction, KEYEVENTF_SCANCODE|KEYEVENTF_KEYUP|KEYEVENTF_EXTENDEDKEY);
+						sendNativeKeyboardInput(&deviceAction, KEYEVENTF_SCANCODE|KEYEVENTF_KEYUP|extraFlags); // KEYEVENTF_EXTENDEDKEY
 
 						break;
 					case ACTION_TYPE_DOWN:
-						sendNativeKeyboardInput(&deviceAction, KEYEVENTF_SCANCODE|KEYEVENTF_EXTENDEDKEY);
+						sendNativeKeyboardInput(&deviceAction, KEYEVENTF_SCANCODE|extraFlags); // KEYEVENTF_EXTENDEDKEY
 
 						break;
 				}
@@ -149,7 +156,7 @@ namespace iosync
 			if (canDetect)
 				flags |= FLAG_CAN_DETECT; // ^= FLAG_CAN_DETECT;
 
-			if (!canSimulate)
+			if (canSimulate)
 				flags |= FLAG_CAN_SIMULATE; // ^= FLAG_CAN_SIMULATE;
 		}
 
@@ -297,7 +304,7 @@ namespace iosync
 
 				actionQueue.push_back(keyboardAction((keyboardKey)rawDevice->data.keyboard.VKey, actionType));
 
-				cout << "Detected key: " << (char)rawDevice->data.keyboard.VKey << ", actionType: " << actionType << endl;
+				cout << "Detected key: " << rawDevice->data.keyboard.VKey << ", actionType: " << actionType << endl;
 
 				return;
 			}
