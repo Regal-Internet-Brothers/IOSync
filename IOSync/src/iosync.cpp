@@ -1,6 +1,10 @@
 // Includes:
 #include "iosync.h"
 
+// Standard library:
+#include <algorithm>
+#include <stack>
+
 // Namespace(s):
 namespace iosync
 {
@@ -147,6 +151,17 @@ namespace iosync
 			disconnect();
 		}
 
+		void connectedDevices::destroyKeyboard()
+		{
+			cout << "Attempting to destroy keyboard device-instance..." << endl;
+
+			delete keyboard; keyboard = nullptr;
+
+			cout << "Device-instance destroyed." << endl;
+
+			return;
+		}
+
 		// Methods:
 		void connectedDevices::update(iosync_application* program)
 		{
@@ -179,7 +194,7 @@ namespace iosync
 			switch (devType)
 			{
 				case DEVICE_TYPE_KEYBOARD:
-					if (!connectKeyboard(program))
+					if (connectKeyboard(program) == nullptr)
 					{
 						return false;
 					}
@@ -201,9 +216,12 @@ namespace iosync
 			switch (devType)
 			{
 				case DEVICE_TYPE_KEYBOARD:
-					if (!disconnectKeyboard())
+					if (!program->network->hasRemoteConnection())
 					{
-						return false;
+						if (!disconnectKeyboard())
+						{
+							return false;
+						}
 					}
 
 					break;
@@ -229,6 +247,13 @@ namespace iosync
 				keyboard = new kbd(program->allowDeviceDetection(), program->allowDeviceSimulation());
 
 				cout << "Keyboard instance created." << endl;
+			}
+
+			if (keyboard->connected())
+			{
+				cout << "Keyboard already connected, continuing anyway." << endl;
+
+				return keyboard;
 			}
 
 			cout << "Attempting to connect keyboard..." << endl;
@@ -454,11 +479,208 @@ namespace iosync
 
 	// iosync_application:
 
+	// Structures:
+	#ifdef IOSYNC_LIVE_COMMANDS
+		// applicationCommand:
+
+		// Constructor(s):
+		iosync_application::applicationCommand::applicationCommand(messageType msgData, programList programs)
+			: data(msgData), connectedPrograms(programs) { /* Nothing so far. */ }
+
+		iosync_application::applicationCommand::applicationCommand(inputStream inStream, programList programs) : connectedPrograms(programs)
+		{
+			// Read from the input-stream specified.
+			readFrom(inStream);
+		}
+
+		// Destructor(s):
+		// Nothing so far.
+
+		// Methods:
+		void iosync_application::applicationCommand::readFrom(inputStream in)
+		{
+			// Read from the input-stream.
+			in >> data;
+			//in.sync();
+
+			return;
+		}
+	#endif
+
 	// Global variable(s):
-	// Nothing so far.
+	#ifdef IOSYNC_LIVE_COMMANDS
+		iosync_application::programList iosync_application::commandTargets;
+		queue<iosync_application::applicationCommand> iosync_application::commandQueue;
+		
+		mutex iosync_application::commandMutex;
+		thread iosync_application::commandThread;
+
+		bool iosync_application::commandThreadRunning;
+	#endif
 
 	// Functions:
-	// Nothing so far.
+	#ifdef IOSYNC_LIVE_COMMANDS
+		void iosync_application::beginLocalCommandAccept()
+		{
+			commandMutex.lock();
+
+			// Make sure to set the "running" flag.
+			commandThreadRunning = true;
+
+			commandMutex.unlock();
+
+			acceptCommands();
+
+			return;
+		}
+
+		void iosync_application::acceptCommands()
+		{
+			while (commandThreadRunning)
+			{
+				// Local variable(s):
+
+				// Read the user's input from the standard input-stream:
+				applicationCommand command
+				(
+					wcin, programList(commandTargets.begin(), commandTargets.end())
+				);
+
+				// Lock the command-mutex.
+				commandMutex.lock();
+
+				// Remove finished commands.
+				pruneCommand(commandQueue);
+
+				// Add this command to the queue.
+				commandQueue.push(command);
+
+				// Unlock the command-mutex.
+				commandMutex.unlock();
+			}
+
+			return;
+		}
+		
+		bool iosync_application::openCommandThread(iosync_application* program)
+		{
+			// Lock the command-thread's mutex.
+			lock_guard<mutex> mutexLock(commandMutex);
+
+			commandTargets.push_back(program);
+
+			// Check if the thread is already running:
+			if (commandThreadRunning)
+				return true;
+
+			// Set the "running" flag to 'true'.
+			commandThreadRunning = true;
+
+			// Start the command-thread; the "running"
+			// flag must be set to 'true' beforehand.
+			commandThread = thread(acceptCommands);
+
+			// Return the default response.
+			return true;
+		}
+
+		bool iosync_application::closeCommandThread(iosync_application* program)
+		{
+			// Local variable(s):
+
+			// Lock the command-thread's mutex.
+			lock_guard<mutex> mutexLock(commandMutex);
+
+			commandTargets.remove(program);
+
+			checkThreadViability();
+
+			// Return the default response.
+			return true;
+		}
+
+		void iosync_application::forceCloseCommandThread()
+		{
+			// Local variable(s):
+
+			// Lock the command-thread's mutex.
+			lock_guard<mutex> mutexLock(commandMutex);
+
+			// Check if we're even running:
+			if (!commandThreadRunning)
+				return;
+
+			// Clear the list of command-targets.
+			commandTargets.clear();
+
+			// Check if this thread is still viable.
+			// The unsafe version is called because we alredy have the mutex locked.
+			checkThreadViability_unsafe();
+
+			return;
+		}
+
+		bool iosync_application::checkThreadViability()
+		{
+			// Local variable(s):
+
+			// Lock the command-thread's mutex.
+			lock_guard<mutex> mutexLock(commandMutex);
+
+			// Execute the main routine.
+			return checkThreadViability_unsafe();
+		}
+
+		bool iosync_application::checkThreadViability_unsafe()
+		{
+			// Check if the command-thread is running:
+			if (!commandThreadRunning)
+				return true;
+
+			// Check if something can still use this thread:
+			if (!commandTargets.empty())
+				return false;
+
+			commandThreadRunning = false;
+
+			// Detach the command-thread.
+			commandThread.detach();
+
+			return true; // (commandThreadRunning == false)
+		}
+	#endif
+
+	#ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
+		static stack<iosync_application*> asyncProgramStack;
+
+		static inline void pushAsyncApplication(iosync_application* program)
+		{
+			asyncProgramStack.push(program);
+
+			return;
+		}
+
+		static inline iosync_application* popAsyncApplication()
+		{
+			iosync_application* application = asyncProgramStack.top();
+
+			asyncProgramStack.pop();
+
+			return application;
+		}
+
+		void iosync_application::executeAsyncApplication()
+		{
+			if (asyncProgramStack.empty())
+				return;
+
+			auto program = popAsyncApplication();
+
+			program->execute();
+
+			return;
+		}
+	#endif
 
 	// Constructor(s):
 	iosync_application::iosync_application(rate updateRate, OSINFO OSInfo) : application(updateRate, OSInfo), network(nullptr)
@@ -528,16 +750,16 @@ namespace iosync
 				{
 					case MODE_CLIENT:
 						#ifndef IOSYNC_FAST_TESTMODE
-							cout << "Address: "; cin >> hostname; cout << endl;
+							cout << "Address: "; cin >> hostname; // cout << endl;
+							cout << "Port: "; cin >> port; // cout << endl;
 
-							cout << "Port: "; cin >> port; cout << endl;
-							cout << "Username: "; wcin >> username; cout << endl;
+							cout << "Username: "; wcin >> username; // cout << endl;
 						#endif
 
 						return execute(username, hostname, port);
 					case MODE_SERVER:
 						#ifndef IOSYNC_FAST_TESTMODE
-							cout << "Port: "; cin >> port; cout << endl;
+							cout << "Port: "; cin >> port; // cout << endl;
 						#endif
 
 						return execute(port);
@@ -591,9 +813,33 @@ namespace iosync
 		return responseCode;
 	}
 
+	#ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
+		void iosync_application::executeAsync()
+		{
+			#ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
+				asyncExecutionMutex.lock();
+			#endif
+
+			// Push this application to the top of the async-application stack.
+			pushAsyncApplication(this);
+
+			// Start the application asynchronously.
+			thread t = thread(executeAsyncApplication);
+
+			// Detach the application's thread.
+			t.detach();
+
+			return;
+		}
+	#endif
+
 	// The main creation routine.
 	void iosync_application::onCreate(applicationMode mode)
 	{
+		#ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
+			asyncExecutionMutex.unlock();
+		#endif
+
 		// Set the internal application-mode.
 		this->mode = mode;
 
@@ -603,6 +849,10 @@ namespace iosync
 		if (window == WINDOW_NONE)
 			throw noWindowException(this);
 
+		#ifdef IOSYNC_LIVE_COMMANDS
+			openCommandThread(this);
+		#endif
+
 		return;
 	}
 
@@ -611,6 +861,12 @@ namespace iosync
 		disconnectDevices();
 
 		closeNetwork();
+
+		//sharedWindow::close();
+
+		#ifdef IOSYNC_LIVE_COMMANDS
+			closeCommandThread(this);
+		#endif
 
 		return;
 	}
@@ -639,11 +895,15 @@ namespace iosync
 	// Update routines:
 	void iosync_application::update(rate frameNumber)
 	{
+		#ifdef IOSYNC_LIVE_COMMANDS
+			parseCommands();
+		#endif
+
 		updateDevices();
 
 		if (network != nullptr)
 			updateNetwork();
-		
+
 		return;
 	}
 
@@ -690,7 +950,7 @@ namespace iosync
 
 			// This still needs to be refactored; all system-messages
 			// are handled by this routine, and that can be problematic:
-			while (PeekMessage(&message, NULL, 0, 0, PM_REMOVE))
+			while (PeekMessage(&message, sharedWindow::windowInstance, 0, 0, PM_REMOVE)) // NULL
 			{
 				TranslateMessage(&message);
 
@@ -728,12 +988,46 @@ namespace iosync
 						break;
 				}
 
-				//DispatchMessage(&message);
+				DefWindowProc(sharedWindow::windowInstance, message.message, message.wParam, message.lParam);
+				DispatchMessage(&message);
 			}
 		#endif
 
 		return;
 	}
+
+	#ifdef IOSYNC_LIVE_COMMANDS
+		bool iosync_application::parseCommand(applicationCommand command)
+		{
+			wcout << L"This is a test: " << command.data << endl;
+
+			// Return the default response.
+			return true;
+		}
+		
+		void iosync_application::parseCommands()
+		{
+			// Local variable(s):
+			lock_guard<mutex> mutexLock(commandMutex);
+
+			while (!commandQueue.empty())
+			{
+				auto& connectedPrograms = commandQueue.front().connectedPrograms;
+
+				// Search for this object
+				if (find(connectedPrograms.begin(), connectedPrograms.end(), this) != connectedPrograms.end())
+				{
+					auto& command = commandQueue.front();
+
+					parseCommand(command);
+
+					command.connectedPrograms.remove(this);
+				}
+			}
+
+			return;
+		}
+	#endif
 
 	// Networking related:
 

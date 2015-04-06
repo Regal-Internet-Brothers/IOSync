@@ -213,6 +213,8 @@ namespace iosync
 				virtual size_t sendMessage(QSocket& socket, address remote, bool resetLength=true);
 				virtual size_t sendMessage(networkDestinationCode destination=DEFAULT_DESTINATION, bool resetLength=true);
 
+				virtual bool hasRemoteConnection() const;
+
 				// Reliable message related:
 
 				// This command is called every time a reliable message is found.
@@ -422,6 +424,8 @@ namespace iosync
 				size_t broadcastMessage(QSocket& socket, bool resetLength=true) override;
 				size_t sendMessage(QSocket& socket, address remote, bool resetLength=true) override;
 
+				bool hasRemoteConnection() const override;
+
 				inline bool timedOut() const
 				{
 					return networkEngine::timedOut(connection.connectionTime());
@@ -589,10 +593,17 @@ namespace iosync
 				}
 
 				// Player/connection management functionality:
+				bool hasRemoteConnection() const override;
+
 				inline bool timedOut(player* p)
 				{
 					// Call the super-class's implementation.
 					return networkEngine::timedOut(p->connectionTime());
+				}
+
+				inline bool hasPlayers() const
+				{
+					return !players.empty();
 				}
 
 				// This command allows you to retrieve a player-entry from the 'players' list.

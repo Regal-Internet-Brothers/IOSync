@@ -1,18 +1,27 @@
 /*
-	I/O Sync: Cross-system "local" multiplayer input handling, across the internet.
-	Using both nodes, and standalone clients, I/O Sync can provide low input-latency.
+	I/O Sync: Cross-system input events.
 
+	TODO Format:
+		X = Finished.
+		/ = Partially implemented.
+		* = On the bucket-list.
+		? = Unsure and/or partially implemented.
 	TODO:
 		X Keyboard integration. (Windows)
+		X Fix application-arguments for Windows "extended" builds.
+
+		/ Adjust network "metrics".
+
 		* Support for multi-threaded console input. (Commands, etc)
-		* Fix application-arguments for Windows "extended" builds.
 		* Options for button-hold timeouts. (In case of disconnection/other)
 		* XInput controller/gamepad integration. (Windows)
+
+		* Fix "const correctness" of some commands.
+
 		? Mouse integration.
 */
 
 // Preprocessor related:
-#define _CRT_SECURE_NO_WARNINGS
 
 // Includes:
 #include "iosync.h"
@@ -34,6 +43,46 @@ using namespace iosync::networking;
 using namespace iosync::devices;
 
 // Functions:
+#ifdef IOSYNC_LIVE_COMMAND_INPUT_ON_MAIN_THREAD
+iosync_application* runProgram(OSINFO OSInfo, rate updateRate=DEFAULT_UPDATERATE)
+#else
+int runProgram(OSINFO OSInfo, rate updateRate=DEFAULT_UPDATERATE)
+#endif
+{
+	#ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
+		iosync_application* program = new iosync_application(updateRate, OSInfo);
+		
+		program->executeAsync();
+
+		return program;
+	#else
+		auto program = iosync_application(updateRate, OSInfo);	
+		
+		try
+		{
+			// Execute the application:
+			auto responseCode = program.execute();
+
+			if (responseCode != 0)
+			{
+				cout << "Unable to continue operations, exiting..." << endl;
+				cout << "Error code thrown by application: " << responseCode << endl;
+
+				system("PAUSE");
+
+				// Return the response-code.
+				return responseCode;
+			}
+		}
+		catch (exception& e)
+		{
+			cout << "Exception: " << endl << endl << e.what() << endl;
+		}
+
+		return 0;
+	#endif
+}
+
 #ifdef PLATFORM_WINDOWS_EXTENSIONS
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 #else
@@ -97,31 +146,28 @@ int main(int argc, char** argv)
 		OSInfo = OSINFO(argc - 1, ((argc > 1) ? (argv + 1) : nullptr));
 	#endif
 
-	auto program = iosync_application(DEFAULT_UPDATERATE, OSInfo);
+	auto programData = runProgram(OSInfo, DEFAULT_UPDATERATE);
 
-	try
-	{
-		// Execute the application.
-		auto responseCode = program.execute();
+	#if defined(IOSYNC_LIVE_COMMANDS)
+		#if !defined(IOSYNC_LIVE_COMMAND_INPUT_ON_MAIN_THREAD)
+			// Ensure the the 'iosync_application' class's command-thread is closed.
+			iosync_application::forceCloseCommandThread();
+		#else // elif defined(IOSYNC_ALLOW_ASYNC_EXECUTE)
+			lock_guard<mutex> startLock(programData->asyncExecutionMutex);
 
-		if (responseCode != 0)
-		{
-			cout << "Unable to continue operations, exiting..." << endl;
-			cout << "Error code thrown by application: " << responseCode << endl;
-
-			system("PAUSE");
-
-			// Return the response-code.
-			return responseCode;
-		}
-	}
-	catch (exception& e)
-	{
-		cout << "Exception: " << endl << endl << e.what() << endl;
-	}
+			// Accept commands as the application runs on another thread.
+			iosync_application::beginLocalCommandAccept();
+		#endif
+	#endif
 
 	// Deinitialize networking functionality.
 	QSocket::deinitSockets();
 	
-	return 0;
+	#if defined(IOSYNC_LIVE_COMMAND_INPUT_ON_MAIN_THREAD)
+		delete programData;
+		
+		return 0;
+	#else
+		return programData;
+	#endif
 }

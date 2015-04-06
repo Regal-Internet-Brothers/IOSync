@@ -2,7 +2,21 @@
 
 // Preprocessor related:
 #define IOSYNC_TESTMODE
-#define IOSYNC_FAST_TESTMODE
+//#define IOSYNC_FAST_TESTMODE
+
+//#define IOSYNC_LIVE_COMMANDS
+
+/*
+#ifdef IOSYNC_LIVE_COMMANDS
+	#define IOSYNC_LIVE_COMMAND_INPUT_ON_MAIN_THREAD
+#endif
+*/
+
+#ifdef IOSYNC_LIVE_COMMAND_INPUT_ON_MAIN_THREAD
+	#define IOSYNC_ALLOW_ASYNC_EXECUTE
+#endif
+
+#define _CRT_SECURE_NO_WARNINGS
 
 // Includes:
 #include "exceptions.h"
@@ -17,6 +31,19 @@
 // Standard library:
 #include <string>
 #include <iostream>
+
+#ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
+	#include <mutex>
+	#include <thread>
+#endif
+
+#ifdef IOSYNC_LIVE_COMMANDS
+	#include <queue>
+	#include <vector>
+	
+	#include <thread>
+	#include <mutex>
+#endif
 
 // Namespace(s):
 using namespace std;
@@ -99,16 +126,7 @@ namespace iosync
 			// Destructor(s):
 			~connectedDevices();
 
-			inline void destroyKeyboard()
-			{
-				cout << "Attempting to destroy keyboard device-instance..." << endl;
-
-				delete keyboard; keyboard = nullptr;
-
-				cout << "Device-instance destroyed." << endl;
-
-				return;
-			}
+			void destroyKeyboard();
 
 			// Methods:
 			void update(iosync_application* program);
@@ -256,6 +274,9 @@ namespace iosync
 	class iosync_application : public application
 	{
 		public:
+			// Typedefs:
+			typedef list<iosync_application*> programList;
+
 			// Enumerator(s):
 			enum applicationModes : applicationMode
 			{
@@ -268,11 +289,85 @@ namespace iosync
 				MESSAGE_TYPE_DEVICE = networkEngine::messageTypes::MESSAGE_TYPE_CUSTOM_LOCATION,
 			};
 
+			// Structures:
+			#ifdef IOSYNC_LIVE_COMMANDS
+				struct applicationCommand
+				{
+					// Typedefs:
+					typedef wstring messageType;
+					typedef wistream& inputStream;
+
+					// Constructor(s):
+					applicationCommand(messageType msgData, programList programs=programList());
+
+					// This command will immediately read from the stream specified.
+					applicationCommand(inputStream inStream, programList programs);
+
+					// Destructor(s):
+					// Nothing so far.
+
+					// Methods:
+					void readFrom(inputStream in);
+
+					// Fields:
+					messageType data;
+					programList connectedPrograms;
+				};
+			#endif
+
 			// Global variable(s):
-			static bool sharedWindowOpen;
+			#ifdef IOSYNC_LIVE_COMMANDS
+				static programList commandTargets;
+				static queue<applicationCommand> commandQueue;
+				
+				static mutex commandMutex;
+				static thread commandThread;
+
+				static bool commandThreadRunning;
+			#endif
 
 			// Functions:
-			// Nothing so far.
+			#ifdef IOSYNC_LIVE_COMMANDS
+				static inline bool pruneCommand(queue<applicationCommand>& commandQueue)
+				{
+					if (!commandQueue.empty())
+					{
+						if (commandQueue.front().connectedPrograms.empty())
+						{
+							commandQueue.pop();
+
+							if (!commandQueue.empty())
+							{
+								pruneCommand(commandQueue);
+
+								return true;
+							}
+						}
+					}
+
+					return false;
+				}
+
+				// This command allows you to manually begin accepting
+				// user-commands, by surrendering the calling thread.
+				static void beginLocalCommandAccept();
+
+				static void acceptCommands();
+				static bool openCommandThread(iosync_application* program);
+				static bool closeCommandThread(iosync_application* program);
+				static void forceCloseCommandThread();
+
+				// This command closes the command-thread if no other applications are using it.
+				// This will return 'true' if it closed the thread, or if the thread was already closed.
+				static bool checkThreadViability();
+
+				// This is used internally for optimization purposes, please use 'checkThreadViability' instead.
+				static bool checkThreadViability_unsafe();
+			#endif
+
+			#ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
+				static void executeAsyncApplication();
+			#endif
 
 			// Constructor(s):
 			iosync_application(rate updateRate = DEFAULT_UPDATERATE, OSINFO OSInfo=OSINFO());
@@ -284,6 +379,10 @@ namespace iosync
 			int execute();
 			int execute(const addressPort port);
 			int execute(wstring username, string remoteAddress, addressPort remotePort = DEFAULT_PORT, addressPort localPort = DEFAULT_LOCAL_PORT);
+
+			#ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
+				void executeAsync();
+			#endif
 
 			void onCreate(applicationMode mode=MODE_SERVER);
 			void onClose();
@@ -297,6 +396,16 @@ namespace iosync
 			void updateDevices();
 
 			void checkDeviceMessages();
+
+			#ifdef IOSYNC_LIVE_COMMANDS
+				// This routine is commonly called through 'parseCommands'.
+				// Basically, this parses the live-command specified.
+				bool parseCommand(applicationCommand command);
+				
+				// This acts as this application's main routine for user-command parsing.
+				// To parse a single command, please use 'parseCommand'.
+				void parseCommands();
+			#endif
 
 			// Networking related:
 
@@ -351,5 +460,9 @@ namespace iosync
 
 			// The window this application is tied to.
 			nativeWindow window;
+
+			#ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
+				mutex asyncExecutionMutex;
+			#endif
 	};
 }
