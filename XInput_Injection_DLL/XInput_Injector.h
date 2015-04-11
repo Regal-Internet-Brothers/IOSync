@@ -3,8 +3,6 @@
 // Preprocessor related:
 #define GAMEPAD_EXTERNAL_ORIGIN
 
-#define _CRT_SECURE_NO_WARNINGS
-
 // XInput macros:
 #define XINPUT_DEVTYPE_GAMEPAD			0x01
 #define XINPUT_DEVSUBTYPE_GAMEPAD		0x01

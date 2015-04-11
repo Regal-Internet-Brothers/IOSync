@@ -13,11 +13,11 @@ namespace REAL_XINPUT
 	// Functions:
 	VOID linkTo(HMODULE hDLL);
 	
-	// The 'MASTER_DLL' argument specifies if this routine
+	// The 'resolveSystemPath' argument specifies if this routine
 	// should add the system-directory to the path.
-	HMODULE linkTo(LPCSTR DLL_Location, BOOL MASTER_DLL=FALSE);
+	HMODULE linkTo(LPCSTR DLL_Location, BOOL resolveSystemPath=FALSE);
 
-	HMODULE linkTo(BOOL MASTER_DLL=FALSE);
+	HMODULE linkTo(BOOL resolveSystemPath=FALSE);
 
 	VOID WINAPI XInputEnable(BOOL enable);
 	DWORD WINAPI XInputSetState(DWORD dwUserIndex, PXINPUT_VIBRATION pVibration);

@@ -1206,9 +1206,9 @@ namespace iosync
 								port = portFromInput(cin); // cout << endl;
 							#endif
 
-							DWORD PID; cout << "Please specify a PID: "; cin >> PID;
+							DWORD PID; cout << "Please specify a PID to apply XInput injection (0 = None): "; cin >> PID;
 
-							devices::gamepad::__winnt__injectLibrary(PID, x64); // x86
+							devices::gamepad::__winnt__injectLibrary(PID);
 						}
 
 						//clearConsole();
