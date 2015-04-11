@@ -2,19 +2,36 @@
 
 // Includes:
 #include "../platform.h"
-#include "../networking/networking.h"
+#include "../networking/forwardSocket.h"
+
+// Standard library:
+#include <iostream>
+
+// Preprocessor related:
+
+// Output-stream macros:
+#define deviceNetInfoStream std::cout
+#define wdeviceNetInfoStream std::wcout
+
+#define deviceInfoStream std::cout
+#define wdeviceInfoStream std::wcout
+
+#define deviceNetInfo std::cout << "{NETWORK} {DEVICE}: " // networkInfo
+#define wdeviceNetInfo std::wcout << L"{NETWORK} {DEVICE}: "
+
+#define deviceInfo std::cout << "{DEVICE}: "
+#define wdeviceInfo std::wcout << L"{DEVICE}: "
 
 // Namespace(s):
 namespace iosync
 {
-	// Forward declarations:
 	class application;
 
 	// Namespace(s):
 	namespace devices
 	{
 		// Namespace(s):
-		using namespace iosync::networking;
+		using namespace quickLib::sockets;
 
 		// Typedefs:
 		typedef unsigned int deviceFlags;
@@ -91,8 +108,15 @@ namespace iosync
 				virtual ~deviceManager();
 
 				// Methods:
-				virtual bool connect() = 0;
-				virtual bool disconnect() = 0;
+
+				// You must provide implementations of these, however,
+				// default implementations are available if you wish to call them.
+				// "Reconnection" and/or multiple "disconnects" must be handled by inheriting classes/structures.
+				// In other words, the default implementations do not handle safety checks.
+				// Under normal circumstances, you should "call up" to these implementations when finished:
+
+				virtual bool connect(); // = 0;
+				virtual bool disconnect(); // = 0;
 
 				virtual bool autoDisconnect();
 				virtual bool autoConnect();
@@ -208,6 +232,7 @@ namespace iosync
 				// Constructor(s):
 				IODevice();
 				IODevice(deviceFlags flagsToAdd);
+				IODevice(bool canDetect, bool canSimulate, deviceFlags flagsToAdd);
 
 				// Destructor(s):
 				// Nothing so far.

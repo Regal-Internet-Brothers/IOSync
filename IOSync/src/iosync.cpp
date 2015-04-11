@@ -2,7 +2,6 @@
 #include "iosync.h"
 
 // Standard library:
-#include <algorithm>
 #include <stack>
 
 // Namespace(s):
@@ -142,7 +141,8 @@ namespace iosync
 		// Constructor(s):
 		connectedDevices::connectedDevices() : keyboard(nullptr)
 		{
-			// Nothing so far.
+			for (auto i = 0; i < MAX_GAMEPADS; i++)
+				gamepads[i] = nullptr;
 		}
 
 		// Destructor(s):
@@ -162,11 +162,109 @@ namespace iosync
 			return;
 		}
 
+		void connectedDevices::destroyGamepad(gp* pad, bool checkArray)
+		{
+			delete pad;
+
+			if (checkArray)
+			{
+				for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
+				{
+					if (gamepads[i] == pad)
+					{
+						gamepads[i] = nullptr;
+
+						break;
+					}
+				}
+			}
+
+			return;
+		}
+
+		void connectedDevices::destroyGamepad(gamepadID identifier)
+		{
+			deviceInfo << "Attempting to destroy gamepad device-instance..." << endl;
+
+			destroyGamepad(gamepads[identifier], false); gamepads[identifier] = nullptr;
+
+			deviceInfo << "Device-instance destroyed." << endl;
+
+			return;
+		}
+
 		// Methods:
 		void connectedDevices::update(iosync_application* program)
 		{
+			updateKeyboard(program);
+			updateGamepads(program);
+
+			return;
+		}
+
+		void connectedDevices::updateKeyboard(iosync_application* program)
+		{
 			if (keyboardConnected())
 				keyboard->update(program);
+
+			return;
+		}
+
+		void connectedDevices::updateGamepads(iosync_application* program)
+		{
+			#if defined(XINPUT_DEVICE_GAMEPAD) && defined(XINPUT_DEVICE_GAMEPAD_AUTODETECT)
+				// Check if we're detecting gamepads:
+				if (program->allowDeviceDetection())
+				{
+					// Check for state changes:
+					for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
+					{
+						bool connected = gamepadConnected(i);
+
+						if (!connected && gamepadReserved(i))
+						{
+							continue;
+						}
+
+						// Check if a gamepad with the 'i' identifier is connected:
+						if (!connected)
+						{
+							if (gp::__winnt__pluggedIn(i))
+							{
+								// Tell the remote host that a gamepad was connected.
+								sendGamepadConnectMessage(*program->network, program->network->socket, DESTINATION_HOST);
+
+								//sendGamepadConnectMessage(*program->network, program->network->socket, i, DESTINATION_HOST);
+
+								// Add this identifier, so we don't bother trying to connect with it redundantly.
+								reservedGamepads.insert(i);
+							}
+						}
+						else
+						{
+							// Check for a real device-disconnection:
+							if (!gamepads[i]->connected_real()) // gp::__winnt__pluggedIn(i)
+							{
+								// Attempt to disconnect the virtual device:
+								if (disconnectLocalGamepad(program, i))
+								{
+									// Disconnection was successful, tell the remote host.
+									sendGamepadDisconnectMessage(*program->network, program->network->socket, i, DESTINATION_HOST);
+
+									// Remove this identifier, so it may be used again.
+									reservedGamepads.erase(i);
+								}
+							}
+						}
+					}
+				}
+			#endif
+
+			for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
+			{
+				if (gamepadConnected(i))
+					gamepads[i]->update(program);
+			}
 
 			return;
 		}
@@ -175,6 +273,7 @@ namespace iosync
 		{
 			// Connect all devices:
 			connectKeyboard(program);
+			connectGamepads(program);
 
 			return;
 		}
@@ -187,71 +286,81 @@ namespace iosync
 			return;
 		}
 
-		bool connectedDevices::connectDevice(deviceType devType, iosync_application* program)
+		void connectedDevices::onGamepadConnected(iosync_application* program, gp* pad)
 		{
-			deviceInfo << "Connecting device (Type: " << isprint(devType) << ")..." << endl;
+			#ifdef PLATFORM_WINDOWS
+				if (program->allowDeviceSimulation())
+					gp::__winnt__activateGamepad(pad->localGamepadNumber);
+			#endif
 
-			switch (devType)
-			{
-				case DEVICE_TYPE_KEYBOARD:
-					if (connectKeyboard(program) == nullptr)
-					{
-						return false;
-					}
-
-					break;
-				default:
-					// This device-type is not supported.
-					return false;
-			}
-
-			// Return the default response.
-			return true;
+			return;
 		}
 
-		bool connectedDevices::disconnectDevice(deviceType devType, iosync_application* program)
+		void connectedDevices::onGamepadDisconnected(iosync_application* program, gp* pad)
 		{
-			if (!program->networkingEnabled() || !program->network->hasRemoteConnection())
-			{
-				deviceInfo << "Disconnecting device (Type: " << isprint(devType) << ")..." << endl;
-
-				switch (devType)
+			#ifdef PLATFORM_WINDOWS
+				if (program->allowDeviceSimulation())
 				{
-					case DEVICE_TYPE_KEYBOARD:
-						if (!disconnectKeyboard())
-						{
-							return false;
-						}
+					gp::__winnt__deactivateGamepad(pad->localGamepadNumber);
 
-						break;
-					default:
-						// This device-type is not supported.
-						return false;
+					// We don't have any gamepads connected,
+					// close the shared memory segment:
+					if (!hasGamepadConnected())
+						gp::__winnt__closeSharedMemory();
 				}
-			}
-			else
+			#endif
+
+			return;
+		}
+
+		bool connectedDevices::disconnectLocalGamepad(iosync_application* program, gamepadID identifier)
+		{
+			if (gamepads[identifier]->disconnect())
 			{
-				deviceNetInfo << "Disconnection request rejected; other players may desire to use it." << endl;
+				// Execute the gamepad disconnection call-back.
+				onGamepadDisconnected(program, gamepads[identifier]);
+
+				destroyGamepad(identifier);
+
+				return true;
 			}
 
 			// Return the default response.
-			return true;
+			return false;
+		}
+
+		// This will disconnect a gamepad using its "remote-identifier".
+		// To use a local/"real" identifier, please use 'disconnectLocalGamepad'.
+		bool connectedDevices::disconnectGamepad(iosync_application* program, gamepadID identifier)
+		{
+			for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
+			{
+				if (!gamepadConnected(i))
+					continue;
+
+				if (gamepads[i]->remoteGamepadNumber == identifier)
+				{
+					return disconnectLocalGamepad(program, identifier);
+				}
+			}
+
+			// Return the default response.
+			return false;
 		}
 
 		kbd* connectedDevices::connectKeyboard(iosync_application* program)
 		{
-			// Check if we need to create a new keyboard:
+			// Check if we need to create a new 'gp' object:
 			if (keyboard == nullptr)
 			{
 				deviceInfo << "Attempting to create keyboard-instance..." << endl;
 
-				// Allocate a new keyboard on the heap.
+				// Allocate a new 'kbd' on the heap.
 				keyboard = new kbd(program->allowDeviceDetection(), program->allowDeviceSimulation());
 
 				deviceInfo << "Keyboard-instance created." << endl;
 			}
-
-			if (keyboard->connected())
+			else if (keyboard->connected())
 			{
 				deviceInfo << "Keyboard already connected, continuing anyway..." << endl;
 
@@ -280,7 +389,222 @@ namespace iosync
 			return keyboard;
 		}
 
+		gamepad* connectedDevices::connectGamepad(iosync_application* program, gamepadID identifier, gamepadID remoteIdentifier)
+		{
+			// Check if we need to create a new 'gp' object:
+			if (gamepads[identifier] == nullptr)
+			{
+				#ifdef PLATFORM_WINDOWS
+					if (program->allowDeviceSimulation())
+					{
+						if (!gp::__winnt__autoOpenSharedMemory())
+							return nullptr;
+					}
+				#endif
+
+				deviceInfo << "Attempting to create gamepad-instance..." << endl;
+
+				// Allocate a new 'gp' on the heap.
+				gamepads[identifier] = new gp(identifier, remoteIdentifier, program->allowDeviceDetection(), program->allowDeviceSimulation());
+
+				deviceInfo << "Gamepad-instance created." << endl;
+			}
+			else if (gamepads[identifier]->connected())
+			{
+				deviceInfo << "Gamepad already connected, continuing anyway..." << endl;
+
+				return gamepads[identifier];
+			}
+
+			deviceInfo << "Attempting to connect gamepad-device..." << endl;
+
+			// Attempt to connect our gamepad:
+			if (!gamepads[identifier]->connect())
+			{
+				deviceInfo << "Failed to connect gamepad, destroying device-instance..." << endl;
+
+				// We couldn't connect it, destroy the object.
+				destroyGamepad(identifier);
+
+				deviceInfo << "Device-instance destroyed." << endl;
+
+				// Tell the user we couldn't connect it.
+				return nullptr;
+			}
+
+			onGamepadConnected(program, gamepads[identifier]);
+
+			deviceInfo << "Gamepad connected." << endl;
+
+			// Return the newly connected 'gamepad' object to the user.
+			return gamepads[identifier];
+		}
+
+		gamepad* connectedDevices::connectGamepad(iosync_application* program, gamepadID remoteIdentifier)
+		{
+			// Local variable(s):
+
+			// Get the next gamepad identifier.
+			auto identifier = getNextGamepadID(program->allowDeviceSimulation());
+
+			// Check if we can connect this device:
+			if (identifier == GAMEPAD_ID_NONE)
+			{
+				// We are unable to connect more gamepads.
+				return nullptr;
+			}
+
+			return connectGamepad(program, identifier, remoteIdentifier);
+		}
+
+		// This implementation is commonly used by servers.
+		gamepad* connectedDevices::connectGamepad(iosync_application* program)
+		{
+			// Local variable(s):
+
+			// Get the next gamepad identifier.
+			auto identifier = getNextGamepadID(program->allowDeviceSimulation());
+
+			// Check if we can connect this device:
+			if (identifier == GAMEPAD_ID_NONE)
+			{
+				// We are unable to connect more gamepads.
+				return nullptr;
+			}
+
+			return connectGamepad(program, identifier, identifier);
+		}
+
 		// Networking related:
+		bool connectedDevices::connectDeviceThroughNetwork(iosync_application* program, QSocket& socket, deviceType devType, bool extended)
+		{
+			deviceInfo << "Connecting device (Type: " << (unsigned short)devType << ")..." << endl;
+
+			switch (devType)
+			{
+				case DEVICE_TYPE_KEYBOARD:
+					if (connectKeyboard(program) == nullptr)
+					{
+						return false;
+					}
+
+					if (program->mode == iosync_application::MODE_SERVER)
+					{
+						sendConnectMessage(*program->network, socket, devType, DESTINATION_REPLY);
+					}
+
+					break;
+				case DEVICE_TYPE_GAMEPAD:
+					{
+						gamepadID identifier;
+
+						if (extended)
+						{
+							identifier = (gamepadID)socket.read<serializedGamepadID>();
+							bool remotelyConnected = remoteGamepadConnected(identifier);
+
+							if (program->allowDeviceDetection() && remotelyConnected)
+							{
+								reservedGamepads.erase(identifier);
+							}
+
+							if (remotelyConnected)
+							{
+								sendGamepadDisconnectMessage(*program->network, socket, identifier, DESTINATION_REPLY);
+
+								return false;
+							}
+						}
+						else
+						{
+							identifier = getNextGamepadID(program->allowDeviceSimulation());
+						}
+
+						if (identifier == GAMEPAD_ID_NONE)
+						{
+							return false;
+						}
+
+						// Connect a gamepad using the identifier specified.
+						if (!connectGamepad(program, identifier))
+						{
+							return false;
+						}
+
+						if (program->mode == iosync_application::MODE_SERVER)
+						{
+							sendGamepadConnectMessage(*program->network, socket, identifier, DESTINATION_REPLY);
+						}
+					}
+
+					break;
+				default:
+					// This device-type is not supported.
+					return false;
+			}
+
+			// Return the default response.
+			return true;
+		}
+
+		bool connectedDevices::disconnectDeviceThroughNetwork(iosync_application* program, QSocket& socket, deviceType devType, bool extended)
+		{
+			if (!program->networkingEnabled() || !program->network->hasRemoteConnection())
+			{
+				deviceInfo << "Disconnecting device (Type: " << isprint(devType) << ")..." << endl;
+
+				bool sendDefaultMessage = true;
+
+				switch (devType)
+				{
+					case DEVICE_TYPE_KEYBOARD:
+						if (!disconnectKeyboard())
+						{
+							return false;
+						}
+
+						break;
+					case DEVICE_TYPE_GAMEPAD:
+						{
+							auto identifier = (gamepadID)socket.read<serializedGamepadID>();
+
+							if (program->allowDeviceDetection() && !remoteGamepadConnected(identifier))
+							{
+								reservedGamepads.insert(identifier);
+
+								return true; // false;
+							}
+
+							if (!disconnectGamepad(program, identifier))
+							{
+								return false;
+							}
+
+							sendDefaultMessage = false;
+
+							sendGamepadDisconnectMessage(*program->network, socket, identifier, DESTINATION_ALL);
+						}
+
+						break;
+					default:
+						// This device-type is not supported.
+						return false;
+				}
+
+				if (sendDefaultMessage)
+				{
+					sendDisconnectMessage(*program->network, socket, devType, DESTINATION_ALL);
+				}
+			}
+			else
+			{
+				deviceNetInfo << "Disconnection request rejected; other players may desire to use it." << endl;
+			}
+
+			// Return the default response.
+			return true;
+		}
+
 		headerInfo connectedDevices::beginDeviceMessage(networkEngine& engine, QSocket& socket, deviceType devType)
 		{
 			headerInfo info = engine.beginMessage(socket, iosync_application::MESSAGE_TYPE_DEVICE);
@@ -296,6 +620,9 @@ namespace iosync
 			if (keyboardConnected())
 				serializeKeyboard(engine, socket);
 
+			// Serialize every connected 'gamepad'.
+			serializeGamepads(engine, socket);
+
 			return;
 		}
 
@@ -303,7 +630,18 @@ namespace iosync
 		{
 			auto headerInformation = beginDeviceMessage(engine, socket, DEVICE_TYPE_KEYBOARD, DEVICE_NETWORK_MESSAGE_ENTRIES);
 
-			serializeKeyboardActions(socket);
+			serializeIODevice(socket, keyboard);
+
+			engine.finishMessage(socket, headerInformation);
+
+			return;
+		}
+
+		void connectedDevices::serializeGamepad(networkEngine& engine, QSocket& socket, gamepadID identifier, gamepadID remoteIdentifier)
+		{
+			auto headerInformation = beginGamepadDeviceMessage(engine, socket, remoteIdentifier, DEVICE_NETWORK_MESSAGE_ENTRIES);
+
+			serializeIODevice(socket, gamepads[identifier]);
 
 			engine.finishMessage(socket, headerInformation);
 
@@ -312,22 +650,40 @@ namespace iosync
 
 		void connectedDevices::serializeConnectMessage(QSocket& socket, deviceType device)
 		{
-			socket.write<deviceType>(device);
+			// Mark this message as non-extension based.
+			socket.writeBool(false);
 
 			return;
 		}
 
 		void connectedDevices::serializeDisconnectMessage(QSocket& socket, deviceType device)
 		{
-			socket.write<deviceType>(device);
+			// Mark this message as non-extension based.
+			socket.writeBool(false);
 
 			return;
 		}
 
-		void connectedDevices::serializeKeyboardActions(QSocket& socket)
+		void connectedDevices::serializeGamepadConnectMessage(QSocket& socket, gamepadID identifier)
+		{
+			// Mark this message as extension based.
+			socket.writeBool(true);
+
+			return;
+		}
+
+		void connectedDevices::serializeGamepadDisconnectMessage(QSocket& socket, gamepadID identifier)
+		{
+			// Mark this message as extension based.
+			socket.writeBool(true);
+
+			return;
+		}
+
+		void connectedDevices::serializeIODevice(QSocket& socket, IODevice* device)
 		{
 			// Write the keyboard's action-queue to the output.
-			keyboard->writeTo(socket);
+			device->writeTo(socket);
 
 			return;
 		}
@@ -351,6 +707,24 @@ namespace iosync
 			return engine.finishReliableMessage(socket, realAddress, headerInformation, forwardAddress);
 		}
 
+		outbound_packet connectedDevices::generateGamepadConnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address realAddress, address forwardAddress)
+		{
+			auto headerInformation = beginGamepadDeviceMessage(engine, socket, identifier, DEVICE_NETWORK_MESSAGE_CONNECT);
+
+			serializeGamepadConnectMessage(socket, identifier);
+
+			return engine.finishReliableMessage(socket, realAddress, headerInformation, forwardAddress);
+		}
+
+		outbound_packet connectedDevices::generateGamepadDisconnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address realAddress, address forwardAddress)
+		{
+			auto headerInformation = beginGamepadDeviceMessage(engine, socket, identifier, DEVICE_NETWORK_MESSAGE_DISCONNECT);
+
+			serializeGamepadDisconnectMessage(socket, identifier);
+
+			return engine.finishReliableMessage(socket, realAddress, headerInformation, forwardAddress);
+		}
+
 		// Parsing/deserialization related:
 		deviceType connectedDevices::parseDeviceMessage(iosync_application* program, QSocket& socket, const messageHeader& header, const messageFooter& footer)
 		{
@@ -367,51 +741,46 @@ namespace iosync
 				case DEVICE_NETWORK_MESSAGE_CONNECT:
 					deviceNetInfo << "Discovered device-connection request, parsing..." << endl;
 
-					if (parseConnectMessage(program, socket, header, footer))
+					if (parseConnectMessage(program, socket, devType, header, footer))
 					{
 						deviceNetInfo << "Parsing operations complete." << endl;
 
+						deviceNetInfo << "Device connected successfully";
+
 						switch (program->mode)
 						{
-							case iosync_application::MODE_SERVER:
-								deviceNetInfo << "Sending device-connection notification to client..." << endl;
-
-								sendConnectMessage(*(program->network), socket, devType, DESTINATION_REPLY);
-
-								deviceNetInfo << "Sending operations complete." << endl;
-
-								break;
 							case iosync_application::MODE_CLIENT:
-								deviceNetInfo << "Device connected successfully, as the remote host intended." << endl;
+								deviceNetInfoStream << ", as the remote host intended";
+							default:
+								deviceNetInfoStream << ".";
 
 								break;
 						}
+
+						deviceNetInfoStream << endl;
 					}
 
 					break;
 				case DEVICE_NETWORK_MESSAGE_DISCONNECT:
 					deviceNetInfo << "Discovered device-disconnection request, parsing..." << endl;
 
-					if (parseDisconnectMessage(program, socket, header, footer))
+					if (parseDisconnectMessage(program, socket, devType, header, footer))
 					{
 						deviceNetInfo << "Parsing operations complete." << endl;
 
+						deviceNetInfo << "Device disconnected successfully";
+
 						switch (program->mode)
 						{
-							case iosync_application::MODE_SERVER:
-								deviceNetInfo << "Sending device-disconnection notification to clients..." << endl;
-
-								// Tell everyone this device has been disconnected.
-								sendDisconnectMessage(*(program->network), socket, devType, DESTINATION_ALL);
-
-								deviceNetInfo << "Sending operations complete." << endl;
-
-								break;
 							case iosync_application::MODE_CLIENT:
-								deviceNetInfo << "Device disconnected successfully, as the remote host intended." << endl;
+								deviceNetInfoStream << ", as the remote host intended";
+							default:
+								deviceNetInfoStream << ".";
 
 								break;
 						}
+
+						deviceNetInfoStream << endl;
 					}
 
 					break;
@@ -428,6 +797,11 @@ namespace iosync
 
 							// The keyboard wasn't connected, tell the user.
 							return DEVICE_TYPE_NOT_FOUND;
+						case DEVICE_TYPE_GAMEPAD:
+							if (parseGamepadMessage(program, socket, subMessageType, header, footer) == DEVICE_NETWORK_MESSAGE_INVALID)
+							{
+								return DEVICE_TYPE_NOT_FOUND;
+							}
 						default:
 							// Tell the user we couldn't find a device.
 							return DEVICE_TYPE_NOT_FOUND;
@@ -438,18 +812,26 @@ namespace iosync
 			return devType;
 		}
 
-		bool connectedDevices::parseConnectMessage(iosync_application* program, QSocket& socket, const messageHeader& header, const messageFooter& footer)
+		bool connectedDevices::parseConnectMessage(iosync_application* program, QSocket& socket, deviceType device, const messageHeader& header, const messageFooter& footer)
 		{
-			auto device = socket.read<deviceType>();
+			// Local variable(s):
 
-			return connectDevice(device, program);
+			// Check if this message is relying upon device-specific extensions.
+			auto extended = socket.readBool();
+
+			// Connect the device specified, then return the connection-response.
+			return connectDeviceThroughNetwork(program, socket, device, extended);
 		}
 
-		bool connectedDevices::parseDisconnectMessage(iosync_application* program, QSocket& socket, const messageHeader& header, const messageFooter& footer)
+		bool connectedDevices::parseDisconnectMessage(iosync_application* program, QSocket& socket, deviceType device, const messageHeader& header, const messageFooter& footer)
 		{
-			auto device = socket.read<deviceType>();
+			// Local variable(s):
 
-			return disconnectDevice(device, program);
+			// Check if this message is relying upon device-specific extensions.
+			auto extended = socket.readBool();
+
+			// Disconnect the device specified, then return the disconnection-response.
+			return disconnectDeviceThroughNetwork(program, socket, device, extended);
 		}
 
 		deviceMessageType connectedDevices::parseKeyboardMessage(iosync_application* program, QSocket& socket, deviceMessageType subMessageType, const messageHeader& header, const messageFooter& footer)
@@ -457,23 +839,50 @@ namespace iosync
 			switch (subMessageType)
 			{
 				case DEVICE_NETWORK_MESSAGE_ENTRIES:
-					parseKeyboardActions(program, socket, header, footer);
+					parseIODevice(program, socket, keyboard, header, footer);
 
 					break;
 				default:
 					// This sub-message type is unsupported, skip it.
 					clog << "Invalid keyboard network-message detected." << endl;
 
-					break;
+					return DEVICE_NETWORK_MESSAGE_INVALID;
 			}
 
 			// Tell the user what kind of message this was.
 			return subMessageType;
 		}
 
-		void connectedDevices::parseKeyboardActions(iosync_application* program, QSocket& socket, const messageHeader& header, const messageFooter& footer)
+		deviceMessageType connectedDevices::parseGamepadMessage(iosync_application* program, QSocket& socket, deviceMessageType subMessageType, const messageHeader& header, const messageFooter& footer)
 		{
-			keyboard->readFrom(socket);
+			// Local variable(s):
+
+			// Read the identifier of the incoming 'gamepad'.
+			gamepadID remoteIdentifier = (gamepadID)socket.read<serializedGamepadID>();
+			gp* pad = getGamepad(remoteIdentifier);
+
+			if (pad == nullptr)
+				return DEVICE_NETWORK_MESSAGE_INVALID;
+
+			switch (subMessageType)
+			{
+				case DEVICE_NETWORK_MESSAGE_ENTRIES:
+					parseIODevice(program, socket, pad, header, footer);
+
+					break;
+				default:
+					// This sub-message type is unsupported, skip it.
+					clog << "Invalid gamepad network-message detected." << endl;
+
+					return DEVICE_NETWORK_MESSAGE_INVALID;
+			}
+
+			return subMessageType;
+		}
+
+		void connectedDevices::parseIODevice(iosync_application* program, QSocket& socket, IODevice* device, const messageHeader& header, const messageFooter& footer)
+		{
+			device->readFrom(socket);
 
 			return;
 		}
@@ -754,8 +1163,6 @@ namespace iosync
 				string hostname = "127.0.0.1";
 				nativePort port = DEFAULT_PORT;
 
-				string::size_type separatorPosition;
-
 				//cout << endl;
 
 				cout << "Application mode (" << MODE_CLIENT << " = Client, " << MODE_SERVER << " = Server): "; cin >> mode; //cout << endl;
@@ -764,25 +1171,29 @@ namespace iosync
 				{
 					case MODE_CLIENT:
 						#ifndef IOSYNC_FAST_TESTMODE
-							cout << "Please supply a hostname: "; cin >> hostname; // cout << endl;
-
-							separatorPosition = hostname.find(networking::ADDRESS_SEPARATOR);
-
-							if (separatorPosition != string::npos && separatorPosition < hostname.length())
 							{
-								port = portFromString(hostname.substr(separatorPosition+1));
+								string::size_type separatorPosition;
 
-								hostname = hostname.substr(0, separatorPosition);
+								cout << "Please supply a hostname: "; cin >> hostname; // cout << endl;
+
+								separatorPosition = hostname.find(networking::ADDRESS_SEPARATOR);
+
+								if (separatorPosition != string::npos && separatorPosition < hostname.length())
+								{
+									port = portFromString(hostname.substr(separatorPosition+1));
+
+									hostname = hostname.substr(0, separatorPosition);
+								}
+								else
+								{
+									string portStr;
+
+									cout << "Please supply a remote-port: ";
+									port = portFromInput(cin); // cout << endl;
+								}
+
+								cout << "Please enter a username (No spaces): "; wcin >> username; // cout << endl;
 							}
-							else
-							{
-								string portStr;
-
-								cout << "Please supply a remote-port: ";
-								port = portFromInput(cin); // cout << endl;
-							}
-
-							cout << "Please enter a username (No spaces): "; wcin >> username; // cout << endl;
 						#endif
 
 						//clearConsole();
@@ -794,6 +1205,10 @@ namespace iosync
 								cout << "Please enter a port to host with: ";
 								port = portFromInput(cin); // cout << endl;
 							#endif
+
+							DWORD PID; cout << "Please specify a PID: "; cin >> PID;
+
+							devices::gamepad::__winnt__injectLibrary(PID, x64); // x86
 						}
 
 						//clearConsole();
@@ -1108,7 +1523,7 @@ namespace iosync
 
 		// Tell the host to connect the devices we have.
 		// If they accept, we will receive messages to connect our devices.
-		devices.sendConnectMessages(engine, DESTINATION_HOST);
+		devices.sendConnectionRequests(engine, DESTINATION_HOST);
 
 		return;
 	}

@@ -93,7 +93,7 @@ namespace iosync
 			// Functions:
 			static inline packetSize_t getRelativeLocation(QSocket& socket, streamLocation origin)
 			{
-				return (socket.writeOffset-origin);
+				return (packetSize_t)(socket.writeOffset-origin);
 			}
 
 			static inline bool markSize(QSocket& socket, streamLocation position, packetSize_t size)

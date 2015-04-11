@@ -575,7 +575,7 @@ namespace iosync
 		// Nothing so far.
 
 		// Serialization related:
-		void networkEngine::serializePlayerConnectionMessage(QSocket& socket, wstring name)
+		void networkEngine::serializeConnectionMessage(QSocket& socket, wstring name)
 		{
 			// Write the namne of the connecting player.
 			socket.writeWideString(name);
@@ -645,7 +645,7 @@ namespace iosync
 			if (connection.name.size() == 0)
 				connection.name = L"Unknown";
 
-			sendPlayerConnectionMessage(socket, connection.name, DESTINATION_HOST);
+			sendConnectionMessage(socket, connection.name, DESTINATION_HOST);
 
 			return true;
 		}
@@ -982,7 +982,7 @@ namespace iosync
 				switch (header.type)
 				{
 					case MESSAGE_TYPE_JOIN:
-						parsePlayerConnectionMessage(socket, remoteAddress, header, footer);
+						parseConnectionMessage(socket, remoteAddress, header, footer);
 
 						return true;
 					case MESSAGE_TYPE_CONFIRM_PACKET:
@@ -1035,45 +1035,55 @@ namespace iosync
 		}
 
 		// Parsing/deserialization related:
-		bool serverNetworkEngine::parsePlayerConnectionMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
+		bool serverNetworkEngine::parseConnectionMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Local variable(s):
 			player* p;
 
 			bool response;
+			connectionType type;
 
-			if (remoteAddress != socket)
+			type = CONNECTION_TYPE_PLAYER; // socket.read<connectionType>();
+
+			switch (type)
 			{
-				p = new indirect_player(remoteAddress, footer.forwardAddress);
+				case CONNECTION_TYPE_PLAYER:
+					if (remoteAddress != socket)
+					{
+						p = new indirect_player(remoteAddress, footer.forwardAddress);
 
-				response = true;
+						response = true;
 
-				if (!connectPlayer(socket, p))
-				{
-					delete p;
+						if (!connectPlayer(socket, p))
+						{
+							delete p;
 
-					return response;
-				}
+							return response;
+						}
+					}
+					else
+					{
+						p = new player(remoteAddress);
+
+						response = false;
+
+						if (!connectPlayer(socket, p))
+						{
+							delete p;
+
+							return response;
+						}
+					}
+
+					// Read the player's name from the input.
+					p->name = socket.readWideString();
+
+					//wclog << L"Player connected: " << p->name << endl;
+
+					parentProgram.onNetworkClientConnected(*this, *p);
+
+					break;
 			}
-			else
-			{
-				p = new player(remoteAddress);
-
-				response = false;
-
-				if (!connectPlayer(socket, p))
-				{
-					delete p;
-
-					return response;
-				}
-			}
-
-			p->name = socket.readWideString();
-
-			//wclog << L"Player connected: " << p->name << endl;
-
-			parentProgram.onNetworkClientConnected(*this, *p);
 
 			// Return the calculated response-code.
 			return response;

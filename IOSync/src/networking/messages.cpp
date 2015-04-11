@@ -169,7 +169,7 @@ namespace iosync
 				forwardAddress = address();
 
 			// Calculate the serialized size of the footer.
-			serializedSize = socket.readOffset-startPosition;
+			serializedSize = (packetSize_t)(socket.readOffset-startPosition);
 
 			return;
 		}

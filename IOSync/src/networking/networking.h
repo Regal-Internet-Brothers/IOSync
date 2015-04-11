@@ -45,6 +45,9 @@ namespace iosync
 		typedef unsigned short messageType;
 		typedef unsigned short packetID; // unsigned long long
 
+		// The type used to deduce/describe the type of a connection.
+		typedef unsigned char connectionType;
+
 		typedef unsigned short disconnectionReason;
 
 		typedef milliseconds connectionPing;

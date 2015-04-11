@@ -1,6 +1,10 @@
 // Includes:
-#include <iostream>
 #include "keyboard.h"
+
+// Standard networking functionality.
+#include "../networking/networking.h"
+
+// Required for shared-window access.
 #include "../iosync.h"
 
 // Namespace(s):
@@ -84,34 +88,44 @@ namespace iosync
 		void keyboard::simulateAction(keyboardAction action)
 		{
 			// Windows-specific implementation:
-			#ifdef KEYBOARD_WINDOWS
+			#ifdef PLATFORM_WINDOWS
+				// Local variable(s):
 				INPUT deviceAction;
 
+				// Set up the input-device descriptor:
 				deviceAction.type = INPUT_KEYBOARD;
 				deviceAction.ki.time = 0;
 				deviceAction.ki.wVk = 0; // (DWORD)action.key
 				deviceAction.ki.dwExtraInfo = 0;
 				deviceAction.ki.wScan = MapVirtualKey(action.key, MAPVK_VK_TO_VSC);
 
+				// Check if this is a key-release event:
 				if (action.type == ACTION_TYPE_HIT && (GetAsyncKeyState(action.key) & 0x8000) > 0)
 					action.type = ACTION_TYPE_RELEASE;
 
-				//deviceInfo << "Simuating key: " << action.key << ", " << action.type << " -- wScan: " << deviceAction.ki.wScan << endl;
+				#ifdef KEYBOARD_DEBUG
+					deviceInfo << "Simuating key: " << action.key << ", " << action.type << " -- wScan: " << deviceAction.ki.wScan << endl;
+				#endif
 
+				// Extra flags that apply to the key event(s) we're about to make.
 				nativeFlags extraFlags = 0;
 
+				// Check if this is an "extended key":
 				if ((action.key >= 33 && action.key <= 46) || (action.key >= 91 && action.key <= 93))
 					extraFlags = KEYEVENTF_EXTENDEDKEY; // |=
 
 				switch (action.type)
 				{
 					case ACTION_TYPE_HIT:
+						// Send the initial input-event, then immediately send a release event:
 						sendNativeKeyboardInput(&deviceAction, KEYEVENTF_SCANCODE|extraFlags); // KEYEVENTF_EXTENDEDKEY
 					case ACTION_TYPE_RELEASE:
+						// Send an input event to release the key.
 						sendNativeKeyboardInput(&deviceAction, KEYEVENTF_SCANCODE|KEYEVENTF_KEYUP|extraFlags); // KEYEVENTF_EXTENDEDKEY
 
 						break;
 					case ACTION_TYPE_DOWN:
+						// Send a single input-event telling the system to hold the key.
 						sendNativeKeyboardInput(&deviceAction, KEYEVENTF_SCANCODE|extraFlags); // KEYEVENTF_EXTENDEDKEY
 
 						break;
@@ -123,7 +137,7 @@ namespace iosync
 
 		void keyboard::linkKeyboard()
 		{
-			#ifdef KEYBOARD_WINDOWS
+			#ifdef PLATFORM_WINDOWS
 				//__winnt_set_keyboard_hook();
 				__winnt__registerHardware(sharedWindow::windowInstance);
 			#endif
@@ -133,7 +147,7 @@ namespace iosync
 
 		void keyboard::unlinkKeyboard()
 		{
-			#ifdef KEYBOARD_WINDOWS
+			#ifdef PLATFORM_WINDOWS
 				//__winnt_unhook_keyboard();
 			#endif
 
@@ -142,7 +156,7 @@ namespace iosync
 
 		bool keyboard::keyboardLinked()
 		{
-			#ifdef KEYBOARD_WINDOWS
+			#ifdef PLATFORM_WINDOWS
 				//return (deviceHook != HHOOK());
 				return registered;
 			#else
@@ -151,13 +165,9 @@ namespace iosync
 		}
 
 		// Constructor(s):
-		keyboard::keyboard(bool canDetect, bool canSimulate, deviceFlags flagsToAdd) : IODevice(flagsToAdd|FLAG_ASYNC_DETECTION)
+		keyboard::keyboard(bool canDetect, bool canSimulate, deviceFlags flagsToAdd) : IODevice(canDetect, canSimulate, flagsToAdd|FLAG_ASYNC_DETECTION)
 		{
-			if (canDetect)
-				flags |= FLAG_CAN_DETECT; // ^= FLAG_CAN_DETECT;
-
-			if (canSimulate)
-				flags |= FLAG_CAN_SIMULATE; // ^= FLAG_CAN_SIMULATE;
+			// Nothing so far.
 		}
 
 		// Destructor(s):
@@ -166,6 +176,7 @@ namespace iosync
 		// Methods:
 		bool keyboard::connect()
 		{
+			// Make sure we aren't already connected:
 			if (connected())
 				return false;
 
@@ -173,14 +184,13 @@ namespace iosync
 			if (!autoLinkKeyboard())
 				return false;
 
-			flags |= FLAG_CONNECTED;
-
-			// Return the default response.
-			return true;
+			// Call the super-class's implementation, then return its response.
+			return deviceManager::connect();
 		}
 
 		bool keyboard::disconnect()
 		{
+			// Make sure we aren't already disconnected:
 			if (disconnected())
 				return false;
 
@@ -190,11 +200,8 @@ namespace iosync
 					return false;
 			#endif
 
-			flags &= ~FLAG_CONNECTED;
-			//flags ~= FLAG_CONNECTED;
-
-			// Return the default response.
-			return true;
+			// Call the super-class's implementation, then return its response.
+			return deviceManager::disconnect();
 		}
 
 		void keyboard::detect(application* program)
@@ -293,15 +300,36 @@ namespace iosync
 			{
 				// Local variable(s):
 				keyboardActionType actionType;
-						
+
+				auto key = (keyboardKey)rawDevice->data.keyboard.VKey;
+				bool isDown = keyEnabled(key);
+				
 				if ((rawDevice->data.keyboard.Flags & RI_KEY_BREAK) > 0)
+				{
+					// If the key is currently up, release/disable it.
+					if (isDown)
+						disableKey(key);
+
 					actionType = ACTION_TYPE_HIT;
+				}
 				else // if ((rawDevice->data.keyboard.Flags & RI_KEY_MAKE) > 0)
+				{
+					// Check if this event is worth logging:
+					if (isDown)
+						return;
+
 					actionType = ACTION_TYPE_DOWN;
 
-				actionQueue.push_back(keyboardAction((keyboardKey)rawDevice->data.keyboard.VKey, actionType));
+					// Enable/hold this key, so we don't
+					// log it again until it's been released.
+					enableKey(key);
+				}
 
-				//deviceInfo << "Detected key: " << rawDevice->data.keyboard.VKey << ", actionType: " << actionType << endl;
+				actionQueue.push_back(keyboardAction(key, actionType));
+
+				#ifdef KEYBOARD_DEBUG
+					deviceInfo << "Detected key: " << rawDevice->data.keyboard.VKey << ", actionType: " << actionType << endl;
+				#endif
 
 				return;
 			}

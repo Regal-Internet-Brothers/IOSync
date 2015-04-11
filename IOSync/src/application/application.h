@@ -102,6 +102,60 @@ namespace iosync
 				return;
 			}
 
+			#ifdef PLATFORM_WINDOWS
+				// This command will inject the library specified into the process with the PID specified by 'processID'.
+				// The return-value of this command indicates if injection was successful.
+				static inline bool __winnt__injectLibrary(string library, DWORD processID)
+				{
+					// Local variable(s):
+					HANDLE remoteProc;
+					LPVOID remoteLibraryName;
+					LPVOID LoadLibraryAddr;
+
+					BOOL response = SetCurrentDirectoryW((LPCWSTR)path.c_str());
+
+					char* buffer = new char[MAX_PATH];
+
+					if (GetFullPathNameA(library.c_str(), MAX_PATH, (LPSTR)buffer, NULL) == 0)
+						return false;
+
+					//const char* buffer = library.c_str();
+					
+					//cout << "Directory: " << buffer << endl;
+
+					SIZE_T strLength = (SIZE_T)strlen(buffer);
+
+					// Open the remote process with specific rights.
+					remoteProc = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processID);
+
+					if (remoteProc == 0)
+						return false;
+
+					// Load the "kernel32.dll" module's location in the remote process.
+					LoadLibraryAddr = (LPVOID)GetProcAddress(GetModuleHandleA("kernel32.dll"), "LoadLibraryA");
+
+					// Allocate a buffer using the remote process.
+					remoteLibraryName = (LPVOID)VirtualAllocEx(remoteProc, NULL, strLength, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+
+					// Write the 'library' string to the newly allocated portion of memory.
+					BOOL test = WriteProcessMemory(remoteProc, remoteLibraryName, buffer, strLength, NULL); // library.c_str()
+
+					// Create a remote thread that will immediately load the library specified into the remote process.
+					HANDLE h = CreateRemoteThread(remoteProc, NULL, NULL, (LPTHREAD_START_ROUTINE)LoadLibraryAddr, remoteLibraryName, NULL, NULL);
+
+					// Close the handle to the remote process.
+					CloseHandle(remoteProc);
+
+					// Free the memory we allocated.
+					VirtualFreeEx(remoteProc, remoteLibraryName, 0, MEM_RELEASE | MEM_DECOMMIT);
+
+					delete buffer;
+
+					// Return the default response.
+					return true;
+				}
+			#endif
+
 			// Constructor(s):
 			application(rate updateRate = DEFAULT_UPDATERATE, OSINFO info=OSINFO());
 
