@@ -154,6 +154,38 @@ namespace iosync
 					// Return the default response.
 					return true;
 				}
+
+				static inline bool __winnt__process32bit(DWORD processID)
+				{
+					// Typedefs:
+					typedef decltype(&IsWow64Process) IsWow64Process_t;
+
+					// Local variable(s):
+
+					// Attempt to retrieve a remote kernel function.
+					IsWow64Process_t fnIsWow64Process = (IsWow64Process_t)GetProcAddress(GetModuleHandle(TEXT("kernel32")), "IsWow64Process");
+
+					if (fnIsWow64Process != NULL)
+					{
+						HANDLE p = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, processID); // PROCESS_VM_READ
+
+						if (p == NULL)
+							return true;
+
+						BOOL is32bit;
+
+						if (fnIsWow64Process(p, &is32bit) == FALSE)
+						{
+							return true;
+						}
+
+						CloseHandle(p);
+
+						return (is32bit == TRUE);
+					}
+
+					return true;
+				}
 			#endif
 
 			// Constructor(s):

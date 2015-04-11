@@ -8,14 +8,18 @@
 	#define PLATFORM_WINDOWS_EXTENSIONS
 #endif
 
-#ifdef _M_AMD64
-	#define PLATFORM_X64
+#if defined(_WIN64)
 	#define PLATFORM_64
+#elif defined(_WIN32)
+	#define PLATFORM_32
 #endif
 
-#ifdef _M_IX86
+#if defined(_M_AMD64)
+	#define PLATFORM_X64
+#elif defined(_M_IX86)
 	#define PLATFORM_X86
-	#define PLATFORM_32
+#elif defined(_M_ARM)
+	#define PLATFORM_ARM
 #endif
 
 #ifdef PLATFORM_WINDOWS
@@ -37,5 +41,6 @@ namespace iosync
 		x86,
 		x64,
 		ARM,
+		ARM64,
 	};
 }

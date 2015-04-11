@@ -27,7 +27,12 @@ namespace process
 	// Functions:
 	DWORD getPID();
 
+	// This will tell you if the module specified is an injection module/DLL.
 	BOOL isInjectionDLL(HMODULE hDLL);
+
+	// This will resolve the proper system-path for the file specified.
+	// This is useful for modules/DLLs that could be "misrepresented" by local implementations.
+	string resolveSystemPath(LPCSTR path);
 
 	// This will return the file-name of the module specified.
 	string getName(HMODULE module);

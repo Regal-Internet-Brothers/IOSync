@@ -57,45 +57,32 @@ namespace REAL_XINPUT
 		return;
 	}
 
-	HMODULE linkTo(LPCSTR DLL_Location, BOOL MASTER_DLL)
+	HMODULE linkTo(LPCSTR DLL_Location, BOOL resolveSystemPath)
 	{
 		using namespace std;
-		using namespace process;
 
 		HMODULE library = NULL;
 
-		if (MASTER_DLL)
+		if (resolveSystemPath == TRUE)
 		{
-			string resolvedPath;
-
-			char buffer[MAX_PATH];
-
-			GetSystemDirectoryA(buffer, MAX_PATH);
-
-			resolvedPath = (string(buffer) + "\\" + DLL_Location);
-
-			if (GetModuleHandleA(resolvedPath.c_str()) != NULL)
-				return NULL;
-
-			library = LoadLibraryA(resolvedPath.c_str());
+			library = LoadLibraryA((process::resolveSystemPath(DLL_Location)).c_str());
 		}
 		else
 		{
-			if (GetModuleHandleA(DLL_Location) != NULL)
-				return NULL;
-
 			library = LoadLibraryA(DLL_Location);
 		}
 
 		if (library == NULL)
 			return NULL;
 
-		linkTo(library); // GetModuleHandleA(hDLL)
+		// Call the main implementation using the loaded module.
+		linkTo(library);
 
+		// Return the loaded module.
 		return library;
 	}
 
-	HMODULE linkTo(BOOL MASTER_DLL)
+	HMODULE linkTo(BOOL resolveSystemPath)
 	{
 		// Not the most efficient, but it works:
 		char DLLName[XINPUT_DLL_NAMELENGTH];
@@ -111,7 +98,7 @@ namespace REAL_XINPUT
 				sprintf(DLLName, "xinput1_%d.dll", i);
 			}
 
-			HMODULE module = linkTo(DLLName, MASTER_DLL);
+			HMODULE module = linkTo(DLLName, resolveSystemPath);
 
 			if (module != NULL)
 			{

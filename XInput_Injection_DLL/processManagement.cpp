@@ -25,6 +25,17 @@ namespace process
 		return (BOOL)(GetProcAddress(hDLL, "XINPUT_INJECTOR_VALIDATOR") != NULL);
 	}
 
+	string resolveSystemPath(LPCSTR path)
+	{	
+		// A temporary buffer for the system-path.
+		char buffer[MAX_PATH];
+
+		// This will not have a trailing back-slash.
+		GetSystemDirectoryA(buffer, MAX_PATH);
+
+		return string(buffer) + "\\" + path;
+	}
+
 	string getName(HMODULE module)
 	{
 		char name[MAX_PATH];
