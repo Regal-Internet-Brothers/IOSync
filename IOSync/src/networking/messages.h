@@ -24,7 +24,7 @@ namespace iosync
 		struct headerInfo
 		{
 			// Functions:
-			inline static bool positionSet(streamLocation position)
+			static inline bool positionSet(streamLocation position)
 			{
 				return (position == 0);
 			}
@@ -91,12 +91,12 @@ namespace iosync
 		struct messageHeader
 		{
 			// Functions:
-			inline static packetSize_t getRelativeLocation(QSocket& socket, streamLocation origin)
+			static inline packetSize_t getRelativeLocation(QSocket& socket, streamLocation origin)
 			{
-				return (socket.writeOffset-origin);
+				return (packetSize_t)(socket.writeOffset-origin);
 			}
 
-			inline static bool markSize(QSocket& socket, streamLocation position, packetSize_t size)
+			static inline bool markSize(QSocket& socket, streamLocation position, packetSize_t size)
 			{
 				// Store the current write-offset.
 				auto offset = socket.writeOffset;
@@ -115,7 +115,7 @@ namespace iosync
 			}
 
 			// This command marks the 'location' value specified, at the stream-position specified.
-			inline static bool markLocation(QSocket& socket, streamLocation position, streamLocation location)
+			static inline bool markLocation(QSocket& socket, streamLocation position, streamLocation location)
 			{
 				// Store the current write-offset.
 				auto offset = socket.writeOffset;
@@ -143,19 +143,19 @@ namespace iosync
 				the write-operation should take place.
 			*/
 
-			inline static bool markCurrentSize(QSocket& socket, streamLocation sizePosition)
+			static inline bool markCurrentSize(QSocket& socket, streamLocation sizePosition)
 			{
 				// This is offset so that the message-size doesn't reflect the storage for the size-entry.
 				return markSize(socket, sizePosition, getRelativeLocation(socket, sizePosition+sizeof(packetSize_t)));
 			}
 
 			// This command will mark/write the current 
-			inline static bool markCurrentLocation(QSocket& socket, streamLocation position)
+			static inline bool markCurrentLocation(QSocket& socket, streamLocation position)
 			{
 				return markLocation(socket, position, getRelativeLocation(socket, position));
 			}
 
-			inline static bool markBoolean(QSocket& socket, streamLocation position, bool value)
+			static inline bool markBoolean(QSocket& socket, streamLocation position, bool value)
 			{
 				// Store the current write-offset.
 				auto offset = socket.writeOffset;

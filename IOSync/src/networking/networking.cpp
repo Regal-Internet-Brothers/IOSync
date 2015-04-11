@@ -118,6 +118,16 @@ namespace iosync
 			return (confirmedPackets.find(ID) != confirmedPackets.end());
 		}
 
+		void player::outputAddressInfo(ostream& os, bool endLine)
+		{
+			os << remoteAddress;
+
+			if (endLine)
+				os << endl;
+
+			return;
+		}
+
 		// indirect_player:
 
 		// Constructor(s):
@@ -131,6 +141,21 @@ namespace iosync
 		}
 
 		// Methods:
+		void indirect_player::outputAddressInfo(ostream& os, bool endLine)
+		{
+			player::outputAddressInfo(os, false);
+
+			if (realAddress.isSet())
+			{
+				os << ", " << realAddress;
+			}
+
+			if (endLine)
+				os << endl;
+
+			return;
+		}
+
 		address indirect_player::vaddr() const
 		{
 			return realAddress;
@@ -155,8 +180,8 @@ namespace iosync
 		// Nothing so far.
 
 		// Constructor(s):
-		networkEngine::networkEngine(const networkMetrics netMetrics)
-			: metrics(netMetrics), isHostNode(false), isMaster(false), nextReliableID(PACKET_ID_FIRST) { /* Nothing so far. */ }
+		networkEngine::networkEngine(application& parent, const networkMetrics netMetrics)
+			: parentProgram(parent), metrics(netMetrics), isHostNode(false), isMaster(false), nextReliableID(PACKET_ID_FIRST) { /* Nothing so far. */ }
 
 		bool networkEngine::open()
 		{
@@ -172,7 +197,7 @@ namespace iosync
 			// Nothing so far.
 		}
 
-		bool networkEngine::close(application* program)
+		bool networkEngine::close()
 		{
 			// Close the internal socket.
 			socket.close();
@@ -181,7 +206,7 @@ namespace iosync
 			packetsInTransit.clear();
 
 			// Tell the 'program' object that we've closed.
-			program->onNetworkClosed(*this);
+			parentProgram.onNetworkClosed(*this);
 
 			// Return the default response.
 			return true;
@@ -190,7 +215,7 @@ namespace iosync
 		// Methods:
 
 		// Update routines:
-		void networkEngine::update(application* program)
+		void networkEngine::update()
 		{
 			if (connectionTime() >= metrics.pingInterval)
 			{
@@ -202,7 +227,7 @@ namespace iosync
 
 			updatePacketsInTransit();
 
-			handleMessages(this->socket, program);
+			handleMessages(this->socket);
 
 			return;
 		}
@@ -363,7 +388,7 @@ namespace iosync
 		}
 
 		// Reliable message related:
-		bool networkEngine::onReliableMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer, application* program)
+		bool networkEngine::onReliableMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Tell the user that reliable messages aren't supported.
 			return false;
@@ -415,7 +440,7 @@ namespace iosync
 			return false;
 		}
 
-		size_t networkEngine::handleMessages(QSocket& socket, application* program)
+		size_t networkEngine::handleMessages(QSocket& socket)
 		{
 			// Local variable(s):
 			size_t messages = 0;
@@ -440,7 +465,7 @@ namespace iosync
 					{
 						if (footer.isReliable())
 						{
-							if (!onReliableMessage(socket, address(socket), header, footer, program))
+							if (!onReliableMessage(socket, address(socket), header, footer))
 							{
 								// Reliable messages aren't supported, or this message
 								// has already been received, skip this message:
@@ -455,7 +480,7 @@ namespace iosync
 						auto parsePosition = socket.readOffset;
 
 						// Attempt to parse the message:
-						if (!parseMessage(socket, address(socket), header, footer, program))
+						if (!parseMessage(socket, address(socket), header, footer))
 						{
 							clog << UNABLE_TO_PARSE_MESSAGE << header.type << endl;
 
@@ -494,7 +519,7 @@ namespace iosync
 					{
 						auto addrOfSocket = address(socket);
 
-						if (!onForwardPacket(socket, startPosition, addrOfSocket, header, footer, program))
+						if (!onForwardPacket(socket, startPosition, addrOfSocket, header, footer))
 						{
 							clog << UNABLE_TO_FORWARD_PACKET << addrOfSocket << endl;
 
@@ -520,7 +545,7 @@ namespace iosync
 		}
 
 		// Parsing/deserialization related:
-		bool networkEngine::parseMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer, application* program)
+		bool networkEngine::parseMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			switch (header.type)
 			{
@@ -540,7 +565,7 @@ namespace iosync
 			return true;
 		}
 
-		bool networkEngine::onForwardPacket(QSocket& socket, streamLocation startPosition, address remoteAddress, const messageHeader& header, const messageFooter& footer, application* program)
+		bool networkEngine::onForwardPacket(QSocket& socket, streamLocation startPosition, address remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Tell the user that packet-forwarding isn't supported.
 			return false;
@@ -550,7 +575,7 @@ namespace iosync
 		// Nothing so far.
 
 		// Serialization related:
-		void networkEngine::serializePlayerConnectionMessage(QSocket& socket, wstring name)
+		void networkEngine::serializeConnectionMessage(QSocket& socket, wstring name)
 		{
 			// Write the namne of the connecting player.
 			socket.writeWideString(name);
@@ -595,8 +620,8 @@ namespace iosync
 		// clientNetworkEngine:
 
 		// Constructor(s):
-		clientNetworkEngine::clientNetworkEngine(wstring username, networkMetrics metrics)
-			: connection(), networkEngine(metrics), connected(false)
+		clientNetworkEngine::clientNetworkEngine(application& parent, wstring username, networkMetrics metrics)
+			: connection(), networkEngine(parent, metrics), connected(false)
 		{
 			// Set the name of this connection.
 			connection.name = username;
@@ -620,35 +645,35 @@ namespace iosync
 			if (connection.name.size() == 0)
 				connection.name = L"Unknown";
 
-			sendPlayerConnectionMessage(socket, connection.name, DESTINATION_HOST);
+			sendConnectionMessage(socket, connection.name, DESTINATION_HOST);
 
 			return true;
 		}
 
 		// Destructor(s):
-		bool clientNetworkEngine::close(application* program)
+		bool clientNetworkEngine::close()
 		{
-			// Nothing so far.
+			this->connected = false;
 
 			// Return the super-class's response.
-			return networkEngine::close(program);
+			return networkEngine::close();
 		}
 
 		// Methods:
 		
 		// Update routines:
-		void clientNetworkEngine::update(application* program)
+		void clientNetworkEngine::update()
 		{
 			// Check if we've timed out:
 			if (timedOut())
 			{
-				close(program);
+				close();
 
 				return;
 			}
 
 			// Call the super-class's implementation.
-			networkEngine::update(program);
+			networkEngine::update();
 
 			return;
 		}
@@ -672,7 +697,7 @@ namespace iosync
 			return;
 		}
 
-		bool clientNetworkEngine::onForwardPacket(QSocket& socket, streamLocation startPosition, address remoteAddress, const messageHeader& header, const messageFooter& footer, application* program)
+		bool clientNetworkEngine::onForwardPacket(QSocket& socket, streamLocation startPosition, address remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Re-write the message.
 			rewriteMessage(socket, header, footer);
@@ -684,7 +709,7 @@ namespace iosync
 		}
 
 		// Reliable message related:
-		bool clientNetworkEngine::onReliableMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer, application* program)
+		bool clientNetworkEngine::onReliableMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Local variable(s):
 
@@ -714,10 +739,10 @@ namespace iosync
 		}
 
 		// Parsing/deserialization related:
-		bool clientNetworkEngine::parseMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer, application* program)
+		bool clientNetworkEngine::parseMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Call the super-class's implementation:
-			if (networkEngine::parseMessage(socket, remoteAddress, header, footer, program))
+			if (networkEngine::parseMessage(socket, remoteAddress, header, footer))
 				return true;
 
 			switch (header.type)
@@ -728,7 +753,7 @@ namespace iosync
 
 					updateSnapshot();
 
-					program->onNetworkConnected(*this);
+					parentProgram.onNetworkConnected(*this);
 
 					break;
 				case MESSAGE_TYPE_PING:
@@ -753,12 +778,12 @@ namespace iosync
 					sendCourtesyLeaveConfirmation(socket);
 
 					// Close this network.
-					close(program);
+					close();
 
 					break;
 				default:
 					// Call the 'program' object's implementation.
-					return program->parseNetworkMessage(socket, header, footer);
+					return parentProgram.parseNetworkMessage(socket, header, footer);
 			}
 
 			// Tell the user that the message was read.
@@ -801,8 +826,8 @@ namespace iosync
 		// serverNetworkEngine:
 
 		// Constructor(s):
-		serverNetworkEngine::serverNetworkEngine(networkMetrics metrics)
-			: networkEngine(metrics) { isHostNode = true; isMaster = true; }
+		serverNetworkEngine::serverNetworkEngine(application& parent, networkMetrics metrics)
+			: networkEngine(parent, metrics) { isHostNode = true; isMaster = true; }
 
 		bool serverNetworkEngine::open(const addressPort port)
 		{
@@ -817,21 +842,21 @@ namespace iosync
 		}
 
 		// Destructor(s):
-		bool serverNetworkEngine::close(application* program)
+		bool serverNetworkEngine::close()
 		{
 			forceDisconnectPlayers(this->socket, DISCONNECTION_REASON_CLOSE, false);
 
 			// Call the super-class's implementation, then return its response.
-			return networkEngine::close(program);
+			return networkEngine::close();
 		}
 
 		// Methods:
 
 		// Update routines:
-		void serverNetworkEngine::update(application* program)
+		void serverNetworkEngine::update()
 		{
 			// Call the super-class's implementation.
-			networkEngine::update(program);
+			networkEngine::update();
 
 			checkClientTimeouts();
 
@@ -862,6 +887,8 @@ namespace iosync
 			{
 				if (timedOut(*p))
 				{
+					parentProgram.onNetworkClientTimedOut(*this, **p);
+
 					forceDisconnectPlayer(socket, *p, DISCONNECTION_REASON_TIMEDOUT, false, false);
 
 					players.erase(p++);
@@ -898,7 +925,7 @@ namespace iosync
 		}
 
 		// Reliable message related:
-		bool serverNetworkEngine::onReliableMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer, application* program)
+		bool serverNetworkEngine::onReliableMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Local variable(s):
 			bool response = true;
@@ -934,14 +961,14 @@ namespace iosync
 			return;
 		}
 
-		bool serverNetworkEngine::onForwardPacket(QSocket& socket, streamLocation startPosition, address remoteAddress, const messageHeader& header, const messageFooter& footer, application* program)
+		bool serverNetworkEngine::onForwardPacket(QSocket& socket, streamLocation startPosition, address remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Tell the user that packet-forwarding isn't supported.
 			return false;
 		}
 
 		// Parsing/deserialization related:
-		bool serverNetworkEngine::parseMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer, application* program)
+		bool serverNetworkEngine::parseMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Local variable(s):
 
@@ -955,7 +982,7 @@ namespace iosync
 				switch (header.type)
 				{
 					case MESSAGE_TYPE_JOIN:
-						parsePlayerConnectionMessage(socket, remoteAddress, header, footer);
+						parseConnectionMessage(socket, remoteAddress, header, footer);
 
 						return true;
 					case MESSAGE_TYPE_CONFIRM_PACKET:
@@ -974,7 +1001,7 @@ namespace iosync
 			}
 
 			// Call the super-class's implementation, then hold its response:
-			bool superResponse = networkEngine::parseMessage(socket, remoteAddress, header, footer, program);
+			bool superResponse = networkEngine::parseMessage(socket, remoteAddress, header, footer);
 
 			switch (header.type)
 			{
@@ -996,7 +1023,7 @@ namespace iosync
 					break;
 				default:
 					// Call the 'program' object's implementation.
-					auto programResponse = program->parseNetworkMessage(socket, header, footer);
+					auto programResponse = parentProgram.parseNetworkMessage(socket, header, footer);
 
 					// After calling the super-class's implementation,
 					// calculate what our response should be.
@@ -1008,43 +1035,55 @@ namespace iosync
 		}
 
 		// Parsing/deserialization related:
-		bool serverNetworkEngine::parsePlayerConnectionMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
+		bool serverNetworkEngine::parseConnectionMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Local variable(s):
 			player* p;
 
 			bool response;
+			connectionType type;
 
-			if (remoteAddress != socket)
+			type = CONNECTION_TYPE_PLAYER; // socket.read<connectionType>();
+
+			switch (type)
 			{
-				p = new indirect_player(remoteAddress, footer.forwardAddress);
+				case CONNECTION_TYPE_PLAYER:
+					if (remoteAddress != socket)
+					{
+						p = new indirect_player(remoteAddress, footer.forwardAddress);
 
-				response = true;
+						response = true;
 
-				if (!connectPlayer(socket, p))
-				{
-					delete p;
+						if (!connectPlayer(socket, p))
+						{
+							delete p;
 
-					return response;
-				}
+							return response;
+						}
+					}
+					else
+					{
+						p = new player(remoteAddress);
+
+						response = false;
+
+						if (!connectPlayer(socket, p))
+						{
+							delete p;
+
+							return response;
+						}
+					}
+
+					// Read the player's name from the input.
+					p->name = socket.readWideString();
+
+					//wclog << L"Player connected: " << p->name << endl;
+
+					parentProgram.onNetworkClientConnected(*this, *p);
+
+					break;
 			}
-			else
-			{
-				p = new player(remoteAddress);
-
-				response = false;
-
-				if (!connectPlayer(socket, p))
-				{
-					delete p;
-
-					return response;
-				}
-			}
-
-			p->name = socket.readWideString();
-
-			wclog << L"Player connected: " << p->name << endl;
 
 			// Return the calculated response-code.
 			return response;

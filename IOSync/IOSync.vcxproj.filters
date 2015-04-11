@@ -25,18 +25,6 @@
     <Filter Include="Header Files\application">
       <UniqueIdentifier>{0498a4dc-3787-4022-a327-d1259489a070}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\libraries">
-      <UniqueIdentifier>{132cb05f-a1f5-428d-86c8-f3ea073baad9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\libraries\QuickSock">
-      <UniqueIdentifier>{15ea671c-4dea-4279-ad2c-5e3abe645f0c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\libraries">
-      <UniqueIdentifier>{dbbf5864-8e18-4509-aece-0776745f13ff}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\libraries\QuickSock">
-      <UniqueIdentifier>{8951e14e-5ac1-42a2-8d30-4b7666d36ea6}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\devices">
       <UniqueIdentifier>{c08e976b-3840-4b3e-a8cd-90ac85d97ec4}</UniqueIdentifier>
     </Filter>
@@ -45,9 +33,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\libraries\QuickSock\QuickSock.cpp">
-      <Filter>Source Files\libraries\QuickSock</Filter>
-    </ClCompile>
     <ClCompile Include="src\networking\address.cpp">
       <Filter>Source Files\networking</Filter>
     </ClCompile>
@@ -78,6 +63,9 @@
     <ClCompile Include="src\exceptions.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\devices\gamepad.cpp">
+      <Filter>Source Files\devices</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\networking\address.h">
@@ -88,15 +76,6 @@
     </ClInclude>
     <ClInclude Include="src\networking\packets.h">
       <Filter>Header Files\networking</Filter>
-    </ClInclude>
-    <ClInclude Include="src\libraries\QuickSock\Exceptions.h">
-      <Filter>Header Files\libraries\QuickSock</Filter>
-    </ClInclude>
-    <ClInclude Include="src\libraries\QuickSock\QuickSock.h">
-      <Filter>Header Files\libraries\QuickSock</Filter>
-    </ClInclude>
-    <ClInclude Include="src\libraries\QuickSock\QuickTypes.h">
-      <Filter>Header Files\libraries\QuickSock</Filter>
     </ClInclude>
     <ClInclude Include="src\application\application.h">
       <Filter>Header Files\application</Filter>
@@ -135,6 +114,12 @@
       <Filter>Header Files\application</Filter>
     </ClInclude>
     <ClInclude Include="src\networking\reliablePacketManager.h">
+      <Filter>Header Files\networking</Filter>
+    </ClInclude>
+    <ClInclude Include="src\devices\gamepad.h">
+      <Filter>Header Files\devices</Filter>
+    </ClInclude>
+    <ClInclude Include="src\networking\forwardSocket.h">
       <Filter>Header Files\networking</Filter>
     </ClInclude>
   </ItemGroup>

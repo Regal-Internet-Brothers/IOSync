@@ -20,6 +20,13 @@ namespace iosync
 		// Forward declarations:
 		struct player;
 
+		// Constant variable(s):
+		#ifdef QSOCK_IPVABSTRACT
+			static const char* ADDRESS_SEPARATOR = "|";
+		#else
+			static const char* ADDRESS_SEPARATOR = ":";
+		#endif
+
 		// Structures:
 		struct address
 		{

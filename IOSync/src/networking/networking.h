@@ -1,6 +1,22 @@
 #pragma once
 
 // Preprocessor related:
+#define NETWORKING_LOG_TO_CONSOLE
+
+// Output-stream macros:
+#ifdef NETWORKING_LOG_TO_CONSOLE
+	#define networkLogStream std::cout
+	#define wnetworkLogStream std::wcout
+
+	#define networkLog std::cout << "{NETWORK}: "
+	#define wnetworkLog std::wcout << L"{NETWORK}: "
+#else
+	#define networkLogStream std::clog
+	#define wnetworkLogStream std::wclog
+
+	#define networkLog std::clog << "{NETWORK}: "
+	#define wnetworkLog std::wclog << L"{NETWORK}: "
+#endif
 
 // Includes:
 #include "socket.h"
@@ -8,6 +24,7 @@
 // Standard library:
 #include <climits>
 
+#include <iostream>
 #include <chrono>
 
 // Namespaces:
@@ -27,6 +44,9 @@ namespace iosync
 		typedef unsigned short packetSize_t;
 		typedef unsigned short messageType;
 		typedef unsigned short packetID; // unsigned long long
+
+		// The type used to deduce/describe the type of a connection.
+		typedef unsigned char connectionType;
 
 		typedef unsigned short disconnectionReason;
 
@@ -132,7 +152,7 @@ namespace iosync
 		// Functions:
 
 		// This command returns the number of milliseconds that have passed since 't' was updated last.
-		inline static milliseconds elapsed(high_resolution_clock::time_point t)
+		static inline milliseconds elapsed(high_resolution_clock::time_point t)
 		{
 			return duration_cast<milliseconds>(high_resolution_clock::now() - t);
 		}

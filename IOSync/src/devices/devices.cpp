@@ -32,14 +32,23 @@ namespace iosync
 		}
 
 		// Methods:
-		bool deviceManager::connected() const
+		bool deviceManager::connect()
 		{
-			return ((flags & FLAG_CONNECTED) > 0);
+			// Set this device as connected.
+			flags |= FLAG_CONNECTED;
+
+			// Return the default response.
+			return true;
 		}
 
-		bool deviceManager::disconnected() const
+		bool deviceManager::disconnect()
 		{
-			return (!connected());
+			// Set this device as disconnected.
+			flags &= ~FLAG_CONNECTED;
+			//flags ~= FLAG_CONNECTED;
+
+			// Return the default response.
+			return true;
 		}
 
 		bool deviceManager::autoDisconnect()
@@ -56,6 +65,16 @@ namespace iosync
 				return connect();
 
 			return false;
+		}
+
+		bool deviceManager::connected() const
+		{
+			return ((flags & FLAG_CONNECTED) > 0);
+		}
+
+		bool deviceManager::disconnected() const
+		{
+			return (!connected());
 		}
 
 		#ifdef PLATFORM_WINDOWS
@@ -130,6 +149,15 @@ namespace iosync
 		IODevice::IODevice(deviceFlags flagsToAdd) : deviceManager(flagsToAdd), inputDevice(), outputDevice() // IODevice()
 		{
 			// Nothing so far.
+		}
+
+		IODevice::IODevice(bool canDetect, bool canSimulate, deviceFlags flagsToAdd) : deviceManager(flagsToAdd)
+		{
+			if (canDetect)
+				flags |= FLAG_CAN_DETECT;
+
+			if (canSimulate)
+				flags |= FLAG_CAN_SIMULATE;
 		}
 
 		// Methods:

@@ -1,29 +1,22 @@
 #pragma once
 
+// Includes:
 #include "../platform.h"
 
-#ifdef PLATFORM_WINDOWS
-	#define KEYBOARD_WINDOWS
-#endif
-
-#ifndef KEYBOARD_WINDOWS
+#ifndef PLATFORM_WINDOWS
 	#error Keyboard support is currently Windows-only.
 #else
 	#define KEYBOARD_GLOBAL_INPUT
 	//#define KEYBOARD_ALLOW_UNLINK
 #endif
 
-// Includes:
+#define KEYBOARD_DEBUG
+
 #include "devices.h"
 
 // Standard library:
 #include <deque>
-#include <chrono>
-
-// Threading / safety:
-#include <thread>
-#include <mutex>
-#include <atomic>
+#include <unordered_set>
 
 // Namespace(s):
 namespace iosync
@@ -37,8 +30,12 @@ namespace iosync
 		struct keyboardAction;
 
 		// Typedefs:
-		typedef DWORD keyboardKey;
-		typedef size_t keyboardReferenceCount;
+		#ifdef PLATFORM_WINDOWS
+			typedef DWORD keyboardKey;
+		#else
+			typedef unsigned long keyboardKey;
+		#endif
+
 		typedef deque<keyboardAction> keyboardActionQueue;
 
 		// Enumerator(s):
@@ -82,8 +79,13 @@ namespace iosync
 		class keyboard : public IODevice
 		{
 			public:
+				// Typedefs:
+
+				// This is used to represent all actively held keys.
+				typedef unordered_set<keyboardKey> deviceRepresentation;
+
 				// Global variable(s):
-				#ifdef KEYBOARD_WINDOWS
+				#ifdef PLATFORM_WINDOWS
 					// Reserved keyboard hook.
 					//static HHOOK deviceHook;
 				#endif
@@ -127,7 +129,7 @@ namespace iosync
 					return !keyboardLinked();
 				}
 
-				inline static bool autoLinkKeyboard()
+				static inline bool autoLinkKeyboard()
 				{
 					if (keyboardUnlinked())
 						linkKeyboard();
@@ -144,7 +146,7 @@ namespace iosync
 					return false;
 				}
 
-				inline static bool autoUnlinkKeyboard()
+				static inline bool autoUnlinkKeyboard()
 				{
 					#ifdef KEYBOARD_ALLOW_UNLINK
 						if (globalDeviceCounter > 0 && keyboardLinked())
@@ -165,7 +167,7 @@ namespace iosync
 
 				// Call this when unsure of the states of active keyboard devices,
 				// but you want to make sure everything's cleaned up.
-				inline static bool cleanUp()
+				static inline bool cleanUp()
 				{
 					return autoUnlinkKeyboard();
 				}
@@ -177,7 +179,7 @@ namespace iosync
 				// Nothing so far.
 
 				// Methods:
-				virtual bool connect() override;
+				bool connect() override;
 				virtual bool disconnect() override;
 
 				virtual void detect(application* program) override;
@@ -190,7 +192,7 @@ namespace iosync
 				// This command simulates the action at the top of the "action-queue".
 				// The return value of this command indicates if the internal
 				// action-queue is empty after the action was simulated.
-				virtual bool simulateAction();
+				bool simulateAction();
 
 				inline bool hasAction() const
 				{
@@ -208,8 +210,33 @@ namespace iosync
 					return ((flags & FLAG_TESTMODE) > 0);
 				}
 
+				inline void enableKey(keyboardKey key)
+				{
+					activeKeys.insert(key);
+
+					return;
+				}
+
+				inline void disableKey(keyboardKey key)
+				{
+					activeKeys.erase(key);
+
+					return;
+				}
+
+				inline bool keyEnabled(keyboardKey key) const
+				{
+					return activeKeys.find(key) != activeKeys.end();
+				}
+
+				inline bool keyDisabled(keyboardKey key) const
+				{
+					return !keyEnabled(key);
+				}
+
 				// Fields:
 				keyboardActionQueue actionQueue;
+				deviceRepresentation activeKeys;
 		};
 	}
 }

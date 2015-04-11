@@ -73,15 +73,8 @@ namespace iosync
 		// Operators:
 		ostream& operator<<(ostream& os, const address& addr)
 		{
-			// Constant variable(s):
-			#ifdef QSOCK_IPVABSTRACT
-				static const char* STR_DIVIDER = "|";
-			#else
-				static const char* STR_DIVIDER = ":";
-			#endif
-
-			// Output the address to the 'os' stream.
-			os << addr.IP << STR_DIVIDER << addr.port;
+			// Output 'addr' to the 'os' output-stream.
+			os << QSocket::representIP(addr.IP) << ADDRESS_SEPARATOR << addr.port;
 
 			// Return the output-stream so it may be chained.
 			return os;

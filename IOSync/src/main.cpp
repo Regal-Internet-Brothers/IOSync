@@ -9,14 +9,15 @@
 	TODO:
 		X Keyboard integration. (Windows)
 		X Fix application-arguments for Windows "extended" builds.
+		X XInput controller/gamepad integration. (Windows)
 
 		/ Adjust network "metrics".
 
-		* Support for multi-threaded console input. (Commands, etc)
+		* Proper support for user-commands.
 		* Options for button-hold timeouts. (In case of disconnection/other)
-		* XInput controller/gamepad integration. (Windows)
+		* Options for vibration timeouts.
 
-		* Fix "const correctness" of some commands.
+		/ Fix "const correctness" for some commands.
 
 		? Mouse integration.
 */
@@ -108,18 +109,16 @@ int main(int argc, char** argv)
 
 			GetModuleFileNameW(NULL, (LPWSTR)pathBuffer, MAX_PATH);
 
-			/*
-			auto tempStr = string(pathBuffer);
+			auto tempStr = wstring(pathBuffer);
 
-			string::size_type dividerLocation = tempStr.find_last_of("\\/");
+			string::size_type dividerLocation = tempStr.find_last_of(L"\\/");
 
 			if (dividerLocation != string::npos)
 			{
 				application::path = tempStr.substr(0, dividerLocation);
 			}
-			*/
 
-			application::path = wstring((const wchar_t*)pathBuffer);
+			//application::path = wstring((const wchar_t*)pathBuffer);
 		}
 	#else
 		application::path = defaultStringToWide(argv[0]);
