@@ -2,7 +2,7 @@
 
 // Preprocessor related:
 #define IOSYNC_TESTMODE
-#define IOSYNC_FAST_TESTMODE
+//#define IOSYNC_FAST_TESTMODE
 
 #define XINPUT_DEVICE_KEYBOARD
 #define XINPUT_DEVICE_GAMEPAD
@@ -764,6 +764,11 @@ namespace iosync
 			inline bool allowDeviceSimulation() const
 			{
 				return (mode == MODE_SERVER);
+			}
+
+			inline bool reserveLocalGamepads() const
+			{
+				return allowDeviceSimulation();
 			}
 
 			// Fields:

@@ -48,7 +48,7 @@ namespace iosync
 			virtual bool hasReliablePackets() const = 0;
 
 			virtual void removeReliablePacket(packetID ID) = 0;
-			virtual bool hasPacket(packetID ID) const = 0;
+			virtual bool hasReliablePacket(packetID ID) const = 0;
 
 			// Fields:
 

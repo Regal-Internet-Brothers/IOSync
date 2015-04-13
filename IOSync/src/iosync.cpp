@@ -445,7 +445,7 @@ namespace iosync
 			// Local variable(s):
 
 			// Get the next gamepad identifier.
-			auto identifier = getNextGamepadID(program->allowDeviceSimulation());
+			auto identifier = getNextGamepadID(program->reserveLocalGamepads());
 
 			// Check if we can connect this device:
 			if (identifier == GAMEPAD_ID_NONE)
@@ -463,7 +463,7 @@ namespace iosync
 			// Local variable(s):
 
 			// Get the next gamepad identifier.
-			auto identifier = getNextGamepadID(program->allowDeviceSimulation());
+			auto identifier = getNextGamepadID(program->reserveLocalGamepads());
 
 			// Check if we can connect this device:
 			if (identifier == GAMEPAD_ID_NONE)
@@ -517,7 +517,7 @@ namespace iosync
 						}
 						else
 						{
-							identifier = getNextGamepadID(program->allowDeviceSimulation());
+							identifier = getNextGamepadID(program->reserveLocalGamepads());
 						}
 
 						if (identifier == GAMEPAD_ID_NONE)

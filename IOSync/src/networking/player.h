@@ -30,7 +30,7 @@ namespace iosync
 			void pruneEarliestPacket();
 
 			virtual void removeReliablePacket(packetID ID) override;
-			virtual bool hasPacket(packetID ID) const override;
+			virtual bool hasReliablePacket(packetID ID) const override;
 
 			// This command outputs address-information to the 'os' stream.
 			virtual void outputAddressInfo(ostream& os, bool endLine=true);

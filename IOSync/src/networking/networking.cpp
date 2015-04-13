@@ -113,7 +113,7 @@ namespace iosync
 			return;
 		}
 
-		bool player::hasPacket(packetID ID) const
+		bool player::hasReliablePacket(packetID ID) const
 		{
 			return (confirmedPackets.find(ID) != confirmedPackets.end());
 		}
@@ -426,7 +426,7 @@ namespace iosync
 			return;
 		}
 
-		bool networkEngine::hasPacket(packetID ID) const
+		bool networkEngine::hasReliablePacket(packetID ID) const
 		{
 			for (auto& packetInTransit : packetsInTransit)
 			{
@@ -716,7 +716,7 @@ namespace iosync
 			// Just an alias to make my life easier.
 			const auto& ID = footer.reliableIdentifier;
 
-			bool response = !connection.hasPacket(ID);
+			bool response = !connection.hasReliablePacket(ID);
 
 			if (response)
 				connection.addReliablePacket(ID);
@@ -934,7 +934,7 @@ namespace iosync
 			// Check for errors:
 			if (p != nullptr)
 			{
-				if (!p->hasPacket(footer.reliableIdentifier))
+				if (!p->hasReliablePacket(footer.reliableIdentifier))
 				{
 					p->addReliablePacket(footer.reliableIdentifier);
 				}

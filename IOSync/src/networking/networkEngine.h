@@ -240,7 +240,7 @@ namespace iosync
 				bool hasReliablePackets() const override;
 
 				void removeReliablePacket(packetID ID) override;
-				bool hasPacket(packetID ID) const override;
+				bool hasReliablePacket(packetID ID) const override;
 
 				// This method passes the message represented by the header specified.
 				// This will only pass the data-segment of the message; the footer will not be passed.

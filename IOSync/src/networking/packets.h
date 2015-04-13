@@ -210,9 +210,10 @@ namespace iosync
 			// The address this packet is going to.
 			address destination;
 
-			// A "snapshot" of the last time this packet was sent.
+			// A "snapshot" of the time this packet was initially sent.
 			high_resolution_clock::time_point snapshot;
 
+			//  A "snapshot" of the time this packet was last sent.
 			high_resolution_clock::time_point resendSnapshot;
 
 			// The reliable identifier of this packet.
