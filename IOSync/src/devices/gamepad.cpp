@@ -26,7 +26,7 @@ namespace iosync
 		void gamepadState::readFrom(QSocket& socket)
 		{
 			#ifdef GAMEPAD_NETWORK_SAFE
-				auto startPosition = socket.readOffset;
+				//auto startPosition = socket.readOffset;
 			#endif
 
 			#ifdef GAMEPAD_FAST_NETWORK_IO
@@ -67,7 +67,7 @@ namespace iosync
 		void gamepadState::writeTo(QSocket& socket)
 		{
 			#ifdef GAMEPAD_NETWORK_SAFE
-				auto startPosition = socket.writeOffset;
+				//auto startPosition = socket.writeOffset;
 			#endif
 
 			#ifdef GAMEPAD_FAST_NETWORK_IO

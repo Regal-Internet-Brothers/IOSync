@@ -2,7 +2,7 @@
 
 // Preprocessor related:
 #define IOSYNC_TESTMODE
-//#define IOSYNC_FAST_TESTMODE
+#define IOSYNC_FAST_TESTMODE
 
 #define XINPUT_DEVICE_KEYBOARD
 #define XINPUT_DEVICE_GAMEPAD
@@ -131,7 +131,7 @@ namespace iosync
 
 		enum gamepadMetrics : unsigned long long
 		{
-			GAMEPAD_DEFAULT_TIMEOUT = 4000,
+			GAMEPAD_DEFAULT_TIMEOUT = 10000,
 		};
 
 		// Structures:
@@ -274,19 +274,38 @@ namespace iosync
 							&& (!checkRealDevices || (!gp::__winnt__pluggedIn(i)))
 						#endif
 					)
+					{
 						return i;
+					}
 				}
 
 				return GAMEPAD_ID_NONE;
 			}
 
 			// This will map a remote gamepad-identifier to a local 'gamepad' object.
-			// If the a device could not be found, this will return 'nullptr'.
+			// If a device could not be found, this will return 'nullptr'.
 			inline gamepad* getGamepad(gamepadID identifier) const
 			{
 				for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
 				{
 					if (gamepadConnected(i) && gamepads[i]->remoteGamepadNumber == identifier)
+					{
+						return gamepads[i];
+					}
+				}
+
+				return nullptr;
+			}
+
+			// This will retrieve a gamepad using its local identifier.
+			// This is mainly provided for future-proofing,
+			// there isn't much of a point to calling this yet.
+			// If a device couldn't be found, this will return 'nullptr'.
+			inline gamepad* getLocalGamepad(gamepadID identifier)
+			{
+				for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
+				{
+					if (gamepadConnected(i) && gamepads[i]->localGamepadNumber == identifier)
 					{
 						return gamepads[i];
 					}
@@ -354,10 +373,14 @@ namespace iosync
 			// This command is used to begin a device-message for a 'gamepad' object.
 			// Please note that this command is only needed when referring to specific 'gamepads',
 			// for messages which deal with all 'gamepads', this is not needed, and may cause undefined behavior.
+			// When using this, please do not supply an "extension flag", this is already handled for you.
 			inline headerInfo beginGamepadDeviceMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, deviceMessageType devMsgType)
 			{
 				// Get the header information from the main routine.
 				auto info = beginDeviceMessage(engine, socket, DEVICE_TYPE_GAMEPAD, devMsgType);
+
+				// Mark this message as "extended".
+				socket.writeBool(true);
 
 				// Write the gamepad identifier specified.
 				socket.write<serializedGamepadID>((serializedGamepadID)identifier);
@@ -465,7 +488,7 @@ namespace iosync
 
 				#if defined(XINPUT_DEVICE_KEYBOARD)
 					// Request for remote-keyboard access.
-					sendConnectMessage(engine, socket, DEVICE_TYPE_KEYBOARD, destination);
+					//sendConnectMessage(engine, socket, DEVICE_TYPE_KEYBOARD, destination);
 				#endif
 
 				#if defined(XINPUT_DEVICE_GAMEPAD) && !defined(XINPUT_DEVICE_GAMEPAD_AUTODETECT)

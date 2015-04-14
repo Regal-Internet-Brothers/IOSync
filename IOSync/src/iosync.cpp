@@ -512,11 +512,9 @@ namespace iosync
 					break;
 				case DEVICE_TYPE_GAMEPAD:
 					{
-						gamepadID identifier;
-
 						if (extended)
 						{
-							identifier = (gamepadID)socket.read<serializedGamepadID>();
+							auto identifier = (gamepadID)socket.read<serializedGamepadID>();
 							bool remotelyConnected = remoteGamepadConnected(identifier);
 
 							if (program->allowDeviceDetection() && remotelyConnected)
@@ -530,26 +528,33 @@ namespace iosync
 
 								return false;
 							}
+
+							// Connect a gamepad using the identifier specified.
+							if (connectGamepad(program, identifier) == nullptr)
+							{
+								return false;
+							}
+
+							if (program->mode == iosync_application::MODE_SERVER)
+							{
+								// Tell the user that their gamepad was connected.
+								sendGamepadConnectMessage(*program->network, socket, identifier, DESTINATION_REPLY);
+							}
 						}
 						else
 						{
-							identifier = getNextGamepadID(program->reserveLocalGamepads());
-						}
+							auto pad = connectGamepad(program);
 
-						if (identifier == GAMEPAD_ID_NONE)
-						{
-							return false;
-						}
+							if (pad == nullptr)
+							{
+								return false;
+							}
 
-						// Connect a gamepad using the identifier specified.
-						if (!connectGamepad(program, identifier))
-						{
-							return false;
-						}
-
-						if (program->mode == iosync_application::MODE_SERVER)
-						{
-							sendGamepadConnectMessage(*program->network, socket, identifier, DESTINATION_REPLY);
+							if (program->mode == iosync_application::MODE_SERVER)
+							{
+								// Tell the user that their gamepad was connected.
+								sendGamepadConnectMessage(*program->network, socket, pad->remoteGamepadNumber, DESTINATION_REPLY);
+							}
 						}
 					}
 
@@ -682,16 +687,14 @@ namespace iosync
 
 		void connectedDevices::serializeGamepadConnectMessage(QSocket& socket, gamepadID identifier)
 		{
-			// Mark this message as extension based.
-			socket.writeBool(true);
+			// Nothing so far.
 
 			return;
 		}
 
 		void connectedDevices::serializeGamepadDisconnectMessage(QSocket& socket, gamepadID identifier)
 		{
-			// Mark this message as extension based.
-			socket.writeBool(true);
+			// Nothing so far.
 
 			return;
 		}
@@ -725,6 +728,7 @@ namespace iosync
 
 		outbound_packet connectedDevices::generateGamepadConnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address realAddress, address forwardAddress)
 		{
+			// This will automatically add the extension-flag to the message.
 			auto headerInformation = beginGamepadDeviceMessage(engine, socket, identifier, DEVICE_NETWORK_MESSAGE_CONNECT);
 
 			serializeGamepadConnectMessage(socket, identifier);
@@ -734,6 +738,7 @@ namespace iosync
 
 		outbound_packet connectedDevices::generateGamepadDisconnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address realAddress, address forwardAddress)
 		{
+			// This will automatically add the extension-flag to the message.
 			auto headerInformation = beginGamepadDeviceMessage(engine, socket, identifier, DEVICE_NETWORK_MESSAGE_DISCONNECT);
 
 			serializeGamepadDisconnectMessage(socket, identifier);
@@ -871,29 +876,44 @@ namespace iosync
 
 		deviceMessageType connectedDevices::parseGamepadMessage(iosync_application* program, QSocket& socket, deviceMessageType subMessageType, const messageHeader& header, const messageFooter& footer)
 		{
-			// Local variable(s):
-
-			// Read the identifier of the incoming 'gamepad'.
-			gamepadID remoteIdentifier = (gamepadID)socket.read<serializedGamepadID>();
-			gp* pad = getGamepad(remoteIdentifier);
-
-			if (pad == nullptr)
-				return DEVICE_NETWORK_MESSAGE_INVALID;
-
-			switch (subMessageType)
+			// Check if this message uses header-extensions:
+			if (socket.readBool())
 			{
-				case DEVICE_NETWORK_MESSAGE_ENTRIES:
-					parseIODevice(program, socket, pad, header, footer);
+				// Local variable(s):
 
-					break;
-				default:
-					// This sub-message type is unsupported, skip it.
-					clog << "Invalid gamepad network-message detected." << endl;
+				// Read the identifier of the incoming 'gamepad'.
+				gamepadID identifier = (gamepadID)socket.read<serializedGamepadID>();
 
+				// Retrieve the correct gamepad for this message.
+				gp* pad = getGamepad(identifier); // getLocalGamepad(identifier);
+
+				// Ensure we were able to retrieve a gamepad:
+				if (pad == nullptr)
 					return DEVICE_NETWORK_MESSAGE_INVALID;
-			}
 
-			return subMessageType;
+				// Check the sub-message type:
+				switch (subMessageType)
+				{
+					case DEVICE_NETWORK_MESSAGE_ENTRIES:
+						parseIODevice(program, socket, pad, header, footer);
+
+						break;
+					default:
+						// This sub-message type is unsupported, skip it.
+						clog << "Invalid gamepad network-message detected." << endl;
+
+						return DEVICE_NETWORK_MESSAGE_INVALID;
+				}
+
+				// Return the sub-message type, so the
+				// caller knows the message was parsed.
+				return subMessageType;
+			}
+			
+			// Non-extended gamepad messages are not supported at this time.
+			// These messages must be handled through the standard routines
+			// that execute before this routine can even be called.
+			return DEVICE_NETWORK_MESSAGE_INVALID;
 		}
 
 		void connectedDevices::parseIODevice(iosync_application* program, QSocket& socket, IODevice* device, const messageHeader& header, const messageFooter& footer)

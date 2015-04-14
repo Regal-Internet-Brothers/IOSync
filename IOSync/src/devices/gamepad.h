@@ -181,11 +181,14 @@ namespace iosync
 					// This command may be used to detect if a real gamepad is connected on the current system.
 					static inline bool __winnt__pluggedIn(gamepadID identifier)
 					{
+						/*
 						XINPUT_CAPABILITIES pCapabilities;
 						ZeroVariable(pCapabilities);
 
-						//return (__winnt__realDeviceStateResponse(identifier) != ERROR_DEVICE_NOT_CONNECTED);
 						return (XInputGetCapabilities((DWORD)identifier, XINPUT_FLAG_GAMEPAD, &pCapabilities) != ERROR_DEVICE_NOT_CONNECTED);
+						*/
+
+						return (__winnt__realDeviceStateResponse(identifier) != ERROR_DEVICE_NOT_CONNECTED);
 					}
 
 					static inline DWORD __winnt__rumbleDevice(gamepadID identifier, XINPUT_VIBRATION vibration, milliseconds ms=(milliseconds)DEFAULT_DEBUG_RUMBLE_TIME)

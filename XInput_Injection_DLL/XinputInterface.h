@@ -6,6 +6,9 @@
 // Includes:
 #include <windows.h>
 
+// Flags to pass to XInputGetCapabilities:
+#define XINPUT_FLAG_GAMEPAD             0x00000001
+
 // Structures:
 typedef struct _XINPUT_GAMEPAD
 {
