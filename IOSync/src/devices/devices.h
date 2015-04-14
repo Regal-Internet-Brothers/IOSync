@@ -2,6 +2,7 @@
 
 // Includes:
 #include "../platform.h"
+#include "../util.h"
 #include "../networking/forwardSocket.h"
 
 // Standard library:

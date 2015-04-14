@@ -59,6 +59,7 @@
     <ClInclude Include="src\networking\reliablePacketManager.h" />
     <ClInclude Include="src\networking\socket.h" />
     <ClInclude Include="src\platform.h" />
+    <ClInclude Include="src\util.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Icon.rc" />

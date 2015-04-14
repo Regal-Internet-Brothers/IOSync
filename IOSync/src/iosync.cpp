@@ -139,7 +139,8 @@ namespace iosync
 		// connectedDevices:
 
 		// Constructor(s):
-		connectedDevices::connectedDevices() : keyboard(nullptr)
+		connectedDevices::connectedDevices(milliseconds gpTimeout)
+			: keyboard(nullptr), gamepadTimeout(gpTimeout)
 		{
 			for (auto i = 0; i < MAX_GAMEPADS; i++)
 				gamepads[i] = nullptr;
@@ -258,6 +259,19 @@ namespace iosync
 						}
 					}
 				}
+				else if (program->allowDeviceSimulation())
+				{
+					for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
+					{
+						if (gamepadConnected(i))
+						{
+							if (gamepads[i]->activityTime() > gamepadTimeout)
+							{
+								disconnectLocalGamepad(program, i);
+							}
+						}
+					}
+				}
 			#endif
 
 			for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
@@ -315,6 +329,8 @@ namespace iosync
 
 		bool connectedDevices::disconnectLocalGamepad(iosync_application* program, gamepadID identifier)
 		{
+			deviceInfo << "Disconnecting local gamepad: " << identifier << endl;
+
 			if (gamepads[identifier]->disconnect())
 			{
 				// Execute the gamepad disconnection call-back.
@@ -340,7 +356,7 @@ namespace iosync
 
 				if (gamepads[i]->remoteGamepadNumber == identifier)
 				{
-					return disconnectLocalGamepad(program, identifier);
+					return disconnectLocalGamepad(program, i); // gamepads[i]->localGamepadNumber;
 				}
 			}
 

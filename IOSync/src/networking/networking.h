@@ -20,6 +20,7 @@
 
 // Includes:
 #include "socket.h"
+#include "../util.h"
 
 // Standard library:
 #include <climits>
@@ -148,13 +149,5 @@ namespace iosync
 		{
 			PING_UNAVAILABLE = USHRT_MAX
 		};
-
-		// Functions:
-
-		// This command returns the number of milliseconds that have passed since 't' was updated last.
-		static inline milliseconds elapsed(high_resolution_clock::time_point t)
-		{
-			return duration_cast<milliseconds>(high_resolution_clock::now() - t);
-		}
 	}
 }

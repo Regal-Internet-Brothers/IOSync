@@ -39,7 +39,7 @@
 // Standard library:
 #include <string>
 #include <iostream>
-#include <algorithm>
+//#include <algorithm>
 
 #ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
 	#include <mutex>
@@ -129,6 +129,11 @@ namespace iosync
 			DEVICE_NETWORK_MESSAGE_INVALID,
 		};
 
+		enum gamepadMetrics : unsigned long long
+		{
+			GAMEPAD_DEFAULT_TIMEOUT = 4000,
+		};
+
 		// Structures:
 		struct connectedDevices final
 		{
@@ -142,8 +147,11 @@ namespace iosync
 			// to ensure clients don't repeatedly request to connect a gamepad.
 			unordered_set<gamepadID> reservedGamepads;
 
+			// The "timeout" for gamepads.
+			milliseconds gamepadTimeout;
+
 			// Constructor(s):
-			connectedDevices();
+			connectedDevices(milliseconds gamepadTimeout=(milliseconds)GAMEPAD_DEFAULT_TIMEOUT);
 
 			// Destructor(s):
 			~connectedDevices();
@@ -514,7 +522,7 @@ namespace iosync
 			inline bool gamepadReserved(const gamepadID identifier) const
 			{
 				// Check if the 'reservedGamepads' container has this identifier:
-				if (find(reservedGamepads.begin(), reservedGamepads.end(), identifier) != reservedGamepads.end())
+				if (reservedGamepads.find(identifier) != reservedGamepads.end())
 				{
 					// This is explicitly reserved; we can not use it.
 					return true;

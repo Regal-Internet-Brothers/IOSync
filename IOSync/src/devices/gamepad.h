@@ -181,13 +181,11 @@ namespace iosync
 					// This command may be used to detect if a real gamepad is connected on the current system.
 					static inline bool __winnt__pluggedIn(gamepadID identifier)
 					{
-						/*
 						XINPUT_CAPABILITIES pCapabilities;
+						ZeroVariable(pCapabilities);
 
+						//return (__winnt__realDeviceStateResponse(identifier) != ERROR_DEVICE_NOT_CONNECTED);
 						return (XInputGetCapabilities((DWORD)identifier, XINPUT_FLAG_GAMEPAD, &pCapabilities) != ERROR_DEVICE_NOT_CONNECTED);
-						*/
-
-						return (__winnt__realDeviceStateResponse(identifier) != ERROR_DEVICE_NOT_CONNECTED);
 					}
 
 					static inline DWORD __winnt__rumbleDevice(gamepadID identifier, XINPUT_VIBRATION vibration, milliseconds ms=(milliseconds)DEFAULT_DEBUG_RUMBLE_TIME)
@@ -408,6 +406,12 @@ namespace iosync
 				// This command simulates the current state if 'hasState' specifies to do so.
 				bool simulateState();
 
+				inline high_resolution_clock::time_point updateActivityTimer()
+				{
+					// Set the activity snapshot, then return it to the user.
+					return activitySnapshot = high_resolution_clock::now();
+				}
+
 				inline bool hasState() const
 				{
 					#ifdef PLATFORM_WINDOWS
@@ -426,11 +430,19 @@ namespace iosync
 					#endif
 				}
 
+				// This will tell you how much time has passed since this device was last used.
+				inline milliseconds activityTime() const
+				{
+					return elapsed(activitySnapshot);
+				}
+
 				// Fields:
 				gamepadID localGamepadNumber;
 				gamepadID remoteGamepadNumber;
 
 				gamepadState state;
+
+				high_resolution_clock::time_point activitySnapshot;
 
 				#ifdef PLATFORM_WINDOWS
 					DWORD __winnt__lastPacketNumber;
