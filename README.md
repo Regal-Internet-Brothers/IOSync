@@ -1,14 +1,10 @@
 # IOSync
-IOSync is an application which allows you to synchronize input events from several computers to a single host machine.
+IOSync is a console-application which allows you to synchronize input events from several computers to a single host machine.
 The main purpose of this application is to send keyboard and gamepad messages to a remote machine, in order to play local multiplayer games over the internet.
 
-Couple this with a quick enough streaming solution (See: ["Streaming (Audio and Video)"](https://github.com/Regal-Internet-Brothers/IOSync/wiki/Streaming-(Audio-and-Video))), and any games that support keyboard input, and you should have an experience almost as good as Steam's in-home streaming. The catch is, this can be done over the internet, rather than a home network. Setting up audio and video solutions can be a daunting for some, but the outcome can definitely be worth it.
+Couple this with a quick enough streaming solution (See: ["Streaming (Audio and Video)"](https://github.com/Regal-Internet-Brothers/IOSync/wiki/Streaming-(Audio-and-Video))), and any games that support keyboard input, and you should have an experience almost as good as [Steam's in-home streaming](http://store.steampowered.com/streaming). The catch is, this can be done over the internet, rather than a home network. No VPN required, just a bit of setup, and a decent internet connection. Setting up audio and video solutions can be a daunting task for some, but the outcome can definitely be worth it. This isn't a replacement for "in-home streaming", but it is a replacement for tricking Steam with a VPN service. This project may not be as elegant as Valve's solutions, but it has some major benefits.
 
-This is an early version of the project; features are untested.
-This repository is mainly meant to "showcase" the source code thus far.
-
-If you would like to help, feel free to make a pull request.
-Just realize that I may fix the formatting of submissions.
+This is an early version of the project; some features haven't been thoroughly tested. This repository is mainly meant to "showcase" the source code thus far. If you would like to help, feel free to make a pull request. Just realize that I may fix the formatting of submissions.
 
 **Supported "devices":**
 * Keyboard (I/O)
@@ -17,6 +13,7 @@ Just realize that I may fix the formatting of submissions.
 **TO-DO List:**
 * Rumble simulation for 'XInput' gamepads.
 * Explicit 'XInput' gamepad/device support synchronization.
+* DirectInput integration.
 
 ##Getting Started##
 
