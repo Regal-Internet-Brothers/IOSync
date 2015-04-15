@@ -2,9 +2,12 @@
 
 // Preprocessor related:
 #define IOSYNC_TESTMODE
-#define IOSYNC_FAST_TESTMODE
+//#define IOSYNC_FAST_TESTMODE
 
-#define XINPUT_DEVICE_KEYBOARD
+#ifndef IOSYNC_FAST_TESTMODE
+	#define XINPUT_DEVICE_KEYBOARD
+#endif
+
 #define XINPUT_DEVICE_GAMEPAD
 
 #define XINPUT_DEVICE_GAMEPAD_AUTODETECT
@@ -488,7 +491,7 @@ namespace iosync
 
 				#if defined(XINPUT_DEVICE_KEYBOARD)
 					// Request for remote-keyboard access.
-					//sendConnectMessage(engine, socket, DEVICE_TYPE_KEYBOARD, destination);
+					sendConnectMessage(engine, socket, DEVICE_TYPE_KEYBOARD, destination);
 				#endif
 
 				#if defined(XINPUT_DEVICE_GAMEPAD) && !defined(XINPUT_DEVICE_GAMEPAD_AUTODETECT)
