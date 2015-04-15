@@ -39,6 +39,11 @@ Building the injection/wrapper DLLs is pretty straight forward, as long as you h
 * DO NOT move any of the injection DLLs/modules into your system-folder ("System32"/"SysWOW64", etc) on Windows. You probably won't get any issues, but if you rename an injection-DLL to one of the 'XInput' DLL names, you could run into problems. If you're going to copy over an injection DLL/module, please copy to the actual location, not your system-folder.
 * Some emulators (Dolphin specifically) have very 'dynamic' ways of managing 'XInput'. Remote DLL injection may not work well with these applications. It's best to simply move over the appropriate injection DLL, then rename it.
 
+#####Special Thanks:#####
+* Matthew Diamond (For initially helping with DLL injection)
+* MainMemory (For his really basic "jump injection" command; [original source here](https://github.com/sonicretro/sadx-mod-loader/blob/49cbca9ffecbcdc9541ac63ed2bc88ae52bfcfbf/include/ModLoader/MemAccess.h#L148))
+* SonicFreak94 (Michael), and Kirbeh (Tristan) for helping with testing.
+
 ##History##
 IOSync was a project I started a few years ago in BlitzMax using the old 'keybd_event' Windows API command, and some hacked together input detection.
 Today, it's not a lot better, but at least it's solid from a networking front.
