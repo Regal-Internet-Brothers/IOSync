@@ -2,7 +2,7 @@
 IOSync is an application which allows you to synchronize input events from several computers to a single host machine.
 The main purpose of this application is to send keyboard and gamepad messages to a remote machine, in order to play local multiplayer games over the internet.
 
-Couple this with a quick enough streaming solution (See below), and any games that support keyboard input, and you should have an experience almost as good as Steam's in-home streaming. The catch is, this can be done over the internet, rather than a home network. Setting up audio and video solutions can be a daunting for some, but the outcome can definitely be worth it.
+Couple this with a quick enough streaming solution (See: ["Streaming (Audio and Video)"](https://github.com/Regal-Internet-Brothers/IOSync/wiki/Streaming-(Audio-and-Video))), and any games that support keyboard input, and you should have an experience almost as good as Steam's in-home streaming. The catch is, this can be done over the internet, rather than a home network. Setting up audio and video solutions can be a daunting for some, but the outcome can definitely be worth it.
 
 This is an early version of the project; features are untested.
 This repository is mainly meant to "showcase" the source code thus far.
@@ -29,7 +29,7 @@ IOSync works immediately when a server is started. This means any client can con
 'XInput' integration is partially automated by default. If a local controller is plugged in, IOSync will see it, and then immediately attempt to connect the virtual device to the remote machine. Virtual 'XInput' devices are only available to programs which use 'XInput', and are able to be easily "injected" into. Injection has not been standardized, so it is not an explicit feature. Despite this, the latest versions of IOSync may request a "PID" when starting up. You may use this to inject one of the "injector" DLLs/modules. The exact module used is dependent on the process's architecture/platform. This will be resolved automatically. In the event remote injection does not work well (Actively changing module/memory state, original module gets unloaded, etc), you may also use the "injection modules" as wrappers/"shims" for the executable directly. This can be done by copying and/or moving the appropriate DLL (Correct architecture; probably x86) into the same folder as the targeted executable, then renaming the module to be the correct 'XInput' module-name ("xinput1_X", "xinput9_1_0.dll", etc). If the program does not use XInput, injection will not work. Injection has also not been tested with DotNET processes; use with caution. As the license says, I'm not held responsible for what happens when you use this software.
 
 ###Streaming (Audio and Video; Gameplay):###
-* [Please visit the wiki page regarding streaming](https://github.com/Regal-Internet-Brothers/IOSync/wiki/Streaming).
+* [Please visit the wiki page regarding streaming](https://github.com/Regal-Internet-Brothers/IOSync/wiki/Streaming-(Audio-and-Video)).
 
 ###Compiling the project(s):###
 This repository only provides source code at this time. This means you're going to have to compile the project.
