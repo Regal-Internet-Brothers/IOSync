@@ -33,8 +33,8 @@ namespace iosync
 			// applicationException:
 
 			// Constructor(s):
-			applicationException::applicationException(application* targetedProgram)
-				: iosync_exception(), program(targetedProgram) { /* Nothing so far. */ }
+			applicationException::applicationException(application* targetedProgram, const string& exception_name)
+				: iosync_exception(exception_name), program(targetedProgram) { /* Nothing so far. */ }
 
 			// Methods:
 			// Nothing so far.

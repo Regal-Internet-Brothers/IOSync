@@ -123,7 +123,7 @@ namespace iosync
 
 			// Constructor(s):
 			noWindowException::noWindowException(application* program)
-				: applicationException(program) { /* Nothing so far. */ }
+				: applicationException(program, "IOSYNC: Unable to open native window.") { /* Nothing so far. */ }
 
 			// Methods:
 			const string noWindowException::message() const throw()

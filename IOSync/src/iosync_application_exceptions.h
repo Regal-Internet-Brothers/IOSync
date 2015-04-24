@@ -19,7 +19,7 @@ namespace iosync
 		namespace applicationExceptions
 		{
 			// Classes:
-			class noWindowException : public applicationException
+			class noWindowException final : public applicationException
 			{
 				public:
 					// Constructor(s):

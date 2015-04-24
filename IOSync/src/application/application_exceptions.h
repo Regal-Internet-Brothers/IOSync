@@ -19,7 +19,7 @@ namespace iosync
 			{
 				public:
 					// Constructor(s):
-					applicationException(application* targetedProgram);
+					applicationException(application* targetedProgram, const string& exception_name="IOSYNC: Application exception.");
 
 					// Methods:
 					virtual const string message() const throw() override = 0;

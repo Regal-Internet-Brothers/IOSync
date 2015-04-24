@@ -11,15 +11,12 @@ namespace iosync
 		// iosync_exception:
 
 		// Constructor(s):
-		iosync_exception::iosync_exception() : exception()
+		iosync_exception::iosync_exception(const string& exception_name) : runtime_error(exception_name)
 		{
 			// Nothing so far.
 		}
 
 		// Methods:
-		const char* iosync_exception::what() const throw()
-		{
-			return message().c_str();
-		}
+		// Nothing so far.
 	}
 }
