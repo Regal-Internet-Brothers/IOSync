@@ -52,6 +52,7 @@
 #include <string>
 #include <iostream>
 #include <stack>
+#include <queue>
 #include <algorithm>
 
 #ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
@@ -655,6 +656,7 @@ namespace iosync
 				static const wstring DEFAULT_PATH;
 
 				// INI sections:
+				static const wstring APPLICATION_SECTION;
 				static const wstring NETWORK_SECTION;
 
 				#ifdef PLATFORM_WINDOWS
@@ -662,6 +664,8 @@ namespace iosync
 				#endif
 
 				// INI properties:
+				static const wstring APPLICATION_MODE;
+
 				static const wstring NETWORK_ADDRESS;
 				static const wstring NETWORK_USERNAME;
 
@@ -670,7 +674,7 @@ namespace iosync
 				#endif
 
 				// Constructor(s):
-				applicationConfiguration();
+				applicationConfiguration(applicationMode internal_mode=MODE_SERVER);
 
 				// Destructor(s):
 				~applicationConfiguration();
@@ -689,10 +693,12 @@ namespace iosync
 				representativeAddress remoteAddress;
 
 				#ifdef PLATFORM_WINDOWS
-					stack<DWORD> PIDs;
+					queue<DWORD> PIDs;
 				#endif
 
 				wstring username;
+
+				applicationMode mode;
 			};
 
 			// Global variable(s):

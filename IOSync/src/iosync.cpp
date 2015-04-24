@@ -3,6 +3,7 @@
 
 // Standard library:
 #include <sstream>
+#include <stdexcept>
 
 // Namespace(s):
 namespace iosync
@@ -962,6 +963,7 @@ namespace iosync
 	const wstring iosync_application::applicationConfiguration::DEFAULT_PATH = L"config.ini";
 
 	// INI sections:
+	const wstring iosync_application::applicationConfiguration::APPLICATION_SECTION = L"application";
 	const wstring iosync_application::applicationConfiguration::NETWORK_SECTION = L"network";
 
 	#ifdef PLATFORM_WINDOWS
@@ -969,6 +971,8 @@ namespace iosync
 	#endif
 
 	// INI properties:
+	const wstring iosync_application::applicationConfiguration::APPLICATION_MODE = L"mode";
+
 	const wstring iosync_application::applicationConfiguration::NETWORK_ADDRESS = L"address";
 	const wstring iosync_application::applicationConfiguration::NETWORK_USERNAME = L"username";
 
@@ -977,7 +981,7 @@ namespace iosync
 	#endif
 
 	// Constructor(s):
-	iosync_application::applicationConfiguration::applicationConfiguration() { /* Nothing so far. */ }
+	iosync_application::applicationConfiguration::applicationConfiguration(applicationMode internal_mode) : mode(internal_mode) { /* Nothing so far. */ }
 
 	// Destructor(s):
 	iosync_application::applicationConfiguration::~applicationConfiguration() { /* Nothing so far. */ }
@@ -1039,6 +1043,15 @@ namespace iosync
 
 		// Local variable(s):
 
+		auto applicationIterator = variables.find(APPLICATION_SECTION);
+
+		if (applicationIterator != variables.end())
+		{
+			auto application = (*applicationIterator).second;
+
+			mode = (applicationMode)stoi(application[APPLICATION_MODE]);
+		}
+
 		// Attempt to find the "networking" section-object from its identifier.
 		auto networkingIterator = variables.find(NETWORK_SECTION);
 		
@@ -1071,18 +1084,44 @@ namespace iosync
 
 				if (PIDEntry != XInput.end())
 				{
-					auto& numbers = (*PIDEntry).second;
-
-					for (wstring::size_type numberLocation = 0; numberLocation != wstring::npos && numberLocation < numbers.length();)
+					try
 					{
-						auto edge = numbers.find(L",", numberLocation);
+						const auto& numbers = (*PIDEntry).second;
 
-						if (edge == wstring::npos)
-							edge = numbers.length();
+						for
+						(
+							// Calculate the start of the first number:
+							wstring::size_type numberLocation = ((numberLocation = numbers.find('[')) != wstring::npos) ? (numberLocation+1) : 0;
+							
+							// Ensure the next number-location isn't at the end of the string:
+							numberLocation != wstring::npos && numberLocation < numbers.length();
+						)
+						{
+							// Calculate the edge of the current number:
+							auto edge = numbers.find(',', numberLocation);
 
-						PIDs.push(stoi(numbers.substr(numberLocation, numberLocation-edge)));
+							if (edge == wstring::npos)
+							{
+								// We were unable to find a separator, look for the scope-end symbol:
+								edge = numbers.find(']', numberLocation);
 
-						numberLocation = edge+1;
+								if (edge == wstring::npos)
+								{
+									// When all else fails, the edge will be the end of the string.
+									edge = numbers.length();
+								}
+							}
+
+							// Push the current number onto the PID-container.
+							PIDs.push(stoi(numbers.substr(numberLocation, numberLocation-edge)));
+
+							// Move to the starting point of the next entry.
+							numberLocation = edge+1;
+						}
+					}
+					catch (std::invalid_argument&)
+					{
+						//PIDs.clear();
 					}
 				}
 			}
@@ -1093,6 +1132,13 @@ namespace iosync
 
 	void iosync_application::applicationConfiguration::write(INI::INIVariables<wstring>& variables)
 	{
+		// Application:
+		auto& application = variables[APPLICATION_SECTION];
+
+		// Encode the application-mode.
+		{ wstringstream ss; ss << mode; application[APPLICATION_MODE] = ss.str(); }
+
+		// Networking:
 		auto& networking = variables[NETWORK_SECTION];
 
 		if (remoteAddress.isSet())
@@ -1101,9 +1147,13 @@ namespace iosync
 		if (username.length() > 0)
 			networking[NETWORK_USERNAME] = username;
 
+		// Windows-specific:
 		#ifdef PLATFORM_WINDOWS
+			// XInput:
 			if (!PIDs.empty())
 			{
+				// In the event other properties are added to
+				// the 'XInput' section, this will need to be moved.
 				auto& XInput = variables[XINPUT_SECTION];
 
 				// Make a local copy of the internal PIDs.
@@ -1113,7 +1163,7 @@ namespace iosync
 
 				ss << "[";
 
-				for (auto PID = PIDs.top(); !PIDs.empty(); PIDs.pop())
+				for (auto PID = PIDs.front(); !PIDs.empty(); PIDs.pop())
 				{
 					ss << PID;
 
@@ -1369,7 +1419,7 @@ namespace iosync
 		// Local variable(s):
 		auto argCount = args.size();
 
-		applicationConfiguration configuration;
+		applicationConfiguration configuration(mode);
 
 		// Attempt to load the default configuration file.
 		#ifndef IOSYNC_FAST_TESTMODE
@@ -1378,24 +1428,43 @@ namespace iosync
 				configuration.load();
 
 				#ifdef PLATFORM_WINDOWS
-					if (!configuration.PIDs.empty())
+					while (!configuration.PIDs.empty())
 					{
-						for (DWORD PID = configuration.PIDs.top(); !configuration.PIDs.empty(); configuration.PIDs.pop())
-						{
-							devices::gamepad::__winnt__injectLibrary(PID);
-						}
+						devices::gamepad::__winnt__injectLibrary(configuration.PIDs.front());
 
-						//configuration.PIDs.clear();
+						configuration.PIDs.pop();
 					}
+
+					//configuration.PIDs.clear();
 				#endif
 
-				if (!configuration.remoteAddress.IP.empty())
+				switch (configuration.mode)
 				{
-					return execute(configuration.username, configuration.remoteAddress.IP, configuration.remoteAddress.port);
-				}
-				else
-				{
-					return execute(configuration.remoteAddress.port);
+					case MODE_CLIENT:
+						// Check if a proper address was specified:
+						if (address::addressSet(configuration.remoteAddress.IP))
+						{
+							return execute(configuration.username, configuration.remoteAddress.IP, configuration.remoteAddress.port);
+						}
+						else
+						{
+							bool hostAnyway;
+
+							// Check if we should move into the next routine or not:
+							cout << "Invalid address specified: Would you like to host instead? (Port: ";
+							cout << configuration.remoteAddress.port << ", Y/N): "; hostAnyway = userBoolean(); // cout << endl;
+
+							if (!hostAnyway)
+							{
+								return -1;
+							}
+						}
+					case MODE_SERVER:
+						return execute(configuration.remoteAddress.port);
+					default:
+						cout << "Invalid application-mode specified." << endl;
+
+						return -1;
 				}
 			}
 			catch (const exception& e)
@@ -1406,14 +1475,7 @@ namespace iosync
 
 			#ifndef IOSYNC_FAST_TESTMODE
 				{
-					char choice;
-
-					cout << "Unable to load configuration, would you like to log new settings? (Y/N): "; cin >> choice; // cout << endl;
-
-					if ((logChoices = (tolower(choice) == 'y')) == false)
-					{
-						logChoices = (choice == '1');
-					}
+					cout << "Unable to load configuration, would you like to log new settings? (Y/N): "; logChoices = userBoolean(); // cout << endl;
 				}
 			#endif
 
@@ -1513,7 +1575,7 @@ namespace iosync
 
 	int iosync_application::execute(wstring username, string remoteAddress, addressPort remotePort, addressPort localPort)
 	{
-		cout << "Attempting to opening client network (" << remoteAddress << networking::ADDRESS_SEPARATOR << remotePort << ")..." << endl << endl;
+		cout << "Attempting to open client network (" << remoteAddress << networking::ADDRESS_SEPARATOR << remotePort << ")..." << endl << endl;
 
 		// Allocate a new "networking engine".
 		auto engine = new clientNetworkEngine(*this, username);

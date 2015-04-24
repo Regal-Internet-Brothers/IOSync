@@ -69,10 +69,14 @@ int runProgram(OSINFO OSInfo, rate updateRate=DEFAULT_UPDATERATE)
 
 			if (responseCode != 0)
 			{
-				cout << "Unable to continue operations, exiting..." << endl;
+				cout << "Unable to continue operations; exiting..." << endl;
 				cout << "Error code thrown by application: " << responseCode << endl;
 
-				system("PAUSE");
+				#ifdef PLATFORM_WINDOWS
+					system("PAUSE");
+				#else
+					cin.get();
+				#endif
 
 				// Return the response-code.
 				return responseCode;

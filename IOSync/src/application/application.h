@@ -14,6 +14,7 @@
 #include <vector>
 #include <string>
 #include <codecvt>
+#include <iostream>
 
 // Namespace(s):
 using namespace iosync::networking;
@@ -102,6 +103,15 @@ namespace iosync
 				system("CLS");
 
 				return;
+			}
+
+			template<typename characterType=char, typename characterTraits=char_traits<characterType>>
+			static inline bool userBoolean(std::basic_istream<characterType, characterTraits>& is=cin)
+			{
+				// Local variable(s):
+				char choice; is >> choice;
+
+				return (choice == '1') || (tolower(choice) == 'y');
 			}
 
 			#ifdef PLATFORM_WINDOWS
