@@ -3,7 +3,11 @@
 // Includes:
 #include <windows.h>
 
-#include "XinputInterface.h"
+#ifdef XINPUT_INJECTOR
+	#include "XinputInterface.h"
+#else
+	#include <Xinput.h>
+#endif
 
 // Namespace(s):
 namespace REAL_XINPUT

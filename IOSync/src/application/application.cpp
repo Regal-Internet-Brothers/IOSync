@@ -57,8 +57,6 @@ namespace iosync
 	// application:
 
 	// Global variable(s):
-	std::wstring_convert<std::codecvt_utf8<wchar_t>> application::stringConverter;
-
 	std::wstring application::path;
 
 	// Constructor(s):

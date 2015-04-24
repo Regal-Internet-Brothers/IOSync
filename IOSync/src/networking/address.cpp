@@ -1,9 +1,12 @@
 // Includes:
 #include "networking.h"
-
 #include "address.h"
 #include "player.h"
 
+// QuickLib:
+#include <QuickLib/QuickINI/QuickINI.h>
+
+// Standard library:
 #include <iostream>
 #include <string>
 
@@ -78,6 +81,20 @@ namespace iosync
 
 			// Return the output-stream so it may be chained.
 			return os;
+		}
+
+		// representativeAddress:
+
+		// Constructor(s):
+		representativeAddress::representativeAddress(string hostname, addressPort remotePort) : IP(hostname), port(remotePort)
+		{
+			// Nothing so far.
+		}
+
+		// Methods:
+		bool representativeAddress::isSet() const
+		{
+			return (port > 0 || (!IP.empty()));
 		}
 	}
 }

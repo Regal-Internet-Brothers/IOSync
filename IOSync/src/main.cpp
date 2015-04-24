@@ -1,4 +1,4 @@
-/*
+﻿/*
 	I/O Sync: Cross-system input events.
 
 	TODO Format:
@@ -35,6 +35,9 @@
 #include <cstdlib>
 #include <cstdio>
 */
+
+#include <io.h>
+#include <fcntl.h>
 
 // Namespace(s):
 using namespace iosync;
@@ -93,12 +96,38 @@ int main(int argc, char** argv)
 	// Initialize networking functionality.
 	QSocket::initSockets();
 
+	#ifdef PLATFORM_WINDOWS
+		REAL_XINPUT::linkTo();
+	#endif
+
 	#ifdef PLATFORM_WINDOWS_EXTENSIONS
 		AllocConsole();
 
 		freopen("CONOUT$", "w", stdout);
-		//freopen("CONOUT$", "w", stderr);
 		freopen("CONIN$", "r", stdin);
+
+		//freopen("CONOUT$", "w", stderr);
+
+		/*
+		// Allow for UTF16 text I/O:
+		char* locale = setlocale(LC_ALL, "English");
+		std::locale engLocale(locale);
+
+		setlocale(LC_ALL, locale);
+		
+		wcout.imbue(engLocale);
+		//wcin.imbue(engLocale);
+
+		_setmode(_fileno(stdout), _O_U16TEXT);
+		_setmode(_fileno(stdin), _O_U16TEXT);
+
+		_wfreopen(L"CONOUT$", L"w", stdout);
+		_wfreopen(L"CONOUT$", L"r", stdin);
+
+		wcout << L"ルイジ." << endl;
+
+		wcin.get();
+		*/
 
 		//SetStdHandle(STD_INPUT_HANDLE, GetStdHandle(STD_INPUT_HANDLE)); // stdin
 		//SetStdHandle(STD_OUTPUT_HANDLE, GetStdHandle(STD_OUTPUT_HANDLE)); // stdout

@@ -79,18 +79,20 @@ namespace iosync
 	{
 		public:
 			// Global variable(s):
-			static std::wstring_convert<std::codecvt_utf8<wchar_t>> stringConverter;
-
 			static std::wstring path;
 
 			// Functions:
 			static inline string wideStringToDefault(const wstring wstr)
 			{
+				std::wstring_convert<std::codecvt_utf8<wchar_t>> stringConverter;
+
 				return stringConverter.to_bytes(wstr);
 			}
 
 			static inline wstring defaultStringToWide(const string str)
 			{
+				std::wstring_convert<std::codecvt_utf8<wchar_t>> stringConverter;
+
 				return stringConverter.from_bytes(str);
 			}
 

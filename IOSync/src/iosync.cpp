@@ -2,7 +2,7 @@
 #include "iosync.h"
 
 // Standard library:
-#include <stack>
+#include <sstream>
 
 // Namespace(s):
 namespace iosync
@@ -956,6 +956,182 @@ namespace iosync
 		}
 	#endif
 
+	// applicationConfiguration:
+
+	// Constant variable(s):
+	const wstring iosync_application::applicationConfiguration::DEFAULT_PATH = L"config.ini";
+
+	// INI sections:
+	const wstring iosync_application::applicationConfiguration::NETWORK_SECTION = L"network";
+
+	#ifdef PLATFORM_WINDOWS
+		const wstring iosync_application::applicationConfiguration::XINPUT_SECTION = L"xinput";
+	#endif
+
+	// INI properties:
+	const wstring iosync_application::applicationConfiguration::NETWORK_ADDRESS = L"address";
+	const wstring iosync_application::applicationConfiguration::NETWORK_USERNAME = L"username";
+
+	#ifdef PLATFORM_WINDOWS
+		const wstring iosync_application::applicationConfiguration::XINPUT_PIDS = L"PIDs";
+	#endif
+
+	// Constructor(s):
+	iosync_application::applicationConfiguration::applicationConfiguration() { /* Nothing so far. */ }
+
+	// Destructor(s):
+	iosync_application::applicationConfiguration::~applicationConfiguration() { /* Nothing so far. */ }
+
+	// Methods:
+	void iosync_application::applicationConfiguration::load(const wstring& path)
+	{
+		read(INI::load(path));
+
+		return;
+	}
+
+	void iosync_application::applicationConfiguration::save(const wstring& path)
+	{
+		// Allocate an INI variable-container.
+		INI::INIVariables<wstring> variables;
+
+		// Write to the local variable-container.
+		write(variables);
+
+		// Save the "serialized" variables to the path specified.
+		INI::save(path, variables, true);
+
+		return;
+	}
+
+	void iosync_application::applicationConfiguration::read(wistream is)
+	{
+		// Allocate an INI variable-container.
+		INI::INIVariables<wstring> variables;
+
+		// Read to the local variable-container.
+		INI::read<wstring::value_type>(is, variables);
+
+		// Read from the container.
+		read(variables);
+
+		return;
+	}
+
+	void iosync_application::applicationConfiguration::write(wostream os)
+	{
+		// Allocate an INI variable-container.
+		INI::INIVariables<wstring> variables;
+
+		// Write to the local variable-container.
+		write(variables);
+
+		// Write the "serialized" variables to the output-stream.
+		INI::write<wstring::value_type>(os, variables, true);
+
+		return;
+	}
+
+	void iosync_application::applicationConfiguration::read(const INI::INIVariables<wstring>& variables)
+	{
+		// Namespace(s):
+		using namespace INI;
+
+		// Local variable(s):
+
+		// Attempt to find the "networking" section-object from its identifier.
+		auto networkingIterator = variables.find(NETWORK_SECTION);
+		
+		// Check for the "networking" section:
+		if (networkingIterator != variables.end())
+		{
+			// Get a reference to the actual section-object.
+			auto networking = (*networkingIterator).second;
+
+			// Parse the user's address-input.
+			remoteAddress.parse(networking[NETWORK_ADDRESS], DEFAULT_PORT);
+
+			// Read the username specified.
+			username = networking[NETWORK_USERNAME];
+		}
+		else
+		{
+			remoteAddress.port = DEFAULT_PORT;
+		}
+
+		#ifdef PLATFORM_WINDOWS
+			// Attempt to find the "xinput" section-object from its identifier.
+			auto XInputIterator = variables.find(XINPUT_SECTION);
+
+			if (XInputIterator != variables.end())
+			{
+				auto& XInput = (*XInputIterator).second;
+
+				auto PIDEntry = XInput.find(XINPUT_PIDS);
+
+				if (PIDEntry != XInput.end())
+				{
+					auto& numbers = (*PIDEntry).second;
+
+					for (wstring::size_type numberLocation = 0; numberLocation != wstring::npos && numberLocation < numbers.length();)
+					{
+						auto edge = numbers.find(L",", numberLocation);
+
+						if (edge == wstring::npos)
+							edge = numbers.length();
+
+						PIDs.push(stoi(numbers.substr(numberLocation, numberLocation-edge)));
+
+						numberLocation = edge+1;
+					}
+				}
+			}
+		#endif
+
+		return;
+	}
+
+	void iosync_application::applicationConfiguration::write(INI::INIVariables<wstring>& variables)
+	{
+		auto& networking = variables[NETWORK_SECTION];
+
+		if (remoteAddress.isSet())
+			remoteAddress.encodeTo(networking[NETWORK_ADDRESS]);
+
+		if (username.length() > 0)
+			networking[NETWORK_USERNAME] = username;
+
+		#ifdef PLATFORM_WINDOWS
+			if (!PIDs.empty())
+			{
+				auto& XInput = variables[XINPUT_SECTION];
+
+				// Make a local copy of the internal PIDs.
+				auto PIDs = this->PIDs;
+
+				wstringstream ss;
+
+				ss << "[";
+
+				for (auto PID = PIDs.top(); !PIDs.empty(); PIDs.pop())
+				{
+					ss << PID;
+
+					if (PIDs.size() > 1)
+					{
+						ss << L", ";
+					}
+				}
+
+				ss << "]";
+
+				XInput[XINPUT_PIDS] = ss.str();
+			}
+		#endif
+
+		return;
+	}
+
 	// Global variable(s):
 	#ifdef IOSYNC_LIVE_COMMANDS
 		iosync_application::programList iosync_application::commandTargets;
@@ -1190,78 +1366,145 @@ namespace iosync
 	// This acts as the default 'execute' implementation.
 	int iosync_application::execute()
 	{
+		// Local variable(s):
 		auto argCount = args.size();
 
-		#ifdef IOSYNC_TESTMODE
-			if (argCount == 0)
+		applicationConfiguration configuration;
+
+		// Attempt to load the default configuration file.
+		#ifndef IOSYNC_FAST_TESTMODE
+			try
 			{
-				wstring username = DEFAULT_PLAYER_NAME;
-				string hostname = "127.0.0.1";
-				nativePort port = DEFAULT_PORT;
+				configuration.load();
 
-				//cout << endl;
-
-				cout << "Application mode (" << MODE_CLIENT << " = Client, " << MODE_SERVER << " = Server): "; cin >> mode; //cout << endl;
-
-				switch (mode)
-				{
-					case MODE_CLIENT:
-						#ifndef IOSYNC_FAST_TESTMODE
-							{
-								string::size_type separatorPosition;
-
-								cout << "Please supply a hostname: "; cin >> hostname; // cout << endl;
-
-								separatorPosition = hostname.find(networking::ADDRESS_SEPARATOR);
-
-								if (separatorPosition != string::npos && separatorPosition < hostname.length())
-								{
-									port = portFromString(hostname.substr(separatorPosition+1));
-
-									hostname = hostname.substr(0, separatorPosition);
-								}
-								else
-								{
-									string portStr;
-
-									cout << "Please supply a remote-port: ";
-									port = portFromInput(cin); // cout << endl;
-								}
-
-								cout << "Please enter a username (No spaces): "; wcin >> username; // cout << endl;
-							}
-						#endif
-
-						//clearConsole();
-
-						return execute(username, hostname, port);
-					case MODE_SERVER:
+				#ifdef PLATFORM_WINDOWS
+					if (!configuration.PIDs.empty())
+					{
+						for (DWORD PID = configuration.PIDs.top(); !configuration.PIDs.empty(); configuration.PIDs.pop())
 						{
-							#ifndef IOSYNC_FAST_TESTMODE
-								cout << "Please enter a port to host with: ";
-								port = portFromInput(cin); // cout << endl;
-							#endif
-
-							DWORD PID; cout << "Please specify a PID to apply XInput injection (0 = None): "; cin >> PID;
-
 							devices::gamepad::__winnt__injectLibrary(PID);
 						}
 
-						//clearConsole();
+						//configuration.PIDs.clear();
+					}
+				#endif
 
-						return execute(port);
+				if (!configuration.remoteAddress.IP.empty())
+				{
+					return execute(configuration.username, configuration.remoteAddress.IP, configuration.remoteAddress.port);
 				}
+				else
+				{
+					return execute(configuration.remoteAddress.port);
+				}
+			}
+			catch (const exception& e)
+			{
+				cout << "Exception caught: " << e.what() << endl;
+		#endif
+			bool logChoices = false;
+
+			#ifndef IOSYNC_FAST_TESTMODE
+				{
+					char choice;
+
+					cout << "Unable to load configuration, would you like to log new settings? (Y/N): "; cin >> choice; // cout << endl;
+
+					if ((logChoices = (tolower(choice) == 'y')) == false)
+					{
+						logChoices = (choice == '1');
+					}
+				}
+			#endif
+
+			#ifdef IOSYNC_TESTMODE
+				if (argCount == 0)
+				{
+					configuration.remoteAddress.port = DEFAULT_PORT;
+
+					//cout << endl;
+
+					cout << "Application mode (" << MODE_CLIENT << " = Client, " << MODE_SERVER << " = Server): "; cin >> mode; //cout << endl;
+
+					switch (mode)
+					{
+						case MODE_CLIENT:
+							#ifndef IOSYNC_FAST_TESTMODE
+								configuration.remoteAddress.IP = "127.0.0.1";
+								configuration.username = DEFAULT_PLAYER_NAME;
+
+								{
+									string::size_type separatorPosition;
+
+									cout << "Please supply a hostname: "; cin >> configuration.remoteAddress.IP; // cout << endl;
+
+									separatorPosition = configuration.remoteAddress.IP.find(networking::ADDRESS_SEPARATOR);
+
+									if (separatorPosition != string::npos && separatorPosition < configuration.remoteAddress.IP.length())
+									{
+										configuration.remoteAddress.port = portFromString(configuration.remoteAddress.IP.substr(separatorPosition+1));
+
+										configuration.remoteAddress.IP = configuration.remoteAddress.IP.substr(0, separatorPosition);
+									}
+									else
+									{
+										string portStr;
+
+										cout << "Please supply a remote-port: ";
+										configuration.remoteAddress.port = portFromInput(cin); // cout << endl;
+									}
+
+									cout << "Please enter a username (No spaces): "; wcin >> configuration.username; // cout << endl;
+								}
+							#endif
+
+							if (logChoices)
+								configuration.save();
+
+							//clearConsole();
+
+							return execute(configuration.username, configuration.remoteAddress.IP, configuration.remoteAddress.port);
+						case MODE_SERVER:
+							{
+								#ifndef IOSYNC_FAST_TESTMODE
+									cout << "Please enter a port to host with: ";
+									configuration.remoteAddress.port = portFromInput(cin); // cout << endl;
+								#endif
+
+								DWORD PID; cout << "Please specify a PID to apply XInput injection (0 = None): "; cin >> PID;
+
+								if (PID != 0)
+								{
+									devices::gamepad::__winnt__injectLibrary(PID);
+
+									if (logChoices)
+									{
+										configuration.PIDs.push(PID);
+									}
+								}
+							}
+
+							if (logChoices)
+								configuration.save();
+
+							//clearConsole();
+
+							return execute(configuration.remoteAddress.port);
+					}
+				}
+			#endif
+		#ifndef IOSYNC_FAST_TESTMODE
 			}
 		#endif
 
 		// Check if we have arguments to use:
-		if (argCount > 0)
-		{
-			return execute((addressPort)stoi(args[0]));
-		}
-		else if (argCount > 1)
+		if (argCount > 1)
 		{
 			return execute((argCount > 2) ? args[2] : DEFAULT_PLAYER_NAME, wideStringToDefault(args[0]), (addressPort)stoi(args[1]));
+		}
+		else if (argCount > 0)
+		{
+			return execute((addressPort)stoi(args[0]));
 		}
 
 		// Call the main implementation.

@@ -2,7 +2,10 @@
 
 // Preprocessor related:
 #define IOSYNC_TESTMODE
-//#define IOSYNC_FAST_TESTMODE
+
+#ifdef IOSYNC_TESTMODE
+	//#define IOSYNC_FAST_TESTMODE
+#endif
 
 #ifndef IOSYNC_FAST_TESTMODE
 	#define XINPUT_DEVICE_KEYBOARD
@@ -25,8 +28,11 @@
 #endif
 
 #define _CRT_SECURE_NO_WARNINGS
+#define _CRT_NON_CONFORMING_SWPRINTFS
 
 // Includes:
+#include "platform.h"
+
 #include "application/application.h"
 
 #include "exceptions.h"
@@ -39,10 +45,14 @@
 #include "devices/keyboard.h"
 #include "devices/gamepad.h"
 
+// QuickLib:
+#include <QuickLib/QuickINI/QuickINI.h>
+
 // Standard library:
 #include <string>
 #include <iostream>
-//#include <algorithm>
+#include <stack>
+#include <algorithm>
 
 #ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
 	#include <mutex>
@@ -59,6 +69,7 @@
 
 // Namespace(s):
 using namespace std;
+using namespace quickLib;
 using namespace iosync::networking;
 using namespace iosync::exceptions::applicationExceptions;
 
@@ -637,6 +648,52 @@ namespace iosync
 					programList connectedPrograms;
 				};
 			#endif
+			
+			struct applicationConfiguration
+			{
+				// Constant variable(s):
+				static const wstring DEFAULT_PATH;
+
+				// INI sections:
+				static const wstring NETWORK_SECTION;
+
+				#ifdef PLATFORM_WINDOWS
+					static const wstring XINPUT_SECTION;
+				#endif
+
+				// INI properties:
+				static const wstring NETWORK_ADDRESS;
+				static const wstring NETWORK_USERNAME;
+
+				#ifdef PLATFORM_WINDOWS
+					static const wstring XINPUT_PIDS;
+				#endif
+
+				// Constructor(s):
+				applicationConfiguration();
+
+				// Destructor(s):
+				~applicationConfiguration();
+
+				// Methods:
+				void load(const wstring& path=DEFAULT_PATH);
+				void save(const wstring& path=DEFAULT_PATH);
+
+				void read(wistream is);
+				void write(wostream os);
+
+				void read(const INI::INIVariables<wstring>& variables);
+				void write(INI::INIVariables<wstring>& variables);
+
+				// Fields:
+				representativeAddress remoteAddress;
+
+				#ifdef PLATFORM_WINDOWS
+					stack<DWORD> PIDs;
+				#endif
+
+				wstring username;
+			};
 
 			// Global variable(s):
 			#ifdef IOSYNC_LIVE_COMMANDS

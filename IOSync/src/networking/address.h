@@ -22,9 +22,9 @@ namespace iosync
 
 		// Constant variable(s):
 		#ifdef QSOCK_IPVABSTRACT
-			static const char* ADDRESS_SEPARATOR = "|";
+			static const char ADDRESS_SEPARATOR = '|';
 		#else
-			static const char* ADDRESS_SEPARATOR = ":";
+			static const char ADDRESS_SEPARATOR = ':';
 		#endif
 
 		// Structures:
@@ -54,6 +54,45 @@ namespace iosync
 			// Network I/O:
 			void readFrom(QSocket& socket);
 			void writeTo(QSocket& socket);
+
+			// Other:
+			template<typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
+			inline void parse(const basic_string<characterType, characterTraits, strAlloc>& input, addressPort default_port)
+			{
+				auto addressDivider = input.find(ADDRESS_SEPARATOR);
+
+				// Ensure we have a separator.
+				if (addressDivider != basic_string<characterType, characterTraits, strAlloc>::npos)
+				{
+					IP = QSocket::StringToIntIP(quickLib::INI::abstractStringToDefault(input.substr(0, addressDivider)));
+					port = stoi(input.substr(addressDivider+1));
+
+					if (port == 0)
+						port = default_port;
+				}
+				else
+				{
+					IP = QSocket::nonNativeToNativeIP(quickLib::INI::abstractStringToDefault(input));
+					port = default_port;
+				}
+
+				return;
+			}
+
+			template<typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
+			void encodeTo(basic_string<characterType, characterTraits, strAlloc>& out_str) const
+			{
+				basic_stringstream<characterType, characterTraits, strAlloc> ss;
+				basic_string<characterType, characterTraits, strAlloc> str;
+
+				quickLib::INI::correctString(QSocket::representIP(IP) + ADDRESS_SEPARATOR, str);
+
+				ss << str << port;
+
+				out_str = ss.str();
+
+				return;
+			}
 
 			// Operators:
 			inline bool operator==(const address* addr) const
@@ -90,6 +129,57 @@ namespace iosync
 
 			// Fields:
 			addressIP IP;
+			addressPort port;
+		};
+
+		struct representativeAddress
+		{
+			// Constructor(s):
+			representativeAddress(string hostname="", addressPort remotePort=0);
+
+			// Methods:
+			bool isSet() const;
+
+			template<typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
+			inline void parse(const basic_string<characterType, characterTraits, strAlloc>& input, addressPort default_port)
+			{
+				auto addressDivider = input.find(ADDRESS_SEPARATOR);
+
+				// Ensure we have a separator.
+				if (addressDivider != basic_string<characterType, characterTraits, strAlloc>::npos)
+				{
+					IP = quickLib::INI::abstractStringToDefault(input.substr(0, addressDivider));
+					port = stoi(input.substr(addressDivider+1));
+
+					if (port == 0)
+						port = default_port;
+				}
+				else
+				{
+					IP = quickLib::INI::abstractStringToDefault(input);
+					port = default_port;
+				}
+
+				return;
+			}
+
+			template<typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
+			void encodeTo(basic_string<characterType, characterTraits, strAlloc>& out_str) const
+			{
+				basic_stringstream<characterType, characterTraits, strAlloc> ss;
+				basic_string<characterType, characterTraits, strAlloc> str;
+
+				quickLib::INI::correctString(IP + ADDRESS_SEPARATOR, str);
+
+				ss << str << port;
+
+				out_str = ss.str();
+
+				return;
+			}
+
+			// Fields:
+			string IP;
 			addressPort port;
 		};
 	}

@@ -31,9 +31,11 @@
     <ClCompile Include="src\devices\devices.cpp" />
     <ClCompile Include="src\devices\gamepad.cpp" />
     <ClCompile Include="src\devices\keyboard.cpp" />
+    <ClCompile Include="src\devices\native\winnt\Real_XInput_Wrapper.cpp" />
     <ClCompile Include="src\exceptions.cpp" />
     <ClCompile Include="src\iosync.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\native\winnt\processManagement.cpp" />
     <ClCompile Include="src\networking\address.cpp" />
     <ClCompile Include="src\networking\messages.cpp" />
     <ClCompile Include="src\networking\networking.cpp" />
@@ -44,11 +46,13 @@
     <ClInclude Include="src\application\application.h" />
     <ClInclude Include="src\application\application_exceptions.h" />
     <ClInclude Include="src\devices\gamepad.h" />
+    <ClInclude Include="src\devices\native\winnt\Real_XInput_Wrapper.h" />
     <ClInclude Include="src\iosync_application_exceptions.h" />
     <ClInclude Include="src\devices\devices.h" />
     <ClInclude Include="src\devices\keyboard.h" />
     <ClInclude Include="src\exceptions.h" />
     <ClInclude Include="src\iosync.h" />
+    <ClInclude Include="src\native\winnt\processManagement.h" />
     <ClInclude Include="src\networking\address.h" />
     <ClInclude Include="src\networking\forwardSocket.h" />
     <ClInclude Include="src\networking\messages.h" />

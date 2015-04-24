@@ -11,7 +11,7 @@
 #include <climits>
 
 // Standard gamepad functionality.
-#include "gamepad.h"
+#include "devices/gamepad.h"
 
 #if defined(PLATFORM_X86)
 	#define FILE_NAME INJECTION_DLL_NAME_X86

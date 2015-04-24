@@ -10,7 +10,8 @@
 // The actual Xinput header.
 #include <Xinput.h>
 
-#include "processManagement.h"
+#include "Real_XInput_Wrapper.h"
+#include "../../../native/winnt/processManagement.h"
 
 // Standard library:
 #include <string>

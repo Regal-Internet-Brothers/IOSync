@@ -15,13 +15,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="processManagement.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Real_XInput_Wrapper.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Source.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IOSync\src\native\winnt\processManagement.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\IOSync\src\devices\native\winnt\Real_XInput_Wrapper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -29,13 +29,7 @@
     <ClInclude Include="XinputInterface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Real_XInput_Wrapper.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="XInput_Injector.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="processManagement.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -35,7 +35,8 @@
 #endif
 
 #if defined(PLATFORM_WINDOWS) && !defined(GAMEPAD_EXTERNAL_ORIGIN)
-	#include <Xinput.h>
+	//#include <Xinput.h>
+	#include "native/winnt/Real_XInput_Wrapper.h"
 #endif
 
 // Standard library:
@@ -43,7 +44,7 @@
 
 // Libraries:
 #if defined(PLATFORM_WINDOWS) && !defined(GAMEPAD_EXTERNAL_ORIGIN)
-	#pragma comment(lib, "Xinput.lib")
+	//#pragma comment(lib, "Xinput.lib")
 #endif
 
 // Namespace(s):
@@ -54,6 +55,10 @@ namespace iosync
 		// Namespace(s):
 		using namespace std;
 		using namespace chrono;
+
+		#ifdef PLATFORM_WINDOWS
+			//using namespace REAL_XINPUT;
+		#endif
 
 		// Forward declarations:
 		struct gamepadState;
@@ -164,7 +169,7 @@ namespace iosync
 						// Make sure to "zero-initialize" our 'state' variable.
 						ZeroVariable(state);
 
-						return XInputGetState((DWORD)identifier, &state);
+						return REAL_XINPUT::XInputGetStateEx((DWORD)identifier, &state); // XInputGetStateEx
 					}
 
 					static inline DWORD __winnt__realDeviceStateResponse(gamepadID identifier)
@@ -194,7 +199,7 @@ namespace iosync
 					static inline DWORD __winnt__rumbleDevice(gamepadID identifier, XINPUT_VIBRATION vibration, milliseconds ms=(milliseconds)DEFAULT_DEBUG_RUMBLE_TIME)
 					{
 						// Local variable(s):
-						auto response = XInputSetState(identifier, &vibration);
+						auto response = REAL_XINPUT::XInputSetState(identifier, &vibration);
 
 						if (response != ERROR_SUCCESS)
 							return response;
@@ -203,7 +208,7 @@ namespace iosync
 
 						this_thread::sleep_for(ms);
 
-						response = XInputSetState(identifier, &vibration);
+						response = REAL_XINPUT::XInputSetState(identifier, &vibration);
 
 						if (response != ERROR_SUCCESS)
 							return response;

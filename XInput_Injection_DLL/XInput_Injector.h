@@ -1,6 +1,8 @@
 #pragma once
 
 // Preprocessor related:
+#define XINPUT_INJECTOR
+
 #define GAMEPAD_EXTERNAL_ORIGIN
 
 // XInput macros:
@@ -27,7 +29,7 @@
 
 // XInput related:
 #include "XinputInterface.h"
-#include "Real_XInput_Wrapper.h"
+#include "devices/native/winnt/Real_XInput_Wrapper.h"
 
 // Other:
-#include "processManagement.h"
+#include "native/winnt/processManagement.h"
