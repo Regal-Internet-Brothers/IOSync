@@ -105,13 +105,35 @@ namespace iosync
 				return;
 			}
 
-			template<typename characterType=char, typename characterTraits=char_traits<characterType>>
+			// This command tells you if the user's input-character is "true".
+			static inline bool isEnabled(const int character)
+			{
+				if (character == '1') // (character == 1)
+					return true;
+
+				auto lcCharacter = tolower(character);
+
+				return (lcCharacter == 'y' || lcCharacter == 't'); // (lcCharacter == 'a')
+			}
+
+			template <typename characterType=char, typename characterTraits=char_traits<characterType>>
 			static inline bool userBoolean(std::basic_istream<characterType, characterTraits>& is=cin)
 			{
 				// Local variable(s):
 				char choice; is >> choice;
 
-				return (choice == '1') || (tolower(choice) == 'y');
+				return isEnabled(choice);
+			}
+
+			template <typename characterType, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
+			static inline bool strEnabled(const basic_string<characterType, characterTraits, strAlloc>& str)
+			{
+				return (!str.empty()) ? isEnabled(str[0]) : false;
+			}
+
+			static inline bool wstrEnabled(const wstring& wstr)
+			{
+				return strEnabled<wchar_t>(wstr);
 			}
 
 			#ifdef PLATFORM_WINDOWS
@@ -157,6 +179,9 @@ namespace iosync
 
 					// Close the handle to the remote process.
 					CloseHandle(remoteProc);
+
+					// Close our local handle to the remote thread.
+					CloseHandle(h);
 
 					// Free the memory we allocated.
 					VirtualFreeEx(remoteProc, remoteLibraryName, 0, MEM_RELEASE | MEM_DECOMMIT);

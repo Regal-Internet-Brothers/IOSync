@@ -53,7 +53,22 @@ namespace REAL_XINPUT
 		_XInputGetBatteryInformation = (_XInputGetBatteryInformation_t)getRemoteFunction("XInputGetBatteryInformation", hDLL);
 		_XInputGetKeystroke = (_XInputGetKeystroke_t)getRemoteFunction("XInputGetKeystroke", hDLL);
 		_XInputGetAudioDeviceIds = (_XInputGetAudioDeviceIds_t)getRemoteFunction("XInputGetAudioDeviceIds", hDLL);
-		_XInputGetStateEx = (_XInputGetStateEx_t)getRemoteFunction("XInputGetStateEx", hDLL);
+
+		// Attempt to get the hidden 'XInputGetStateEx' function.
+		_XInputGetStateEx = (_XInputGetStateEx_t)getRemoteFunction(XInputGetStateEx_Ordinal(), hDLL);
+
+		// Check if we were able to find it:
+		if (_XInputGetStateEx == nullptr)
+		{
+			// Try getting the function normally (Normally doesn't work):
+			_XInputGetStateEx = (_XInputGetStateEx_t)getRemoteFunction("XInputGetStateEx", hDLL);
+
+			if (_XInputGetStateEx == nullptr)
+			{
+				// If all else fails, attach to the standard version.
+				_XInputGetStateEx = _XInputGetState;
+			}
+		}
 
 		return;
 	}

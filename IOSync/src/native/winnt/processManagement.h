@@ -14,6 +14,7 @@
 
 // Includes:
 #include <windows.h>
+#include <psapi.h>
 
 // Standard library:
 #include <string>
@@ -50,4 +51,55 @@ namespace process
 
 	BOOL mapRemoteFunction(LPCSTR name, LPVOID function, HMODULE hDLL);
 	BOOL mapRemoteFunction(LPCSTR name, LPVOID function, LPCSTR DLL=INJECTOR_XINPUT_DEFAULT_DLL_A);
+
+	// This command requires you to link with "psapi.lib"; use at your own risk.
+	template <const size_t max_processes=1024>
+	inline DWORD PIDFromProcessNameW(const wstring& entry)
+	{
+		DWORD aProcesses[max_processes], cbNeeded;
+
+		DWORD PID = 0;
+
+		if (EnumProcesses(aProcesses, sizeof(aProcesses), &cbNeeded))
+		{
+			DWORD cProcesses = (cbNeeded / sizeof(DWORD));
+
+			for (unsigned int i = 0; i < cProcesses; i++)
+			{
+				if (aProcesses[i] != 0) // NULL
+				{
+					HANDLE hProcess = OpenProcess
+					(
+						PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+						FALSE, aProcesses[i]
+					);
+
+					if (hProcess != NULL)
+					{
+						HMODULE hMod;
+						DWORD _cbNeeded;
+
+						if (EnumProcessModules(hProcess, &hMod, sizeof(hMod), &_cbNeeded))
+						{
+							WCHAR processName[MAX_PATH] = L"<unknown>";
+
+							GetModuleBaseNameW(hProcess, hMod, (LPWSTR)processName, sizeof(processName)/sizeof(WCHAR));
+
+							if (entry == processName)
+							{
+								PID = aProcesses[i];
+							}
+						}
+
+						CloseHandle(hProcess);
+					}
+				}
+
+				if (PID != 0)
+					break;
+			}
+		}
+
+		return PID;
+	}
 }

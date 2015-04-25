@@ -65,6 +65,10 @@
 #include "devices/keyboard.h"
 #include "devices/gamepad.h"
 
+#ifdef PLATFORM_WINDOWS
+	#include "native/winnt/processManagement.h"
+#endif
+
 // QuickLib:
 #include <QuickLib/QuickINI/QuickINI.h>
 
@@ -86,6 +90,12 @@
 	
 	#include <thread>
 	#include <mutex>
+#endif
+
+// Libraries:
+#ifdef PLATFORM_WINDOWS
+	// Required for advanced process management.
+	#pragma comment(lib, "psapi.lib")
 #endif
 
 // Namespace(s):
@@ -178,6 +188,11 @@ namespace iosync
 			kbd* keyboard;
 			gp* gamepads[MAX_GAMEPADS];
 
+			// Meta:
+			bool keyboardEnabled;
+			bool gamepadsEnabled;
+			unsigned char max_virtual_gamepads; // gamepadID
+
 			// A set of reserved gamepad device-identifiers. This is used
 			// to ensure clients don't repeatedly request to connect a gamepad.
 			unordered_set<gamepadID> reservedGamepads;
@@ -186,7 +201,13 @@ namespace iosync
 			milliseconds gamepadTimeout;
 
 			// Constructor(s):
-			connectedDevices(milliseconds gamepadTimeout=(milliseconds)GAMEPAD_DEFAULT_TIMEOUT);
+			connectedDevices
+			(
+				milliseconds gamepadTimeout=(milliseconds)GAMEPAD_DEFAULT_TIMEOUT,
+				bool kbdEnabled=true,
+				bool gpdsEnabled=true,
+				unsigned char max_gamepads=(unsigned char)MAX_GAMEPADS
+			);
 
 			// Destructor(s):
 			~connectedDevices();
@@ -243,7 +264,39 @@ namespace iosync
 				return false;
 			}
 
-			// These are call-backs which get executed when a gamepad is connected, or disconnected, respectively.
+			// These call-backs are executed whenever their specific device-type's connection has been disrupted:
+			void onGamepadConnectionDisrupted(iosync_application* program, gamepadID identifier, gamepadID remoteIdentifier) const;
+			void onKeyboardConnectionDisrupted(iosync_application* program) const;
+
+			// This command specifies if a gamepad-connection should be interrupted.
+			// In the event the device was interrupted, operations on, or to create that device should not continue.
+			inline bool interruptGamepad(iosync_application* program, gamepadID identifier, gamepadID remoteIdentifier) const
+			{
+				// Check if everything's normal:
+				if (gamepadsEnabled && gamepadsConnected() < max_virtual_gamepads)
+					return false;
+
+				onGamepadConnectionDisrupted(program, identifier, remoteIdentifier);
+
+				// Return the default response.
+				return true;
+			}
+
+			// This command specifies if a keyboard-connection should be interrupted.
+			// In the event the device was interrupted, operations on, or to create that device should not continue.
+			inline bool interruptKeyboard(iosync_application* program) const
+			{
+				// Check if everything's normal:
+				if (keyboardEnabled)
+					return false;
+
+				onKeyboardConnectionDisrupted(program);
+
+				// Return the default response.
+				return true;
+			}
+
+			// These are call-backs which get executed when a gamepad is connected, or disconnected, respectively:
 			void onGamepadConnected(iosync_application* program, gp* pad);
 			void onGamepadDisconnected(iosync_application* program, gp* pad);
 
@@ -522,14 +575,20 @@ namespace iosync
 				auto& socket = engine.socket;
 
 				#if defined(XINPUT_DEVICE_KEYBOARD)
-					// Request for remote-keyboard access.
-					sendConnectMessage(engine, socket, DEVICE_TYPE_KEYBOARD, destination);
+					if (keyboardEnabled)
+					{
+						// Request for remote-keyboard access.
+						sendConnectMessage(engine, socket, DEVICE_TYPE_KEYBOARD, destination);
+					}
 				#endif
 
 				#if defined(XINPUT_DEVICE_GAMEPAD) && !defined(XINPUT_DEVICE_GAMEPAD_AUTODETECT)
-					// Attempt to reserve a remote gamepad-identifier,
-					// connecting the virtual gamepad if possible.
-					sendGamepadConnectMessage(engine, socket, destination);
+					if (gamepadsEnabled)
+					{
+						// Attempt to reserve a remote gamepad-identifier,
+						// connecting the virtual gamepad if possible.
+						sendGamepadConnectMessage(engine, socket, destination);
+					}
 				#endif
 
 				// Return the number of bytes sent.
@@ -677,6 +736,7 @@ namespace iosync
 
 				// INI sections:
 				static const wstring APPLICATION_SECTION;
+				static const wstring DEVICES_SECTION;
 				static const wstring NETWORK_SECTION;
 
 				#ifdef PLATFORM_WINDOWS
@@ -684,8 +744,17 @@ namespace iosync
 				#endif
 
 				// INI properties:
+
+				// Application:
 				static const wstring APPLICATION_MODE;
 				static const wstring APPLICATION_USECMD;
+
+				// Devices:
+				static const wstring DEVICES_KEYBOARD;
+				static const wstring DEVICES_GAMEPADS;
+				static const wstring DEVICES_MAX_GAMEPADS;
+
+				// Networking:
 
 				// This is represented with an IP address / hostname, and optionally, a port.
 				// A port may also be supplied without an address if a separator is specified. (Usually ':')
@@ -697,12 +766,29 @@ namespace iosync
 
 				static const wstring NETWORK_USERNAME;
 
+				// Windows-specific
 				#ifdef PLATFORM_WINDOWS
-					static const wstring XINPUT_PIDS;
+					// XInput:
+					static const wstring XINPUT_PROCESSES;
 				#endif
 
+				// Other:
+
+				// Networking:
+				static const wstring NETWORKING_DEFAULT_PORT;
+
+				// Devices:
+				static const wstring DEVICES_GAMEPADS_MAXIMUM;
+
 				// Constructor(s):
-				applicationConfiguration(applicationMode internal_mode=MODE_SERVER, bool cmdOnly=false);
+				applicationConfiguration
+				(
+					applicationMode internal_mode=MODE_SERVER,
+					bool cmdOnly=false,
+					bool kbdEnabled=true,
+					bool gpdsEnabled=true,
+					unsigned char max_gpds=(unsigned char)devices::metrics::MAX_GAMEPADS
+				);
 
 				// Destructor(s):
 				~applicationConfiguration();
@@ -720,16 +806,21 @@ namespace iosync
 				// Fields:
 				representativeAddress remoteAddress;
 
-				#ifdef PLATFORM_WINDOWS
-					queue<DWORD> PIDs;
-				#endif
-
 				wstring username;
 
 				applicationMode mode;
 
+				unsigned char max_gamepads; // gamepadID
+
+				#ifdef PLATFORM_WINDOWS
+					queue<DWORD> PIDs;
+				#endif
+
 				// Booleans / Flags:
 				bool useCmd;
+
+				bool keyboardEnabled;
+				bool gamepadsEnabled;
 			};
 
 			// Global variable(s):
@@ -809,6 +900,10 @@ namespace iosync
 
 				return portFromString(portStr);
 			}
+
+			#ifdef PLATFORM_WINDOWS
+				static DWORD __winnt__getPIDW(wstring entry);
+			#endif
 
 			// Constructor(s):
 			iosync_application(rate updateRate = DEFAULT_UPDATERATE, OSINFO OSInfo=OSINFO());

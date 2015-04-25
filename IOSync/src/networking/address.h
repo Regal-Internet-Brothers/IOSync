@@ -56,7 +56,7 @@ namespace iosync
 			void writeTo(QSocket& socket);
 
 			// Other:
-			template<typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
+			template <typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
 			inline void parse(const basic_string<characterType, characterTraits, strAlloc>& input, addressPort default_port)
 			{
 				auto addressDivider = input.find(ADDRESS_SEPARATOR);
@@ -79,7 +79,7 @@ namespace iosync
 				return;
 			}
 
-			template<typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
+			template <typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
 			void encodeTo(basic_string<characterType, characterTraits, strAlloc>& out_str) const
 			{
 				basic_stringstream<characterType, characterTraits, strAlloc> ss;
@@ -140,7 +140,7 @@ namespace iosync
 			// Methods:
 			bool isSet() const;
 
-			template<typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
+			template <typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
 			inline void parse(const basic_string<characterType, characterTraits, strAlloc>& input, addressPort default_port)
 			{
 				auto addressDivider = input.find(ADDRESS_SEPARATOR);
@@ -163,7 +163,7 @@ namespace iosync
 				return;
 			}
 
-			template<typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
+			template <typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
 			void encodeTo(basic_string<characterType, characterTraits, strAlloc>& out_str) const
 			{
 				basic_stringstream<characterType, characterTraits, strAlloc> ss;

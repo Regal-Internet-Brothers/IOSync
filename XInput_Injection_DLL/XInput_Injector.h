@@ -13,7 +13,8 @@
 // Other:
 //#define DLLExport // __declspec( dllexport )
 
-#define DLL_DEBUG
+//#define DLL_DEBUG
+#define DLL_CONFIRMATION_MESSAGE
 
 /*
 #ifdef DLL_DEBUG

@@ -141,8 +141,14 @@ namespace iosync
 		// connectedDevices:
 
 		// Constructor(s):
-		connectedDevices::connectedDevices(milliseconds gpTimeout)
-			: keyboard(nullptr), gamepadTimeout(gpTimeout)
+		connectedDevices::connectedDevices
+		(
+			milliseconds gpTimeout,
+			bool kbdEnabled,
+			bool gpdsEnabled,
+			unsigned char max_gamepads
+		) : keyboard(nullptr), keyboardEnabled(kbdEnabled), gamepadsEnabled(gpdsEnabled),
+			max_virtual_gamepads(max_gamepads), gamepadTimeout(gpTimeout)
 		{
 			for (auto i = 0; i < MAX_GAMEPADS; i++)
 				gamepads[i] = nullptr;
@@ -219,43 +225,46 @@ namespace iosync
 				// Check if we're detecting gamepads:
 				if (program->allowDeviceDetection())
 				{
-					// Check for state changes:
-					for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
+					if (gamepadsEnabled)
 					{
-						bool connected = gamepadConnected(i);
-
-						if (!connected && gamepadReserved(i))
+						// Check for state changes:
+						for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
 						{
-							continue;
-						}
+							bool connected = gamepadConnected(i);
 
-						// Check if a gamepad with the 'i' identifier is connected:
-						if (!connected)
-						{
-							if (gp::__winnt__pluggedIn(i))
+							if (!connected && gamepadReserved(i))
 							{
-								// Tell the remote host that a gamepad was connected.
-								sendGamepadConnectMessage(*program->network, program->network->socket, DESTINATION_HOST);
-
-								//sendGamepadConnectMessage(*program->network, program->network->socket, i, DESTINATION_HOST);
-
-								// Add this identifier, so we don't bother trying to connect with it redundantly.
-								reservedGamepads.insert(i);
+								continue;
 							}
-						}
-						else
-						{
-							// Check for a real device-disconnection:
-							if (!gamepads[i]->connected_real()) // gp::__winnt__pluggedIn(i)
-							{
-								// Attempt to disconnect the virtual device:
-								if (disconnectLocalGamepad(program, i))
-								{
-									// Disconnection was successful, tell the remote host.
-									sendGamepadDisconnectMessage(*program->network, program->network->socket, i, DESTINATION_HOST);
 
-									// Remove this identifier, so it may be used again.
-									reservedGamepads.erase(i);
+							// Check if a gamepad with the 'i' identifier is connected:
+							if (!connected)
+							{
+								if (gp::__winnt__pluggedIn(i))
+								{
+									// Tell the remote host that a gamepad was connected.
+									sendGamepadConnectMessage(*program->network, program->network->socket, DESTINATION_HOST);
+
+									//sendGamepadConnectMessage(*program->network, program->network->socket, i, DESTINATION_HOST);
+
+									// Add this identifier, so we don't bother trying to connect with it redundantly.
+									reservedGamepads.insert(i);
+								}
+							}
+							else
+							{
+								// Check for a real device-disconnection:
+								if (!gamepads[i]->connected_real()) // gp::__winnt__pluggedIn(i)
+								{
+									// Attempt to disconnect the virtual device:
+									if (disconnectLocalGamepad(program, i))
+									{
+										// Disconnection was successful, tell the remote host.
+										sendGamepadDisconnectMessage(*program->network, program->network->socket, i, DESTINATION_HOST);
+
+										// Remove this identifier, so it may be used again.
+										reservedGamepads.erase(i);
+									}
 								}
 							}
 						}
@@ -298,6 +307,20 @@ namespace iosync
 		{
 			// Disconnect all devices:
 			disconnectKeyboard();
+
+			return;
+		}
+
+		void connectedDevices::onGamepadConnectionDisrupted(iosync_application* program, gamepadID identifier, gamepadID remoteIdentifier) const
+		{
+			deviceInfo << "Gamepad connection attempt (" << identifier << ", " << remoteIdentifier << ") disrupted: Manually disabled/limited by user." << endl;
+
+			return;
+		}
+
+		void connectedDevices::onKeyboardConnectionDisrupted(iosync_application* program) const
+		{
+			deviceInfo << "Keyboard connection attempt disrupted: Manually disabled by user." << endl;
 
 			return;
 		}
@@ -368,6 +391,12 @@ namespace iosync
 
 		kbd* connectedDevices::connectKeyboard(iosync_application* program)
 		{
+			// Check for errors:
+			if (interruptKeyboard(program))
+			{
+				return nullptr;
+			}
+
 			// Check if we need to create a new 'gp' object:
 			if (keyboard == nullptr)
 			{
@@ -409,6 +438,12 @@ namespace iosync
 
 		gamepad* connectedDevices::connectGamepad(iosync_application* program, gamepadID identifier, gamepadID remoteIdentifier)
 		{
+			// Check for errors:
+			if (interruptGamepad(program, identifier, remoteIdentifier))
+			{
+				return nullptr;
+			}
+
 			// Check if we need to create a new 'gp' object:
 			if (gamepads[identifier] == nullptr)
 			{
@@ -465,6 +500,12 @@ namespace iosync
 			// Get the next gamepad identifier.
 			auto identifier = getNextGamepadID(program->reserveLocalGamepads());
 
+			// Check for errors:
+			if (interruptGamepad(program, identifier, remoteIdentifier))
+			{
+				return nullptr;
+			}
+
 			// Check if we can connect this device:
 			if (identifier == GAMEPAD_ID_NONE)
 			{
@@ -482,6 +523,12 @@ namespace iosync
 
 			// Get the next gamepad identifier.
 			auto identifier = getNextGamepadID(program->reserveLocalGamepads());
+
+			// Check for errors:
+			if (interruptGamepad(program, identifier, identifier))
+			{
+				return nullptr;
+			}
 
 			// Check if we can connect this device:
 			if (identifier == GAMEPAD_ID_NONE)
@@ -782,6 +829,10 @@ namespace iosync
 
 						deviceNetInfoStream << endl;
 					}
+					else
+					{
+						deviceNetInfo << "Device-connection request failed." << endl;
+					}
 
 					break;
 				case DEVICE_NETWORK_MESSAGE_DISCONNECT:
@@ -804,6 +855,10 @@ namespace iosync
 						}
 
 						deviceNetInfoStream << endl;
+					}
+					else
+					{
+						deviceNetInfo << "Device-disconnection request failed." << endl;
 					}
 
 					break;
@@ -965,6 +1020,7 @@ namespace iosync
 
 	// INI sections:
 	const wstring iosync_application::applicationConfiguration::APPLICATION_SECTION = L"application";
+	const wstring iosync_application::applicationConfiguration::DEVICES_SECTION = L"devices";
 	const wstring iosync_application::applicationConfiguration::NETWORK_SECTION = L"network";
 
 	#ifdef PLATFORM_WINDOWS
@@ -972,19 +1028,44 @@ namespace iosync
 	#endif
 
 	// INI properties:
+
+	// Application:
 	const wstring iosync_application::applicationConfiguration::APPLICATION_MODE = L"mode";
 	const wstring iosync_application::applicationConfiguration::APPLICATION_USECMD = L"force_cmd";
 
+	// Devices:
+	const wstring iosync_application::applicationConfiguration::DEVICES_KEYBOARD = L"keyboard";
+	const wstring iosync_application::applicationConfiguration::DEVICES_GAMEPADS = L"gamepads";
+	const wstring iosync_application::applicationConfiguration::DEVICES_MAX_GAMEPADS = L"max_controllers";
+
+	// Networking:
 	const wstring iosync_application::applicationConfiguration::NETWORK_ADDRESS = L"address";
 	const wstring iosync_application::applicationConfiguration::NETWORK_PORT = L"port";
 	const wstring iosync_application::applicationConfiguration::NETWORK_USERNAME = L"username";
 
+	// Windows-specific:
 	#ifdef PLATFORM_WINDOWS
-		const wstring iosync_application::applicationConfiguration::XINPUT_PIDS = L"PIDs";
+		// XInput:
+		const wstring iosync_application::applicationConfiguration::XINPUT_PROCESSES = L"processes";
 	#endif
 
+	// Other:
+
+	// Networking:
+	const wstring iosync_application::applicationConfiguration::NETWORKING_DEFAULT_PORT = L"default";
+
+	// Devices:
+	const wstring iosync_application::applicationConfiguration::DEVICES_GAMEPADS_MAXIMUM = L"maximum";
+
 	// Constructor(s):
-	iosync_application::applicationConfiguration::applicationConfiguration(applicationMode internal_mode, bool cmdOnly) : mode(internal_mode), useCmd(cmdOnly) { /* Nothing so far. */ }
+	iosync_application::applicationConfiguration::applicationConfiguration
+	(
+		applicationMode internal_mode,
+		bool cmdOnly,
+		bool kbdEnabled,
+		bool gpdsEnabled,
+		unsigned char max_gpds
+	) : mode(internal_mode), useCmd(cmdOnly), keyboardEnabled(kbdEnabled), gamepadsEnabled(gpdsEnabled), max_gamepads(max_gpds) { /* Nothing so far. */ }
 
 	// Destructor(s):
 	iosync_application::applicationConfiguration::~applicationConfiguration() { /* Nothing so far. */ }
@@ -1046,6 +1127,8 @@ namespace iosync
 
 		// Local variable(s):
 
+		// Application:
+
 		auto applicationIterator = variables.find(APPLICATION_SECTION);
 
 		if (applicationIterator != variables.end())
@@ -1057,24 +1140,78 @@ namespace iosync
 
 				if (cmdIterator != application.end())
 				{
-					if (!cmdIterator->second.empty())
+					useCmd = wstrEnabled(cmdIterator->second);
+
+					// Check if we're forcing command-line input:
+					if (useCmd)
 					{
-						auto firstChar = cmdIterator->second[0];
-
-						useCmd = (firstChar == '1' || tolower(firstChar) == 'y');
-
-						// Check if we're forcing command-line input:
-						if (useCmd)
-						{
-							// Don't bother reading further, we don't need to.
-							return;
-						}
+						// Don't bother reading further, we don't need to.
+						return;
 					}
 				}
 			}
 
 			mode = (applicationMode)stoi(application[APPLICATION_MODE]);
 		}
+
+		// Devices:
+
+		auto devicesIterator = variables.find(DEVICES_SECTION);
+
+		if (devicesIterator != variables.end())
+		{
+			auto devices = devicesIterator->second;
+
+			auto kbdEnabledIterator = devices.find(DEVICES_KEYBOARD);
+
+			if (kbdEnabledIterator != devices.end())
+			{
+				keyboardEnabled = wstrEnabled(kbdEnabledIterator->second);
+			}
+
+			auto gpEnabledIterator = devices.find(DEVICES_GAMEPADS);
+
+			if (gpEnabledIterator != devices.end())
+			{
+				gamepadsEnabled = wstrEnabled(gpEnabledIterator->second);
+
+				if (gamepadsEnabled)
+				{
+					auto max_gpds_str = devices[DEVICES_MAX_GAMEPADS];
+
+					try
+					{
+						// Read the maximum number of gamepads supported:
+						max_gamepads = stoi(max_gpds_str);
+
+						/*
+						if (max_gamepads == 0)
+							max_gamepads = devices::metrics::MAX_GAMEPADS;
+						*/
+					}
+					catch (std::invalid_argument&)
+					{
+						// Make the maximum-gamepads string lowercase.
+						transform(max_gpds_str.begin(), max_gpds_str.end(), max_gpds_str.begin(), tolower);
+
+						// Compare this string against the fall-back string (Maximum number of gamepads):
+						if (max_gpds_str == DEVICES_GAMEPADS_MAXIMUM)
+						{
+							// Set the maximum number of gamepads to the absolute maximum.
+							max_gamepads = devices::metrics::MAX_GAMEPADS;
+						}
+						else
+						{
+							// Gamepads can not be enabled under these conditions:
+							max_gamepads = 0;
+							gamepadsEnabled = false;
+						}
+					}
+				}
+			}
+		}
+
+		// Networking:
 
 		// Attempt to find the "networking" section-object from its identifier.
 		auto networkingIterator = variables.find(NETWORK_SECTION);
@@ -1098,7 +1235,16 @@ namespace iosync
 
 			if (explciitPortIterator != networking.end())
 			{
-				remoteAddress.port = (addressPort)stoi(explciitPortIterator->second);
+				auto portStr = explciitPortIterator->second;
+
+				try
+				{
+					remoteAddress.port = (addressPort)stoi(portStr);
+				}
+				catch (std::invalid_argument&)
+				{
+					remoteAddress.port = DEFAULT_PORT;
+				}
 			}
 
 			// Read the username specified.
@@ -1109,7 +1255,10 @@ namespace iosync
 			remoteAddress.port = DEFAULT_PORT;
 		}
 
+		// Windows-specific:
 		#ifdef PLATFORM_WINDOWS
+			// XInput:	
+			
 			// Attempt to find the "xinput" section-object from its identifier.
 			auto XInputIterator = variables.find(XINPUT_SECTION);
 
@@ -1117,48 +1266,63 @@ namespace iosync
 			{
 				auto& XInput = XInputIterator->second;
 
-				auto PIDEntry = XInput.find(XINPUT_PIDS);
+				auto processes_entry = XInput.find(XINPUT_PROCESSES);
 
-				if (PIDEntry != XInput.end())
+				if (processes_entry != XInput.end())
 				{
-					try
-					{
-						const auto& numbers = PIDEntry->second;
+					const auto& entries = processes_entry->second;
 
-						for
-						(
-							// Calculate the start of the first number:
-							wstring::size_type numberLocation = ((numberLocation = numbers.find('[')) != wstring::npos) ? (numberLocation+1) : 0;
+					for
+					(
+						// Calculate the start of the first number:
+						wstring::size_type numberLocation = ((numberLocation = entries.find('[')) != wstring::npos) ? (numberLocation+1) : 0;
 							
-							// Ensure the next number-location isn't at the end of the string:
-							numberLocation != wstring::npos && numberLocation < numbers.length();
-						)
+						// Ensure the next number-location isn't at the end of the string:
+						numberLocation != wstring::npos && numberLocation < entries.length();
+					)
+					{
+						// Calculate the edge of the current number:
+						auto edge = entries.find('|', numberLocation);
+
+						if (edge == wstring::npos)
 						{
-							// Calculate the edge of the current number:
-							auto edge = numbers.find(',', numberLocation);
+							// We were unable to find a separator, look for the scope-end symbol:
+							edge = entries.find(']', numberLocation);
 
 							if (edge == wstring::npos)
 							{
-								// We were unable to find a separator, look for the scope-end symbol:
-								edge = numbers.find(']', numberLocation);
-
-								if (edge == wstring::npos)
-								{
-									// When all else fails, the edge will be the end of the string.
-									edge = numbers.length();
-								}
+								// When all else fails, the edge will be the end of the string.
+								edge = entries.length();
 							}
-
-							// Push the current number onto the PID-container.
-							PIDs.push(stoi(numbers.substr(numberLocation, numberLocation-edge)));
-
-							// Move to the starting point of the next entry.
-							numberLocation = edge+1;
 						}
-					}
-					catch (std::invalid_argument&)
-					{
-						//PIDs.clear();
+
+						DWORD PID = 0;
+
+						// This will act as the current entry in the "array" of processes.
+						auto entry = entries.substr(numberLocation, edge-numberLocation);
+							
+						try
+						{
+							PID = (DWORD)stoi(entry);
+						}
+						catch (std::invalid_argument&)
+						{
+							GetWindowThreadProcessId(FindWindowW(NULL, (LPCWSTR)entry.c_str()), (LPDWORD)&PID);
+
+							if (PID == 0)
+							{
+								PID = process::PIDFromProcessNameW(entry);
+							}
+						}
+
+						if (PID != 0)
+						{
+							// Push the current number onto the PID-container.
+							PIDs.push(PID);
+						}
+
+						// Move to the starting point of the next entry.
+						numberLocation = edge+1;
 					}
 				}
 			}
@@ -1170,22 +1334,36 @@ namespace iosync
 	void iosync_application::applicationConfiguration::write(INI::INIVariables<wstring>& variables)
 	{
 		// Application:
+		
 		auto& application = variables[APPLICATION_SECTION];
 
 		// Encode the application-mode.
 		application[APPLICATION_MODE] = to_wstring(mode);
 
 		// Encode the command-line setting.
-		application[APPLICATION_USECMD] = ((useCmd) ? '1' : '0');
+		application[APPLICATION_USECMD] = to_wstring(useCmd);
+
+		// Devices:
+
+		auto& devices = variables[DEVICES_SECTION];
+
+		devices[DEVICES_KEYBOARD] = to_wstring(keyboardEnabled);
+		devices[DEVICES_GAMEPADS] = to_wstring(gamepadsEnabled);
+
+		if (max_gamepads == devices::metrics::MAX_GAMEPADS)
+			devices[DEVICES_MAX_GAMEPADS] = DEVICES_GAMEPADS_MAXIMUM;
+		else
+			devices[DEVICES_MAX_GAMEPADS] = to_wstring(max_gamepads);
 
 		// Networking:
+
 		auto& networking = variables[NETWORK_SECTION];
 
 		if (remoteAddress.isSet())
 		{
 			if (address::addressSet(remoteAddress.port) && !address::addressSet(remoteAddress.IP))
 			{
-				networking[NETWORK_PORT] = to_wstring(remoteAddress.port);
+				networking[NETWORK_PORT] = (remoteAddress.port == DEFAULT_PORT) ? NETWORKING_DEFAULT_PORT : to_wstring(remoteAddress.port);
 			}
 			else
 			{
@@ -1199,6 +1377,9 @@ namespace iosync
 		// Windows-specific:
 		#ifdef PLATFORM_WINDOWS
 			// XInput:
+
+			/*
+			// Currently disabled, because it's not very useful:
 			if (!PIDs.empty())
 			{
 				// In the event other properties are added to
@@ -1224,8 +1405,9 @@ namespace iosync
 
 				ss << "]";
 
-				XInput[XINPUT_PIDS] = ss.str();
+				XInput[XINPUT_PROCESSES] = ss.str();
 			}
+			*/
 		#endif
 
 		return;
@@ -1403,6 +1585,29 @@ namespace iosync
 			program->execute();
 
 			return;
+		}
+	#endif
+
+	#ifdef PLATFORM_WINDOWS
+		DWORD iosync_application::__winnt__getPIDW(wstring entry)
+		{
+			DWORD PID = 0;
+
+			try
+			{
+				PID = (DWORD)stoi(entry);
+			}
+			catch (std::invalid_argument&)
+			{
+				GetWindowThreadProcessId(FindWindowW(NULL, (LPCWSTR)entry.c_str()), (LPDWORD)&PID);
+
+				if (PID == 0)
+				{
+					PID = process::PIDFromProcessNameW(entry);
+				}
+			}
+
+			return PID;
 		}
 	#endif
 
@@ -1586,15 +1791,31 @@ namespace iosync
 		}
 
 		#ifdef PLATFORM_WINDOWS
+			// Attempt to inject into the PIDs in the configuration-object:
 			while (!configuration.PIDs.empty())
 			{
-				devices::gamepad::__winnt__injectLibrary(configuration.PIDs.front());
+				auto PID = configuration.PIDs.front();
+
+				#ifdef IOSYNC_TESTMODE
+					cout << "XINPUT INJECTION ATTEMPT: " << PID << " - Response: " <<
+				#endif
+
+				devices::gamepad::__winnt__injectLibrary(PID);
+
+				#ifdef IOSYNC_TESTMODE
+					cout << endl;
+				#endif
 
 				configuration.PIDs.pop();
 			}
 
 			//configuration.PIDs.clear();
 		#endif
+
+		// Apply device configurations:
+		devices.keyboardEnabled = configuration.keyboardEnabled;
+		devices.gamepadsEnabled = configuration.gamepadsEnabled;
+		devices.max_virtual_gamepads = configuration.max_gamepads;
 
 		switch (configuration.mode)
 		{
@@ -1619,11 +1840,11 @@ namespace iosync
 				}
 			case MODE_SERVER:
 				return execute(configuration.remoteAddress.port);
-			default:
-				cout << "Invalid application-mode specified." << endl;
-
-				return -1;
 		}
+
+		cout << "Invalid application-mode specified." << endl;
+
+		return -1;
 	}
 
 	int iosync_application::applyCommandlineConfiguration(applicationConfiguration& configuration, bool logChoices)
@@ -1689,15 +1910,23 @@ namespace iosync
 					#endif
 
 					#ifndef IOSYNC_FAST_TESTMODE_SINGLE_INPUT
-						DWORD PID; cout << "Please specify a PID to apply XInput injection (0 = None): "; cin >> PID;
+						wstring entry;
 
-						if (PID != 0)
+						cout << "Please specify a PID, window, or process name to apply XInput injection (0 = None): ";
+						wcin >> entry; // cout << endl;
+
+						if (entry != L"0" && entry != L"None")
 						{
-							devices::gamepad::__winnt__injectLibrary(PID);
+							DWORD PID = __winnt__getPIDW(entry);
 
-							if (logChoices)
+							if (PID != 0)
 							{
-								configuration.PIDs.push(PID);
+								devices::gamepad::__winnt__injectLibrary(PID);
+
+								if (logChoices)
+								{
+									configuration.PIDs.push(PID);
+								}
 							}
 						}
 					#endif

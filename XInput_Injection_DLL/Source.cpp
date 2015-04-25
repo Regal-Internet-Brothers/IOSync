@@ -39,11 +39,6 @@ bool* pluggedIn = nullptr;
 HANDLE gamepad::sharedMemory = NULL;
 
 // Functions:
-LPCSTR XInputGetStateEx_Ordinal()
-{
-	return (LPCSTR)100;
-}
-
 void detachSharedMemory()
 {
 	// Un-map the shared memory segment.
@@ -253,7 +248,7 @@ extern "C"
 									mapRemoteFunction("XInputGetAudioDeviceIds", (LPVOID)::XInputGetAudioDeviceIds, hDLL);
 
 									// Extensions:
-									mapRemoteFunction((LPCSTR)XInputGetStateEx_Ordinal(), (LPVOID)::XInputGetStateEx, hDLL); // "XInputGetStateEx"
+									mapRemoteFunction(REAL_XINPUT::XInputGetStateEx_Ordinal(), (LPVOID)::XInputGetStateEx, hDLL); // "XInputGetStateEx"
 
 									#ifdef DLL_DEBUG
 										cout << "Functions injected." << endl;
@@ -302,6 +297,10 @@ extern "C"
 
 							return FALSE;
 						}
+
+						#ifdef DLL_CONFIRMATION_MESSAGE
+							MessageBox(NULL, TEXT("XInput Initialized."), TEXT("IOSync"), MB_OK);
+						#endif
 					}
 				}
 

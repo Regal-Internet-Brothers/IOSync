@@ -15,6 +15,11 @@ namespace REAL_XINPUT
 	//#include <Xinput.h>
 
 	// Functions:
+	inline LPCSTR XInputGetStateEx_Ordinal()
+	{
+		return (LPCSTR)100;
+	}
+
 	VOID linkTo(HMODULE hDLL);
 	
 	// The 'resolveSystemPath' argument specifies if this routine
