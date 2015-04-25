@@ -1052,8 +1052,28 @@ namespace iosync
 		{
 			auto application = applicationIterator->second;
 
+			{
+				auto cmdIterator = application.find(APPLICATION_USECMD);
+
+				if (cmdIterator != application.end())
+				{
+					if (!cmdIterator->second.empty())
+					{
+						auto firstChar = cmdIterator->second[0];
+
+						useCmd = (firstChar == '1' || tolower(firstChar) == 'y');
+
+						// Check if we're forcing command-line input:
+						if (useCmd)
+						{
+							// Don't bother reading further, we don't need to.
+							return;
+						}
+					}
+				}
+			}
+
 			mode = (applicationMode)stoi(application[APPLICATION_MODE]);
-			useCmd = (bool)(application[APPLICATION_USECMD][0] == '1');
 		}
 
 		// Attempt to find the "networking" section-object from its identifier.
@@ -1458,8 +1478,8 @@ namespace iosync
 			return execute((addressPort)stoi(args[0]));
 		}
 		
-		// Attempt to load the default configuration file.
 		#ifndef IOSYNC_FAST_TESTMODE
+			// Attempt to load the default configuration file:
 			try
 			{
 				// Local variable(s):
@@ -1487,9 +1507,7 @@ namespace iosync
 					bool logChoices = false;
 
 					#ifndef IOSYNC_FAST_TESTMODE
-						{
-							cout << "Unable to load configuration, would you like to log new settings? (Y/N): "; logChoices = userBoolean(); // cout << endl;
-						}
+						cout << "Unable to load configuration; would you like to log new settings? (Y/N): "; logChoices = userBoolean(); // cout << endl;
 					#endif
 
 					return applyCommandlineConfiguration(applicationConfiguration(mode), logChoices);
