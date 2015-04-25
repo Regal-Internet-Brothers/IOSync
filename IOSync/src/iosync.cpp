@@ -3,6 +3,7 @@
 
 // Standard library:
 #include <sstream>
+#include <exception>
 #include <stdexcept>
 
 // Namespace(s):
@@ -972,8 +973,10 @@ namespace iosync
 
 	// INI properties:
 	const wstring iosync_application::applicationConfiguration::APPLICATION_MODE = L"mode";
+	const wstring iosync_application::applicationConfiguration::APPLICATION_USECMD = L"force_cmd";
 
 	const wstring iosync_application::applicationConfiguration::NETWORK_ADDRESS = L"address";
+	const wstring iosync_application::applicationConfiguration::NETWORK_PORT = L"port";
 	const wstring iosync_application::applicationConfiguration::NETWORK_USERNAME = L"username";
 
 	#ifdef PLATFORM_WINDOWS
@@ -981,7 +984,7 @@ namespace iosync
 	#endif
 
 	// Constructor(s):
-	iosync_application::applicationConfiguration::applicationConfiguration(applicationMode internal_mode) : mode(internal_mode) { /* Nothing so far. */ }
+	iosync_application::applicationConfiguration::applicationConfiguration(applicationMode internal_mode, bool cmdOnly) : mode(internal_mode), useCmd(cmdOnly) { /* Nothing so far. */ }
 
 	// Destructor(s):
 	iosync_application::applicationConfiguration::~applicationConfiguration() { /* Nothing so far. */ }
@@ -1047,9 +1050,10 @@ namespace iosync
 
 		if (applicationIterator != variables.end())
 		{
-			auto application = (*applicationIterator).second;
+			auto application = applicationIterator->second;
 
 			mode = (applicationMode)stoi(application[APPLICATION_MODE]);
+			useCmd = (bool)(application[APPLICATION_USECMD][0] == '1');
 		}
 
 		// Attempt to find the "networking" section-object from its identifier.
@@ -1059,10 +1063,23 @@ namespace iosync
 		if (networkingIterator != variables.end())
 		{
 			// Get a reference to the actual section-object.
-			auto networking = (*networkingIterator).second;
+			auto networking = networkingIterator->second;
 
-			// Parse the user's address-input.
-			remoteAddress.parse(networking[NETWORK_ADDRESS], DEFAULT_PORT);
+			auto addressIterator = networking.find(NETWORK_ADDRESS);
+
+			if (addressIterator != networking.end())
+			{
+				// Parse the user's address-input.
+				remoteAddress.parse(addressIterator->second, DEFAULT_PORT);
+			}
+
+			// Check for an explciit port:
+			auto explciitPortIterator = networking.find(NETWORK_PORT);
+
+			if (explciitPortIterator != networking.end())
+			{
+				remoteAddress.port = (addressPort)stoi(explciitPortIterator->second);
+			}
 
 			// Read the username specified.
 			username = networking[NETWORK_USERNAME];
@@ -1078,7 +1095,7 @@ namespace iosync
 
 			if (XInputIterator != variables.end())
 			{
-				auto& XInput = (*XInputIterator).second;
+				auto& XInput = XInputIterator->second;
 
 				auto PIDEntry = XInput.find(XINPUT_PIDS);
 
@@ -1086,7 +1103,7 @@ namespace iosync
 				{
 					try
 					{
-						const auto& numbers = (*PIDEntry).second;
+						const auto& numbers = PIDEntry->second;
 
 						for
 						(
@@ -1136,13 +1153,25 @@ namespace iosync
 		auto& application = variables[APPLICATION_SECTION];
 
 		// Encode the application-mode.
-		{ wstringstream ss; ss << mode; application[APPLICATION_MODE] = ss.str(); }
+		application[APPLICATION_MODE] = to_wstring(mode);
+
+		// Encode the command-line setting.
+		application[APPLICATION_USECMD] = ((useCmd) ? '1' : '0');
 
 		// Networking:
 		auto& networking = variables[NETWORK_SECTION];
 
 		if (remoteAddress.isSet())
-			remoteAddress.encodeTo(networking[NETWORK_ADDRESS]);
+		{
+			if (address::addressSet(remoteAddress.port) && !address::addressSet(remoteAddress.IP))
+			{
+				networking[NETWORK_PORT] = to_wstring(remoteAddress.port);
+			}
+			else
+			{
+				remoteAddress.encodeTo(networking[NETWORK_ADDRESS]);
+			}
+		}
 
 		if (username.length() > 0)
 			networking[NETWORK_USERNAME] = username;
@@ -1419,146 +1448,6 @@ namespace iosync
 		// Local variable(s):
 		auto argCount = args.size();
 
-		applicationConfiguration configuration(mode);
-
-		// Attempt to load the default configuration file.
-		#ifndef IOSYNC_FAST_TESTMODE
-			try
-			{
-				configuration.load();
-
-				#ifdef PLATFORM_WINDOWS
-					while (!configuration.PIDs.empty())
-					{
-						devices::gamepad::__winnt__injectLibrary(configuration.PIDs.front());
-
-						configuration.PIDs.pop();
-					}
-
-					//configuration.PIDs.clear();
-				#endif
-
-				switch (configuration.mode)
-				{
-					case MODE_CLIENT:
-						// Check if a proper address was specified:
-						if (address::addressSet(configuration.remoteAddress.IP))
-						{
-							return execute(configuration.username, configuration.remoteAddress.IP, configuration.remoteAddress.port);
-						}
-						else
-						{
-							bool hostAnyway;
-
-							// Check if we should move into the next routine or not:
-							cout << "Invalid address specified: Would you like to host instead? (Port: ";
-							cout << configuration.remoteAddress.port << ", Y/N): "; hostAnyway = userBoolean(); // cout << endl;
-
-							if (!hostAnyway)
-							{
-								return -1;
-							}
-						}
-					case MODE_SERVER:
-						return execute(configuration.remoteAddress.port);
-					default:
-						cout << "Invalid application-mode specified." << endl;
-
-						return -1;
-				}
-			}
-			catch (const exception& e)
-			{
-				cout << "Exception caught: " << e.what() << endl;
-		#endif
-			bool logChoices = false;
-
-			#ifndef IOSYNC_FAST_TESTMODE
-				{
-					cout << "Unable to load configuration, would you like to log new settings? (Y/N): "; logChoices = userBoolean(); // cout << endl;
-				}
-			#endif
-
-			#ifdef IOSYNC_TESTMODE
-				if (argCount == 0)
-				{
-					configuration.remoteAddress.port = DEFAULT_PORT;
-
-					//cout << endl;
-
-					cout << "Application mode (" << MODE_CLIENT << " = Client, " << MODE_SERVER << " = Server): "; cin >> mode; //cout << endl;
-
-					switch (mode)
-					{
-						case MODE_CLIENT:
-							#ifndef IOSYNC_FAST_TESTMODE
-								configuration.remoteAddress.IP = "127.0.0.1";
-								configuration.username = DEFAULT_PLAYER_NAME;
-
-								{
-									string::size_type separatorPosition;
-
-									cout << "Please supply a hostname: "; cin >> configuration.remoteAddress.IP; // cout << endl;
-
-									separatorPosition = configuration.remoteAddress.IP.find(networking::ADDRESS_SEPARATOR);
-
-									if (separatorPosition != string::npos && separatorPosition < configuration.remoteAddress.IP.length())
-									{
-										configuration.remoteAddress.port = portFromString(configuration.remoteAddress.IP.substr(separatorPosition+1));
-
-										configuration.remoteAddress.IP = configuration.remoteAddress.IP.substr(0, separatorPosition);
-									}
-									else
-									{
-										string portStr;
-
-										cout << "Please supply a remote-port: ";
-										configuration.remoteAddress.port = portFromInput(cin); // cout << endl;
-									}
-
-									cout << "Please enter a username (No spaces): "; wcin >> configuration.username; // cout << endl;
-								}
-							#endif
-
-							if (logChoices)
-								configuration.save();
-
-							//clearConsole();
-
-							return execute(configuration.username, configuration.remoteAddress.IP, configuration.remoteAddress.port);
-						case MODE_SERVER:
-							{
-								#ifndef IOSYNC_FAST_TESTMODE
-									cout << "Please enter a port to host with: ";
-									configuration.remoteAddress.port = portFromInput(cin); // cout << endl;
-								#endif
-
-								DWORD PID; cout << "Please specify a PID to apply XInput injection (0 = None): "; cin >> PID;
-
-								if (PID != 0)
-								{
-									devices::gamepad::__winnt__injectLibrary(PID);
-
-									if (logChoices)
-									{
-										configuration.PIDs.push(PID);
-									}
-								}
-							}
-
-							if (logChoices)
-								configuration.save();
-
-							//clearConsole();
-
-							return execute(configuration.remoteAddress.port);
-					}
-				}
-			#endif
-		#ifndef IOSYNC_FAST_TESTMODE
-			}
-		#endif
-
 		// Check if we have arguments to use:
 		if (argCount > 1)
 		{
@@ -1568,9 +1457,49 @@ namespace iosync
 		{
 			return execute((addressPort)stoi(args[0]));
 		}
+		
+		// Attempt to load the default configuration file.
+		#ifndef IOSYNC_FAST_TESTMODE
+			try
+			{
+				// Local variable(s):
+				applicationConfiguration configuration(mode);
 
-		// Call the main implementation.
-		return execute(DEFAULT_PORT);
+				configuration.load();
+
+				return applyConfiguration(configuration);
+			}
+			catch
+			(
+				const exception&
+				
+				// This is just to get MSVC to stop warning me:
+				#ifdef IOSYNC_TESTMODE
+					e
+				#endif
+			)
+			{
+				#ifdef IOSYNC_TESTMODE
+					cout << "Exception caught: " << e.what() << endl;
+				#endif
+		#endif
+				#ifdef IOSYNC_CONSOLE_INPUT
+					bool logChoices = false;
+
+					#ifndef IOSYNC_FAST_TESTMODE
+						{
+							cout << "Unable to load configuration, would you like to log new settings? (Y/N): "; logChoices = userBoolean(); // cout << endl;
+						}
+					#endif
+
+					return applyCommandlineConfiguration(applicationConfiguration(mode), logChoices);
+				#endif
+		#ifndef IOSYNC_FAST_TESTMODE
+			}
+
+			// If all else fails, host with the default port.
+			return execute(DEFAULT_PORT);
+		#endif
 	}
 
 	int iosync_application::execute(wstring username, string remoteAddress, addressPort remotePort, addressPort localPort)
@@ -1630,6 +1559,145 @@ namespace iosync
 			return;
 		}
 	#endif
+
+	int iosync_application::applyConfiguration(applicationConfiguration& configuration)
+	{
+		if (configuration.useCmd)
+		{
+			return applyCommandlineConfiguration(configuration, false);
+		}
+
+		#ifdef PLATFORM_WINDOWS
+			while (!configuration.PIDs.empty())
+			{
+				devices::gamepad::__winnt__injectLibrary(configuration.PIDs.front());
+
+				configuration.PIDs.pop();
+			}
+
+			//configuration.PIDs.clear();
+		#endif
+
+		switch (configuration.mode)
+		{
+			case MODE_CLIENT:
+				// Check if a proper address was specified:
+				if (address::addressSet(configuration.remoteAddress.IP))
+				{
+					return execute(configuration.username, configuration.remoteAddress.IP, configuration.remoteAddress.port);
+				}
+				else
+				{
+					bool hostAnyway;
+
+					// Check if we should move into the next routine or not:
+					cout << "Invalid address specified: Would you like to host instead? (Port: ";
+					cout << configuration.remoteAddress.port << ", Y/N): "; hostAnyway = userBoolean(); // cout << endl;
+
+					if (!hostAnyway)
+					{
+						return -1;
+					}
+				}
+			case MODE_SERVER:
+				return execute(configuration.remoteAddress.port);
+			default:
+				cout << "Invalid application-mode specified." << endl;
+
+				return -1;
+		}
+	}
+
+	int iosync_application::applyCommandlineConfiguration(applicationConfiguration& configuration, bool logChoices)
+	{
+		configuration.remoteAddress.port = DEFAULT_PORT;
+
+		//cout << endl;
+
+		cout << "Application mode (" << MODE_CLIENT << " = Client, " << MODE_SERVER << " = Server): "; cin >> mode; //cout << endl;
+
+		if (logChoices)
+		{
+			// We're going to attempt to write to the disk,
+			// so we need to store the application-mode.
+			configuration.mode = mode;
+		}
+
+		switch (mode)
+		{
+			case MODE_CLIENT:
+				#ifndef IOSYNC_FAST_TESTMODE
+					configuration.remoteAddress.IP = "127.0.0.1";
+					configuration.username = DEFAULT_PLAYER_NAME;
+
+					{
+						string::size_type separatorPosition;
+
+						cout << "Please supply a hostname: "; cin >> configuration.remoteAddress.IP; // cout << endl;
+
+						separatorPosition = configuration.remoteAddress.IP.find(networking::ADDRESS_SEPARATOR);
+
+						if (separatorPosition != string::npos && separatorPosition < configuration.remoteAddress.IP.length())
+						{
+							configuration.remoteAddress.port = portFromString(configuration.remoteAddress.IP.substr(separatorPosition+1));
+
+							configuration.remoteAddress.IP = configuration.remoteAddress.IP.substr(0, separatorPosition);
+						}
+						else
+						{
+							string portStr;
+
+							cout << "Please supply a remote-port: ";
+							configuration.remoteAddress.port = portFromInput(cin); // cout << endl;
+						}
+
+						cout << "Please enter a username (No spaces): "; wcin >> configuration.username; // cout << endl;
+					}
+				#endif
+
+				if (logChoices)
+				{
+					configuration.save();
+				}
+
+				//clearConsole();
+
+				return execute(configuration.username, configuration.remoteAddress.IP, configuration.remoteAddress.port);
+			case MODE_SERVER:
+				{
+					#ifndef IOSYNC_FAST_TESTMODE
+						cout << "Please enter a port to host with: ";
+						configuration.remoteAddress.port = portFromInput(cin); // cout << endl;
+					#endif
+
+					#ifndef IOSYNC_FAST_TESTMODE_SINGLE_INPUT
+						DWORD PID; cout << "Please specify a PID to apply XInput injection (0 = None): "; cin >> PID;
+
+						if (PID != 0)
+						{
+							devices::gamepad::__winnt__injectLibrary(PID);
+
+							if (logChoices)
+							{
+								configuration.PIDs.push(PID);
+							}
+						}
+					#endif
+				}
+
+				if (logChoices)
+				{
+					configuration.save();
+				}
+
+				//clearConsole();
+
+				return execute(configuration.remoteAddress.port);
+		}
+
+		// If all else fails, host with the default port.
+		return execute(DEFAULT_PORT);
+	}
 
 	// The main creation routine.
 	void iosync_application::onCreate(applicationMode mode)

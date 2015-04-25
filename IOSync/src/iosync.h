@@ -1,19 +1,39 @@
 #pragma once
 
 // Preprocessor related:
-#define IOSYNC_TESTMODE
+#ifdef _DEBUG
+	#define IOSYNC_TESTMODE
+#endif
+
+/*
+	This determines if command-line input is
+	enabled when no configuration-file is present.
+
+	This does not stop the user from manually enabling
+	console-input through their configuration-file.
+*/
+
+#define IOSYNC_CONSOLE_INPUT
 
 #ifdef IOSYNC_TESTMODE
 	//#define IOSYNC_FAST_TESTMODE
+	
+	#ifdef IOSYNC_FAST_TESTMODE
+		#define IOSYNC_FAST_TESTMODE_SINGLE_INPUT
+	#endif
 #endif
 
+// This is just so endless keyboard loops don't occur:
 #ifndef IOSYNC_FAST_TESTMODE
 	#define XINPUT_DEVICE_KEYBOARD
 #endif
 
 #define XINPUT_DEVICE_GAMEPAD
 
-#define XINPUT_DEVICE_GAMEPAD_AUTODETECT
+#ifdef XINPUT_DEVICE_GAMEPAD
+	// Gamepads are currently auto-detected by default.
+	#define XINPUT_DEVICE_GAMEPAD_AUTODETECT
+#endif
 
 //#define IOSYNC_LIVE_COMMANDS
 
@@ -665,8 +685,16 @@ namespace iosync
 
 				// INI properties:
 				static const wstring APPLICATION_MODE;
+				static const wstring APPLICATION_USECMD;
 
+				// This is represented with an IP address / hostname, and optionally, a port.
+				// A port may also be supplied without an address if a separator is specified. (Usually ':')
 				static const wstring NETWORK_ADDRESS;
+
+				// This may be used to manually supply a port, rather than using 'NETWORK_ADDRESS'.
+				// There is no hostname/IP equivalent, as 'NETWORK_ADDRESS' already covers it.
+				static const wstring NETWORK_PORT;
+
 				static const wstring NETWORK_USERNAME;
 
 				#ifdef PLATFORM_WINDOWS
@@ -674,7 +702,7 @@ namespace iosync
 				#endif
 
 				// Constructor(s):
-				applicationConfiguration(applicationMode internal_mode=MODE_SERVER);
+				applicationConfiguration(applicationMode internal_mode=MODE_SERVER, bool cmdOnly=false);
 
 				// Destructor(s):
 				~applicationConfiguration();
@@ -699,6 +727,9 @@ namespace iosync
 				wstring username;
 
 				applicationMode mode;
+
+				// Booleans / Flags:
+				bool useCmd;
 			};
 
 			// Global variable(s):
@@ -793,6 +824,15 @@ namespace iosync
 			#ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
 				void executeAsync();
 			#endif
+
+			// This command may be used in order to execute/start an application using a configuration-object.
+			int applyConfiguration(applicationConfiguration& configuration);
+
+			// This command polls information from the user, rather than the disk.
+			// If the 'logChoices' argument is set to 'true', this may write to the disk.
+			// The 'configuration' argument should be a valid container
+			// used to output the settings provided by the user.
+			int applyCommandlineConfiguration(applicationConfiguration& configuration, bool logChoices=false);
 
 			void onCreate(applicationMode mode=MODE_SERVER);
 			void onClose();

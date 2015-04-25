@@ -7,12 +7,13 @@
 #include <string>
 
 // Namespace(s):
-using namespace std;
-
 namespace iosync
 {
 	namespace exceptions
 	{
+		// Namespace(s):
+		using namespace std;
+
 		// Classes:
 		class iosync_exception : public runtime_error
 		{
