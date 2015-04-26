@@ -1,4 +1,4 @@
-# IOSync
+# ![IOSync Logo](/IOSync/IOSync.ico) IOSync
 IOSync is a console-application which allows you to synchronize input events from several computers to a single host machine.
 The main purpose of this application is to send keyboard and gamepad messages to a remote machine, in order to play local multiplayer games over the internet.
 
@@ -40,7 +40,7 @@ Building the injection/wrapper DLLs is pretty straight forward, as long as you h
 * Some emulators (Dolphin specifically) have very 'dynamic' ways of managing 'XInput'. Remote DLL injection may not work well with these applications. It's best to simply move over the appropriate injection DLL, then rename it.
 
 #####Special Thanks:#####
-* Matthew Diamond (For initially helping with DLL injection)
+* Matthew Diamond (For initially helping with DLL injection, as well as making the logo)
 * MainMemory (For his really basic "jump injection" command; [original source here](https://github.com/sonicretro/sadx-mod-loader/blob/49cbca9ffecbcdc9541ac63ed2bc88ae52bfcfbf/include/ModLoader/MemAccess.h#L148))
 * SonicFreak94 (Michael), and Kirbeh (Tristan) for helping with testing.
 
