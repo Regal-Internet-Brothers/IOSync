@@ -749,6 +749,9 @@ namespace iosync
 				static const wstring APPLICATION_MODE;
 				static const wstring APPLICATION_USECMD;
 
+				// This is used to redirect to another configuration-file.
+				static const wstring APPLICATION_CONFIG;
+
 				// Devices:
 				static const wstring DEVICES_KEYBOARD;
 				static const wstring DEVICES_GAMEPADS;
@@ -960,7 +963,7 @@ namespace iosync
 			// If the 'logChoices' argument is set to 'true', this may write to the disk.
 			// The 'configuration' argument should be a valid container
 			// used to output the settings provided by the user.
-			int applyCommandlineConfiguration(applicationConfiguration& configuration, bool logChoices=false);
+			int applyCommandlineConfiguration(applicationConfiguration& configuration, const bool logChoices=false, const wstring& output_file=wstring());
 
 			void onCreate(applicationMode mode=MODE_SERVER);
 			void onClose();

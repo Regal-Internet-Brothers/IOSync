@@ -13,8 +13,10 @@
 // Other:
 //#define DLLExport // __declspec( dllexport )
 
+//#define DLL_DEBUG
+#define DLL_CONFIRMATION_MESSAGE
+
 // Includes:
-#include "settings.h"
 
 // Windows-specific:
 #include <windows.h>

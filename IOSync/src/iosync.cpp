@@ -1032,6 +1032,7 @@ namespace iosync
 	// Application:
 	const wstring iosync_application::applicationConfiguration::APPLICATION_MODE = L"mode";
 	const wstring iosync_application::applicationConfiguration::APPLICATION_USECMD = L"force_cmd";
+	const wstring iosync_application::applicationConfiguration::APPLICATION_CONFIG = L"config";
 
 	// Devices:
 	const wstring iosync_application::applicationConfiguration::DEVICES_KEYBOARD = L"keyboard";
@@ -1135,19 +1136,28 @@ namespace iosync
 		{
 			auto application = applicationIterator->second;
 
+			// Check if we're being redirected somewhere else:
+			auto redirectIterator = application.find(APPLICATION_CONFIG);
+
+			if (redirectIterator != application.end())
 			{
-				auto cmdIterator = application.find(APPLICATION_USECMD);
+				// Load the redirection-file, instead.
+				load(redirectIterator->second);
 
-				if (cmdIterator != application.end())
+				return;
+			}
+			
+			auto cmdIterator = application.find(APPLICATION_USECMD);
+
+			if (cmdIterator != application.end())
+			{
+				useCmd = wstrEnabled(cmdIterator->second);
+
+				// Check if we're forcing command-line input:
+				if (useCmd)
 				{
-					useCmd = wstrEnabled(cmdIterator->second);
-
-					// Check if we're forcing command-line input:
-					if (useCmd)
-					{
-						// Don't bother reading further, we don't need to.
-						return;
-					}
+					// Don't bother reading further, we don't need to.
+					return;
 				}
 			}
 
@@ -1680,6 +1690,9 @@ namespace iosync
 	// This acts as the default 'execute' implementation.
 	int iosync_application::execute()
 	{
+		// Namespace(s):
+		using namespace INI;
+
 		// Local variable(s):
 		auto argCount = args.size();
 
@@ -1729,13 +1742,77 @@ namespace iosync
 				#endif
 		#endif
 				#ifdef IOSYNC_CONSOLE_INPUT
-					bool logChoices = false;
+					wstring output_file = applicationConfiguration::DEFAULT_PATH;
 
-					#ifndef IOSYNC_FAST_TESTMODE
-						cout << "Unable to load configuration; would you like to log new settings? (Y/N): "; logChoices = userBoolean(); // cout << endl;
-					#endif
+					cout << "Unable to load configuration: ";
 
-					return applyCommandlineConfiguration(applicationConfiguration(mode), logChoices);
+					do
+					{
+						bool logChoices = false;
+						bool newFile = false;
+
+						#ifndef IOSYNC_FAST_TESTMODE
+							cout << "Would you like to specify a custom configuration-file? (Y/N): "; newFile = userBoolean();
+							
+							if (!newFile)
+							{
+								cout << "Would you like to log new settings? (Y/N): "; logChoices = userBoolean();
+							}
+							else
+							{
+								cout << "Please specifiy a configuration file: ";
+								wcin >> output_file; // cout << endl;
+
+								// Local variable(s):
+								bool loadingWorked = false;
+								applicationConfiguration configuration;
+
+								try
+								{
+									configuration.load(output_file);
+
+									loadingWorked = true;
+								}
+								catch (exception&)
+								{
+									cout << "Unable to load custom configuration file." << endl;
+								}
+
+								cout << "Would you like this to be your default file? (Y/N): "; logChoices = userBoolean();
+
+								if (logChoices)
+								{
+									// If the user used the default file-name, don't bother redirecting.
+									if (output_file != applicationConfiguration::DEFAULT_PATH)
+									{
+										INIVariables<wstring> redirectionRep;
+
+										auto& application = redirectionRep[applicationConfiguration::APPLICATION_SECTION] = INISection<wstring>();
+
+										application[applicationConfiguration::APPLICATION_CONFIG] = output_file;
+
+										save(applicationConfiguration::DEFAULT_PATH, redirectionRep);
+									}
+								}
+								else if (loadingWorked)
+								{
+									return applyConfiguration(configuration);
+								}
+								else
+								{
+									wcout << L"Would you like to log to this file? (\"" << output_file << L"\", Y/N): "; logChoices = userBoolean();
+
+									if (!logChoices)
+									{
+										// Try asking the user again.
+										continue;
+									}
+								}
+							}
+						#endif
+
+						return applyCommandlineConfiguration(applicationConfiguration(mode), logChoices, output_file);
+					} while (true);
 				#endif
 		#ifndef IOSYNC_FAST_TESTMODE
 			}
@@ -1892,7 +1969,7 @@ namespace iosync
 		return -1;
 	}
 
-	int iosync_application::applyCommandlineConfiguration(applicationConfiguration& configuration, bool logChoices)
+	int iosync_application::applyCommandlineConfiguration(applicationConfiguration& configuration, const bool logChoices, const wstring& output_file)
 	{
 		configuration.remoteAddress.port = DEFAULT_PORT;
 
@@ -1922,7 +1999,7 @@ namespace iosync
 
 				if (logChoices)
 				{
-					configuration.save();
+					configuration.save(output_file);
 				}
 
 				//clearConsole();
@@ -1959,7 +2036,7 @@ namespace iosync
 
 				if (logChoices)
 				{
-					configuration.save();
+					configuration.save(output_file);
 				}
 
 				//clearConsole();
