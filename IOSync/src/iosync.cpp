@@ -45,7 +45,7 @@ namespace iosync
 				//ShowWindow(windowInstance, OSInfo.nCmdShow);
 				UpdateWindow(windowInstance);
 			#endif
-
+			
 			return windowInstance;
 		}
 
@@ -1252,8 +1252,13 @@ namespace iosync
 				}
 			}
 
-			// Read the username specified.
-			username = networking[NETWORK_USERNAME];
+			auto usernameIterator = networking.find(NETWORK_USERNAME);
+
+			if (usernameIterator != networking.end())
+			{
+				// Read the username specified.
+				username = usernameIterator->second;
+			}
 		}
 		else
 		{
@@ -1376,7 +1381,7 @@ namespace iosync
 			}
 		}
 
-		if (username.length() > 0)
+		if (!username.empty())
 			networking[NETWORK_USERNAME] = username;
 
 		// Windows-specific:
@@ -1835,24 +1840,49 @@ namespace iosync
 		switch (configuration.mode)
 		{
 			case MODE_CLIENT:
-				// Check if a proper address was specified:
-				if (address::addressSet(configuration.remoteAddress.IP))
+				do
 				{
-					return execute(configuration.username, configuration.remoteAddress.IP, configuration.remoteAddress.port);
-				}
-				else
-				{
-					bool hostAnyway;
-
-					// Check if we should move into the next routine or not:
-					cout << "Invalid address specified: Would you like to host instead? (Port: ";
-					cout << configuration.remoteAddress.port << ", Y/N): "; hostAnyway = userBoolean(); // cout << endl;
-
-					if (!hostAnyway)
+					// Check if a proper address was specified:
+					if (address::addressSet(configuration.remoteAddress.IP))
 					{
-						return -1;
+						return execute((configuration.username.empty()) ? DEFAULT_PLAYER_NAME : configuration.username, configuration.remoteAddress.IP, configuration.remoteAddress.port);
 					}
-				}
+					else
+					{
+						bool hostAnyway;
+
+						cout << "Invalid address specified: Would you like to supply a new address? (Y/N): "; hostAnyway = !userBoolean(); // cout << endl;
+
+						if (!hostAnyway)
+						{
+							// Request a new address from the user.
+							requestAddress(configuration.remoteAddress);
+
+							// Check if we have a username:
+							if (configuration.username.empty())
+							{
+								cout << "Please supply a username: "; wcin >> configuration.username; // cout << endl;
+							}
+						}
+						else
+						{
+							// Check if we should move into the next routine or not:
+							cout << "Would you like to host instead? (Port: ";
+							cout << configuration.remoteAddress.port << ", Y/N): "; hostAnyway = userBoolean(); // cout << endl;
+
+							if (!hostAnyway)
+							{
+								// Tell the user that the program failed to execute.
+								return -1;
+							}
+							else
+							{
+								// Break the endless loop, then move into the next case.
+								break;
+							}
+						}
+					}
+				} while(true);
 			case MODE_SERVER:
 				return execute(configuration.remoteAddress.port);
 		}
@@ -1881,32 +1911,13 @@ namespace iosync
 		{
 			case MODE_CLIENT:
 				#ifndef IOSYNC_FAST_TESTMODE
-					configuration.remoteAddress.IP = "127.0.0.1";
+					//configuration.remoteAddress.IP = "127.0.0.1";
 					configuration.username = DEFAULT_PLAYER_NAME;
 
-					{
-						string::size_type separatorPosition;
+					// Request an address from the user.
+					requestAddress(configuration.remoteAddress);
 
-						cout << "Please supply a hostname: "; cin >> configuration.remoteAddress.IP; // cout << endl;
-
-						separatorPosition = configuration.remoteAddress.IP.find(networking::ADDRESS_SEPARATOR);
-
-						if (separatorPosition != string::npos && separatorPosition < configuration.remoteAddress.IP.length())
-						{
-							configuration.remoteAddress.port = portFromString(configuration.remoteAddress.IP.substr(separatorPosition+1));
-
-							configuration.remoteAddress.IP = configuration.remoteAddress.IP.substr(0, separatorPosition);
-						}
-						else
-						{
-							string portStr;
-
-							cout << "Please supply a remote-port: ";
-							configuration.remoteAddress.port = portFromInput(cin); // cout << endl;
-						}
-
-						cout << "Please enter a username (No spaces): "; wcin >> configuration.username; // cout << endl;
-					}
+					cout << "Please enter a username (No spaces): "; wcin >> configuration.username; // cout << endl;
 				#endif
 
 				if (logChoices)
@@ -1920,8 +1931,7 @@ namespace iosync
 			case MODE_SERVER:
 				{
 					#ifndef IOSYNC_FAST_TESTMODE
-						cout << "Please enter a port to host with: ";
-						configuration.remoteAddress.port = portFromInput(cin); // cout << endl;
+						configuration.remoteAddress.port = requestPort(cin); // cout << endl;
 					#endif
 
 					#ifndef IOSYNC_FAST_TESTMODE_SINGLE_INPUT

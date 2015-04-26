@@ -236,25 +236,16 @@ namespace REAL_XINPUT
 	{
 		#ifdef DEBUG_XINPUT_CALLS
 			cout << "XInputGetState(" << dwUserIndex << ", " << pState << ")" << endl;
-			cout << "_XInputGetState: " << _XInputGetState << endl;
 		#endif
 
 		if (_XInputGetState != nullptr)
 		{
 			if (shouldFixJumps())
 			{
-				#ifdef DEBUG_XINPUT_CALLS
-					cout << "Jump fixing..." << endl;
-				#endif
-
 				auto entryIterator = jumpStates.find((LPVOID)_XInputGetState);
 
 				if (entryIterator != jumpStates.end())
 				{
-					#ifdef DEBUG_XINPUT_CALLS
-						cout << "__XInputGetState? - " << entryIterator->first << endl;
-					#endif
-
 					jumpEntry entry = *entryIterator;
 
 					swapJumps(entry);

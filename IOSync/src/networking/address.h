@@ -56,8 +56,10 @@ namespace iosync
 			void writeTo(QSocket& socket);
 
 			// Other:
+
+			// The return value of this command specifies if both a port, and an IP address/hostname was parsed.
 			template <typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
-			inline void parse(const basic_string<characterType, characterTraits, strAlloc>& input, addressPort default_port)
+			inline bool parse(const basic_string<characterType, characterTraits, strAlloc>& input, addressPort default_port)
 			{
 				auto addressDivider = input.find(ADDRESS_SEPARATOR);
 
@@ -65,18 +67,30 @@ namespace iosync
 				if (addressDivider != basic_string<characterType, characterTraits, strAlloc>::npos)
 				{
 					IP = QSocket::StringToIntIP(quickLib::INI::abstractStringToDefault(input.substr(0, addressDivider)));
-					port = stoi(input.substr(addressDivider+1));
 
-					if (port == 0)
-						port = default_port;
+					try
+					{
+						port = stoi(input.substr(addressDivider+1));
+
+						if (port == 0)
+							port = default_port;
+
+						return true;
+					}
+					catch (invalid_argument&)
+					{
+						//port = 0;
+					}
 				}
 				else
 				{
 					IP = QSocket::nonNativeToNativeIP(quickLib::INI::abstractStringToDefault(input));
-					port = default_port;
 				}
 
-				return;
+				port = default_port;
+
+				// Return the default response.
+				return false;
 			}
 
 			template <typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
@@ -140,8 +154,9 @@ namespace iosync
 			// Methods:
 			bool isSet() const;
 
+			// The return value of this command specifies if both a port, and an IP address/hostname was parsed.
 			template <typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
-			inline void parse(const basic_string<characterType, characterTraits, strAlloc>& input, addressPort default_port)
+			inline bool parse(const basic_string<characterType, characterTraits, strAlloc>& input, addressPort default_port)
 			{
 				auto addressDivider = input.find(ADDRESS_SEPARATOR);
 
@@ -149,18 +164,30 @@ namespace iosync
 				if (addressDivider != basic_string<characterType, characterTraits, strAlloc>::npos)
 				{
 					IP = quickLib::INI::abstractStringToDefault(input.substr(0, addressDivider));
-					port = stoi(input.substr(addressDivider+1));
 
-					if (port == 0)
-						port = default_port;
+					try
+					{
+						port = stoi(input.substr(addressDivider+1));
+
+						if (port == 0)
+							port = default_port;
+
+						return true;
+					}
+					catch (invalid_argument&)
+					{
+						//port = 0;
+					}
 				}
 				else
 				{
 					IP = quickLib::INI::abstractStringToDefault(input);
-					port = default_port;
 				}
 
-				return;
+				port = default_port;
+
+				// Return the default response.
+				return false;
 			}
 
 			template <typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
@@ -169,9 +196,9 @@ namespace iosync
 				basic_stringstream<characterType, characterTraits, strAlloc> ss;
 				basic_string<characterType, characterTraits, strAlloc> str;
 
-				quickLib::INI::correctString(IP + ADDRESS_SEPARATOR, str);
+				quickLib::INI::correctString(IP, str);
 
-				ss << str << port;
+				ss << str << ADDRESS_SEPARATOR << port;
 
 				out_str = ss.str();
 

@@ -24,7 +24,7 @@ namespace iosync
 		// Functions:
 		bool address::addressSet(string IP)
 		{
-			return (IP.length() > 0);
+			return (!IP.empty());
 		}
 
 		bool address::addressSet(QSOCK_UINT32_LONG IP)

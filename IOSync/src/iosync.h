@@ -892,13 +892,46 @@ namespace iosync
 				return DEFAULT_PORT;
 			}
 
-			static inline nativePort portFromInput(istream& is)
+			static inline nativePort portFromInput(istream& is=cin)
 			{
 				string portStr;
 
 				is >> portStr;
 
 				return portFromString(portStr);
+			}
+
+			// The return-value of this command follows the behavior of the 'representativeAddress' structure's 'parse' command.
+			static inline bool addressFromInput(representativeAddress& address, istream& is = cin, addressPort default_port=DEFAULT_PORT)
+			{
+				string addr_str;
+
+				is >> addr_str;
+
+				return address.parse(addr_str, default_port);
+			}
+
+			// This command accepts input from the user, then mutates the remote-address using that data.
+			static inline void requestAddress(representativeAddress& remoteAddress, istream& is=cin, ostream& os=cout, addressPort default_port=DEFAULT_PORT)
+			{
+				do
+				{
+					os << "Please supply an address: ";
+
+					if (!addressFromInput(remoteAddress, is, default_port))
+					{
+						remoteAddress.port = requestPort(is, os);
+					}
+				} while (remoteAddress.IP.empty());
+
+				return;
+			}
+
+			static inline nativePort requestPort(istream& is=cin, ostream& os=cout)
+			{
+				os << "Please supply a port: ";
+
+				return portFromInput(is);
 			}
 
 			#ifdef PLATFORM_WINDOWS
