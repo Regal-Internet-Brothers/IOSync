@@ -242,6 +242,7 @@
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="settings.h" />
     <ClInclude Include="XinputInterface.h" />
     <ClInclude Include="XInput_Injector.h" />
   </ItemGroup>

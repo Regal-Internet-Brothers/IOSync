@@ -18,6 +18,7 @@
 
 // Standard library:
 #include <string>
+#include <array>
 
 // Namespace(s):
 namespace process
@@ -25,6 +26,14 @@ namespace process
 	// Namespace(s):
 	using namespace std;
 
+	// Constant variable(s):
+	const size_t JUMP_SEGMENT_SIZE = 5;
+
+	// Typedefs:
+
+	// A "segment" of memory dedicated to a jump instruction.
+	typedef array<unsigned char, JUMP_SEGMENT_SIZE> jumpSegment;
+	
 	// Functions:
 	DWORD getPID();
 
@@ -44,13 +53,17 @@ namespace process
 	// This will return the result of 'getName', plus an additional random-number.
 	string getUniqueName();
 
-	BOOL writeJump(LPVOID writeaddress, LPVOID funcaddress);
+	void readJumpSegment(jumpSegment& output, LPCVOID address);
+	void writeJumpSegment(const jumpSegment& segment, LPVOID writeaddress);
+
+	jumpSegment swapJumpInstruction(LPVOID writeaddress, const jumpSegment& segment);
+	jumpSegment writeJump(LPVOID writeaddress, LPCVOID funcaddress);
 
 	LPVOID getRemoteFunction(LPCSTR name, HMODULE hDLL);
 	LPVOID getRemoteFunction(LPCSTR name, LPCSTR DLL=INJECTOR_XINPUT_DEFAULT_DLL_A);
 
-	BOOL mapRemoteFunction(LPCSTR name, LPVOID function, HMODULE hDLL);
-	BOOL mapRemoteFunction(LPCSTR name, LPVOID function, LPCSTR DLL=INJECTOR_XINPUT_DEFAULT_DLL_A);
+	jumpSegment mapRemoteFunction(LPCSTR name, LPCVOID function, HMODULE hDLL);
+	jumpSegment mapRemoteFunction(LPCSTR name, LPCVOID function, LPCSTR DLL=INJECTOR_XINPUT_DEFAULT_DLL_A);
 
 	// This command requires you to link with "psapi.lib"; use at your own risk.
 	template <const size_t max_processes=1024>

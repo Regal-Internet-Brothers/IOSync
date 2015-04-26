@@ -112,6 +112,9 @@ namespace iosync
 		static const size_t serializedNativeGamepadSize = sizeof(nativeGamepad); // sizeof(nativeGamepad);
 
 		#ifdef PLATFORM_WINDOWS
+			const string XINPUT_INJECTION_ARGUMENT = "XI_INJECT";
+			const wstring XINPUT_INJECTION_ARGUMENTW = L"XI_INJECT";
+			
 			static LPCTSTR SHARED_GAMEPAD_MEMORY_NAME = "IOSYNC_GAMEPAD_BUFFER";
 
 			static const size_t SHARED_SIZEOF_PLUGGED_IN_SEGMENT = (sizeof(bool)*MAX_GAMEPADS);

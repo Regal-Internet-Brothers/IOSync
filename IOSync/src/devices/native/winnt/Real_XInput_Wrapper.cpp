@@ -1,6 +1,11 @@
 // Preprocessor related:
+
 //#define WIN32_LEAN_AND_MEAN
 #define _CRT_SECURE_NO_WARNINGS
+
+// This enables console-output when injected XInput commands are executed (Virtual or real).
+// This also applies to IOSync's general XInput support.
+//#define DEBUG_XINPUT_CALLS
 
 // Includes:
 
@@ -11,11 +16,14 @@
 #include <Xinput.h>
 
 #include "Real_XInput_Wrapper.h"
-#include "../../../native/winnt/processManagement.h"
 
 // Standard library:
 #include <string>
 //#include <sstream>
+
+//#ifdef DEBUG_XINPUT_CALLS
+#include <iostream>
+//#endif
 
 // Namespace(s):
 namespace REAL_XINPUT
@@ -39,9 +47,39 @@ namespace REAL_XINPUT
 	_XInputGetAudioDeviceIds_t _XInputGetAudioDeviceIds;
 	_XInputGetStateEx_t _XInputGetStateEx;
 
+	// Global variable(s):
+	jumpMap jumpStates;
+
 	// Functions:
 
 	// Meta:
+	process::jumpSegment mapRemoteFunction(LPCSTR name, LPCVOID function, HMODULE hDLL)
+	{
+		using namespace process;
+
+		#ifdef PROCESS_MANAGER_DEBUG
+			cout << "{XINPUT}: Attempting to map '" << function << "' to: '" << name << "'" << endl;
+		#endif
+
+		auto remoteFunction = getRemoteFunction(name, hDLL);
+
+		if (remoteFunction == NULL)
+		{
+			#ifdef PROCESS_MANAGER_DEBUG
+				cout << "Mapping failed; unable to find remote function."
+			#endif
+
+			// For now, do nothing.
+			return jumpSegment();
+		}
+
+		auto response = writeJump(remoteFunction, function);
+
+		jumpStates[remoteFunction] = response;
+
+		return response;
+	}
+
 	VOID linkTo(HMODULE hDLL)
 	{
 		using namespace process;
@@ -130,8 +168,30 @@ namespace REAL_XINPUT
 	// Wrapper / "shim":
 	VOID WINAPI XInputEnable(BOOL enable)
 	{
+		#ifdef DEBUG_XINPUT_CALLS
+			cout << "XInputEnable(" << enable << ")" << endl;
+		#endif
+
 		if (_XInputEnable != nullptr)
-		{	
+		{
+			if (shouldFixJumps())
+			{
+				auto entryIterator = jumpStates.find((LPVOID)_XInputEnable);
+
+				if (entryIterator != jumpStates.end())
+				{
+					jumpEntry entry = *entryIterator;
+
+					swapJumps(entry);
+					
+					_XInputEnable(enable);
+
+					swapJumps(entry);
+
+					return;
+				}
+			}
+
 			_XInputEnable(enable);
 
 			return;
@@ -142,8 +202,30 @@ namespace REAL_XINPUT
 
 	DWORD WINAPI XInputSetState(DWORD dwUserIndex, PXINPUT_VIBRATION pVibration)
 	{
+		#ifdef DEBUG_XINPUT_CALLS
+			cout << "XInputSetState(" << dwUserIndex << ", " << pVibration << ")" << endl;
+		#endif
+
 		if (_XInputSetState != nullptr)
 		{
+			if (shouldFixJumps())
+			{
+				auto entryIterator = jumpStates.find((LPVOID)_XInputSetState);
+
+				if (entryIterator != jumpStates.end())
+				{
+					jumpEntry entry = *entryIterator;
+
+					swapJumps(entry);
+					
+					auto response = _XInputSetState(dwUserIndex, pVibration);
+
+					swapJumps(entry);
+
+					return response;
+				}
+			}
+
 			return _XInputSetState(dwUserIndex, pVibration);
 		}
 
@@ -152,8 +234,39 @@ namespace REAL_XINPUT
 
 	DWORD WINAPI XInputGetState(DWORD dwUserIndex, PXINPUT_STATE pState)
 	{
+		#ifdef DEBUG_XINPUT_CALLS
+			cout << "XInputGetState(" << dwUserIndex << ", " << pState << ")" << endl;
+			cout << "_XInputGetState: " << _XInputGetState << endl;
+		#endif
+
 		if (_XInputGetState != nullptr)
 		{
+			if (shouldFixJumps())
+			{
+				#ifdef DEBUG_XINPUT_CALLS
+					cout << "Jump fixing..." << endl;
+				#endif
+
+				auto entryIterator = jumpStates.find((LPVOID)_XInputGetState);
+
+				if (entryIterator != jumpStates.end())
+				{
+					#ifdef DEBUG_XINPUT_CALLS
+						cout << "__XInputGetState? - " << entryIterator->first << endl;
+					#endif
+
+					jumpEntry entry = *entryIterator;
+
+					swapJumps(entry);
+					
+					auto response = _XInputGetState(dwUserIndex, pState);
+
+					swapJumps(entry);
+
+					return response;
+				}
+			}
+
 			return _XInputGetState(dwUserIndex, pState);
 		}
 
@@ -162,10 +275,30 @@ namespace REAL_XINPUT
 
 	DWORD WINAPI XInputGetCapabilities(DWORD dwUserIndex, DWORD dwFlags, PXINPUT_CAPABILITIES pCapabilities)
 	{
-		using namespace std;
+		#ifdef DEBUG_XINPUT_CALLS
+			cout << "XInputGetCapabilities(" << dwUserIndex << ", " << dwFlags << ", " << pCapabilities << ")" << endl;
+		#endif
 
 		if (_XInputGetCapabilities != nullptr)
 		{
+			if (shouldFixJumps())
+			{
+				auto entryIterator = jumpStates.find((LPVOID)_XInputGetCapabilities);
+
+				if (entryIterator != jumpStates.end())
+				{
+					jumpEntry entry = *entryIterator;
+
+					swapJumps(entry);
+					
+					auto response = _XInputGetCapabilities(dwUserIndex, dwFlags, pCapabilities);
+
+					swapJumps(entry);
+
+					return response;
+				}
+			}
+
 			return _XInputGetCapabilities(dwUserIndex, dwFlags, pCapabilities);
 		}
 
@@ -174,8 +307,30 @@ namespace REAL_XINPUT
 
 	DWORD WINAPI XInputGetBatteryInformation(DWORD dwUserIndex, BYTE devType, PXINPUT_BATTERY_INFORMATION battery)
 	{
+		#ifdef DEBUG_XINPUT_CALLS
+			cout << "XInputGetBatteryInformation(" << dwUserIndex << ", " << devType << ", " << battery << ")" << endl;
+		#endif
+
 		if (_XInputGetBatteryInformation != nullptr)
 		{
+			if (shouldFixJumps())
+			{
+				auto entryIterator = jumpStates.find((LPVOID)_XInputGetBatteryInformation);
+
+				if (entryIterator != jumpStates.end())
+				{
+					jumpEntry entry = *entryIterator;
+
+					swapJumps(entry);
+					
+					auto response = _XInputGetBatteryInformation(dwUserIndex, devType, battery);
+
+					swapJumps(entry);
+
+					return response;
+				}
+			}
+
 			return _XInputGetBatteryInformation(dwUserIndex, devType, battery);
 		}
 
@@ -184,8 +339,30 @@ namespace REAL_XINPUT
 
 	DWORD WINAPI XInputGetKeystroke(DWORD dwUserIndex, DWORD dwReserved, PXINPUT_KEYSTROKE pKeyStroke)
 	{
+		#ifdef DEBUG_XINPUT_CALLS
+			cout << "XInputGetKeystroke(" << dwUserIndex << ", " << dwReserved << ", " << pKeyStroke << ")" << endl;
+		#endif
+
 		if (_XInputGetKeystroke != nullptr)
 		{
+			if (shouldFixJumps())
+			{
+				auto entryIterator = jumpStates.find((LPVOID)_XInputGetKeystroke);
+
+				if (entryIterator != jumpStates.end())
+				{
+					jumpEntry entry = *entryIterator;
+
+					swapJumps(entry);
+					
+					auto response = _XInputGetKeystroke(dwUserIndex, dwReserved, pKeyStroke);
+
+					swapJumps(entry);
+
+					return response;
+				}
+			}
+
 			return _XInputGetKeystroke(dwUserIndex, dwReserved, pKeyStroke);
 		}
 
@@ -194,8 +371,30 @@ namespace REAL_XINPUT
 
 	DWORD WINAPI XInputGetAudioDeviceIds(DWORD dwUserIndex, LPWSTR pRenderDeviceId, PUINT renderCount, LPWSTR captureDeviceId, PUINT captureCount)
 	{
+		#ifdef DEBUG_XINPUT_CALLS
+			cout << "XInputGetAudioDeviceIds(" << dwUserIndex << ", " << pRenderDeviceId << ", " << renderCount << ", " << captureDeviceId << ", " << captureCount << ")" << endl;
+		#endif
+
 		if (_XInputGetAudioDeviceIds != nullptr)
 		{
+			if (shouldFixJumps())
+			{
+				auto entryIterator = jumpStates.find((LPVOID)_XInputGetAudioDeviceIds);
+
+				if (entryIterator != jumpStates.end())
+				{
+					jumpEntry entry = *entryIterator;
+
+					swapJumps(entry);
+					
+					auto response = _XInputGetAudioDeviceIds(dwUserIndex, pRenderDeviceId, renderCount, captureDeviceId, captureCount);
+
+					swapJumps(entry);
+
+					return response;
+				}
+			}
+
 			return _XInputGetAudioDeviceIds(dwUserIndex, pRenderDeviceId, renderCount, captureDeviceId, captureCount);
 		}
 
@@ -204,9 +403,31 @@ namespace REAL_XINPUT
 
 	DWORD WINAPI XInputGetStateEx(DWORD dwUserIndex, PXINPUT_STATE pState)
 	{
-		if (_XInputGetState != nullptr)
+		#ifdef DEBUG_XINPUT_CALLS
+			cout << "XInputGetStateEx(" << dwUserIndex << ", " << pState << ")" << endl;
+		#endif
+
+		if (_XInputGetStateEx != nullptr)
 		{
-			return _XInputGetState(dwUserIndex, pState);
+			if (shouldFixJumps())
+			{
+				auto entryIterator = jumpStates.find((LPVOID)_XInputGetStateEx);
+
+				if (entryIterator != jumpStates.end())
+				{
+					jumpEntry entry = *entryIterator;
+
+					swapJumps(entry);
+					
+					auto response = _XInputGetStateEx(dwUserIndex, pState);
+
+					swapJumps(entry);
+
+					return response;
+				}
+			}
+
+			return _XInputGetStateEx(dwUserIndex, pState);
 		}
 
 		return ERROR_DEVICE_NOT_CONNECTED;

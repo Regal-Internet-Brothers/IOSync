@@ -1151,7 +1151,12 @@ namespace iosync
 				}
 			}
 
-			mode = (applicationMode)stoi(application[APPLICATION_MODE]);
+			auto modeIterator = application.find(APPLICATION_MODE);
+
+			if (modeIterator != application.end())
+			{
+				mode = (applicationMode)stoi(modeIterator->second);
+			}
 		}
 
 		// Devices:
@@ -1676,6 +1681,16 @@ namespace iosync
 		// Check if we have arguments to use:
 		if (argCount > 1)
 		{
+			#ifdef PLATFORM_WINDOWS
+				if (devices::XINPUT_INJECTION_ARGUMENTW == args[0])
+				{
+					if (!devices::gamepad::__winnt__injectLibrary(stoi(args[1])))
+						return -1;
+
+					return 0;
+				}
+			#endif
+
 			return execute((argCount > 2) ? args[2] : DEFAULT_PLAYER_NAME, wideStringToDefault(args[0]), (addressPort)stoi(args[1]));
 		}
 		else if (argCount > 0)
@@ -1688,7 +1703,7 @@ namespace iosync
 			try
 			{
 				// Local variable(s):
-				applicationConfiguration configuration(mode);
+				applicationConfiguration configuration;
 
 				configuration.load();
 
