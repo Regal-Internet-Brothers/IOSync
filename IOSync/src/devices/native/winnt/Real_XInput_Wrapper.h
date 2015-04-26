@@ -1,6 +1,8 @@
 #pragma once
 
 // Includes:
+#include "../../../native/winnt/processManagement.h"
+
 #include <windows.h>
 
 #ifdef XINPUT_INJECTOR
@@ -9,16 +11,41 @@
 	#include <Xinput.h>
 #endif
 
+// Standard library:
+#include <map>
+
 // Namespace(s):
 namespace REAL_XINPUT
 {
-	//#include <Xinput.h>
+	// Namespace(s):
+	using namespace std;
+
+	// Typedefs:
+	typedef pair<LPVOID, process::jumpSegment> jumpEntry;
+	typedef map<LPVOID, process::jumpSegment> jumpMap;
+
+	// Global variable(s):
+	extern jumpMap jumpStates;
 
 	// Functions:
+	inline bool shouldFixJumps()
+	{
+		return !jumpStates.empty();
+	}
+
+	inline void swapJumps(jumpEntry& entry)
+	{
+		entry.second = process::swapJumpInstruction(entry.first, entry.second);
+
+		return;
+	}
+
 	inline LPCSTR XInputGetStateEx_Ordinal()
 	{
 		return (LPCSTR)100;
 	}
+
+	process::jumpSegment mapRemoteFunction(LPCSTR name, LPCVOID function, HMODULE hDLL);
 
 	VOID linkTo(HMODULE hDLL);
 	

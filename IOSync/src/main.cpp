@@ -72,11 +72,7 @@ int runProgram(OSINFO OSInfo, rate updateRate=DEFAULT_UPDATERATE)
 				cout << "Unable to continue operations; exiting..." << endl;
 				cout << "Error code thrown by application: " << responseCode << endl;
 
-				#ifdef PLATFORM_WINDOWS
-					system("PAUSE");
-				#else
-					cin.get();
-				#endif
+				cout << "Press any key to continue..."; cin.get();
 
 				// Return the response-code.
 				return responseCode;
@@ -97,6 +93,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 int main(int argc, char** argv)
 #endif
 {
+	// Local variable(s):
+	bool parentConsoleAttached = false;
+
 	// Initialize networking functionality.
 	QSocket::initSockets();
 
@@ -105,37 +104,6 @@ int main(int argc, char** argv)
 	#endif
 
 	#ifdef PLATFORM_WINDOWS_EXTENSIONS
-		AllocConsole();
-
-		freopen("CONOUT$", "w", stdout);
-		freopen("CONIN$", "r", stdin);
-
-		//freopen("CONOUT$", "w", stderr);
-
-		/*
-		// Allow for UTF16 text I/O:
-		char* locale = setlocale(LC_ALL, "English");
-		std::locale engLocale(locale);
-
-		setlocale(LC_ALL, locale);
-		
-		wcout.imbue(engLocale);
-		//wcin.imbue(engLocale);
-
-		_setmode(_fileno(stdout), _O_U16TEXT);
-		_setmode(_fileno(stdin), _O_U16TEXT);
-
-		_wfreopen(L"CONOUT$", L"w", stdout);
-		_wfreopen(L"CONOUT$", L"r", stdin);
-
-		wcout << L"ルイジ." << endl;
-
-		wcin.get();
-		*/
-
-		//SetStdHandle(STD_INPUT_HANDLE, GetStdHandle(STD_INPUT_HANDLE)); // stdin
-		//SetStdHandle(STD_OUTPUT_HANDLE, GetStdHandle(STD_OUTPUT_HANDLE)); // stdout
-
 		// Kept in its own scope due to large stack allocation(s):
 		{
 			WCHAR pathBuffer[MAX_PATH];
@@ -153,19 +121,53 @@ int main(int argc, char** argv)
 
 			//application::path = wstring((const wchar_t*)pathBuffer);
 		}
+
+		if (!AttachConsole(ATTACH_PARENT_PROCESS))
+		{
+			AllocConsole();
+		}
+		else
+		{
+			parentConsoleAttached = true;
+		}
+
+		freopen("CONOUT$", "w", stdout);
+		freopen("CONIN$", "r", stdin);
+
+		//freopen("CONOUT$", "w", stderr);
+
+		/*
+		// Allow for UTF16 text I/O:
+		char* locale = setlocale(LC_ALL, "English");
+		std::locale engLocale(locale);
+
+		setlocale(LC_ALL, locale);
+
+		wcout.imbue(engLocale);
+		//wcin.imbue(engLocale);
+
+		_setmode(_fileno(stdout), _O_U16TEXT);
+		_setmode(_fileno(stdin), _O_U16TEXT);
+
+		_wfreopen(L"CONOUT$", L"w", stdout);
+		_wfreopen(L"CONOUT$", L"r", stdin);
+
+		wcout << L"ルイジ." << endl;
+
+		wcin.get();
+		*/
+
+		//SetStdHandle(STD_INPUT_HANDLE, GetStdHandle(STD_INPUT_HANDLE)); // stdin
+		//SetStdHandle(STD_OUTPUT_HANDLE, GetStdHandle(STD_OUTPUT_HANDLE)); // stdout
 	#else
 		application::path = defaultStringToWide(argv[0]);
 	#endif
 
-	//wcout << "Path: " << "\"" << application::path << "\"" << endl;
-	cout << "Starting the application..." << endl;
-	
-	/*
-	keyboard test_keyboard(keyboardDeviceFlag::FLAG_TESTMODE);
-
-	if (!test_keyboard.connect())
-		return -1;
-	*/
+	if (!parentConsoleAttached)
+	{
+		//wcout << "Path: " << "\"" << application::path << "\"" << endl;
+		cout << "Starting the application..." << endl;
+	}
 
 	// Allocate the main application using the stack's memory.
 	// This effectively embeds 'program' into 'main'.

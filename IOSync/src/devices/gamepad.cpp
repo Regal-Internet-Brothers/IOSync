@@ -120,6 +120,15 @@ namespace iosync
 		#ifdef PLATFORM_WINDOWS
 			bool gamepad::__winnt__injectLibrary(DWORD processID, CPUArchitecture process_Architecture)
 			{
+				// Nested functions/lambdas:
+				auto injectionStr = [&]() -> string
+				{
+					stringstream injectionStream;
+					injectionStream << "IGNORE " << XINPUT_INJECTION_ARGUMENT << " " << processID;
+
+					return injectionStream.str();
+				};
+
 				if (processID == 0)
 					return false;
 
@@ -127,9 +136,17 @@ namespace iosync
 				{
 					#if defined(PLATFORM_X86) || defined(PLATFORM_X64)
 						case x86:
-							return application::__winnt__injectLibrary(INJECTION_DLL_NAME_X86, processID);
+							#if defined(PLATFORM_X86)
+								return application::__winnt__injectLibrary(INJECTION_DLL_NAME_X86, processID);
+							#else
+								return application::__winnt__startProcess(TEXT("IOSync_x86.exe"), injectionStr());
+							#endif
 						case x64:
-							return application::__winnt__injectLibrary(INJECTION_DLL_NAME_X64, processID);
+							#if defined(PLATFORM_X64)
+								return application::__winnt__injectLibrary(INJECTION_DLL_NAME_X64, processID);
+							#else
+								return application::__winnt__startProcess(TEXT("IOSync_x64.exe"), injectionStr());
+							#endif
 					#elif defined(PLATFORM_ARM) || defined(PLATFORM_ARM64)
 						case ARM:
 							return application::__winnt__injectLibrary(INJECTION_DLL_NAME_ARM, processID);

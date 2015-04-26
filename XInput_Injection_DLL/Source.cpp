@@ -183,7 +183,9 @@ extern "C"
 
 					if (sharedMemoryResponse == SHARED_MEMORY_ALLOCATED || sharedMemoryResponse == SHARED_MEMORY_ALREADY_ALLOCATED)
 					{
-						auto PID = getPID();
+						#ifdef DLL_DEBUG
+							auto PID = getPID();
+						#endif
 
 						sharedBuffer = gamepad::__winnt__mapSharedMemory(FILE_MAP_READ);
 
@@ -195,6 +197,7 @@ extern "C"
 
 						bool injected = false;
 						bool shouldInject = true;
+
 						char DLLName[XINPUT_DLL_NAMELENGTH];
 
 						for (auto i = XINPUT_MAX_SUBVERSION; i > 0; i--)
@@ -237,18 +240,18 @@ extern "C"
 									#ifdef DLL_DEBUG
 										cout << "Injecting functions..." << endl;
 									#endif
-
-									// Remap the active functions in the remote library.
-									mapRemoteFunction("XInputEnable", (LPVOID)::XInputEnable, hDLL);
-									mapRemoteFunction("XInputGetState", (LPVOID)::XInputGetState, hDLL);
-									mapRemoteFunction("XInputSetState", (LPVOID)::XInputSetState, hDLL);
-									mapRemoteFunction("XInputGetCapabilities", (LPVOID)::XInputGetCapabilities, hDLL);
-									mapRemoteFunction("XInputGetKeystroke", (LPVOID)::XInputGetKeystroke, hDLL);
-									mapRemoteFunction("XInputGetBatteryInformation", (LPVOID)::XInputGetBatteryInformation, hDLL);
-									mapRemoteFunction("XInputGetAudioDeviceIds", (LPVOID)::XInputGetAudioDeviceIds, hDLL);
+									//jumpSegment
+									// Remap the active functions in the remote library:
+									REAL_XINPUT::mapRemoteFunction("XInputEnable", (LPVOID)::XInputEnable, hDLL);
+									REAL_XINPUT::mapRemoteFunction("XInputGetState", (LPVOID)::XInputGetState, hDLL);
+									REAL_XINPUT::mapRemoteFunction("XInputSetState", (LPVOID)::XInputSetState, hDLL);
+									REAL_XINPUT::mapRemoteFunction("XInputGetCapabilities", (LPVOID)::XInputGetCapabilities, hDLL);
+									REAL_XINPUT::mapRemoteFunction("XInputGetKeystroke", (LPVOID)::XInputGetKeystroke, hDLL);
+									REAL_XINPUT::mapRemoteFunction("XInputGetBatteryInformation", (LPVOID)::XInputGetBatteryInformation, hDLL);
+									REAL_XINPUT::mapRemoteFunction("XInputGetAudioDeviceIds", (LPVOID)::XInputGetAudioDeviceIds, hDLL);
 
 									// Extensions:
-									mapRemoteFunction(REAL_XINPUT::XInputGetStateEx_Ordinal(), (LPVOID)::XInputGetStateEx, hDLL); // "XInputGetStateEx"
+									REAL_XINPUT::mapRemoteFunction(REAL_XINPUT::XInputGetStateEx_Ordinal(), (LPVOID)::XInputGetStateEx, hDLL); // "XInputGetStateEx"
 
 									#ifdef DLL_DEBUG
 										cout << "Functions injected." << endl;
@@ -256,12 +259,11 @@ extern "C"
 										cout << "Attempting to link with real 'XInput' module..." << endl;
 									#endif
 
-									// Link to this module.
+									// Safely link to the real module.
 									REAL_XINPUT::linkTo(hDLL);
 
-									#ifdef DLL_DEBUG
-										cout << "Real module linked." << endl;
-									#endif
+									// Set the global XInput-module.
+									XINPUT_MODULE = hDLL;
 
 									// Set the injection-flag to 'true'.
 									injected = true;
@@ -269,7 +271,7 @@ extern "C"
 								else
 								{
 									// Link to an 'XInput' DLL in the system-folder.
-									XINPUT_MODULE = REAL_XINPUT::linkTo(DLLName, TRUE);
+									XINPUT_MODULE = REAL_XINPUT::linkTo((PCSTR)DLLName, TRUE);
 								}
 
 								break;

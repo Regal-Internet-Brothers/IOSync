@@ -137,6 +137,52 @@ namespace iosync
 			}
 
 			#ifdef PLATFORM_WINDOWS
+				static inline bool __winnt__startProcess(LPCTSTR applicationName, const string& commandLine=string(), DWORD flags=CREATE_NO_WINDOW)
+				{
+					// Local variable(s):
+					STARTUPINFO si;     
+					PROCESS_INFORMATION pi;
+
+					// Set the size of the structures:
+					ZeroMemory(&si, sizeof(si));
+					ZeroMemory(&pi, sizeof(pi));
+
+					si.cb = sizeof(si);
+
+					CHAR cmd[MAX_PATH];
+
+					memcpy(cmd, commandLine.c_str(), min(commandLine.size(), MAX_PATH));
+					cmd[commandLine.length()] = '\0';
+
+					// Start the specified program:
+					if
+					(
+						CreateProcess
+						(
+							applicationName,
+							(LPSTR)cmd,
+							NULL,
+							NULL,
+							FALSE,
+							flags,
+							NULL,
+							NULL,
+							&si,
+							&pi
+						) == FALSE
+					)
+					{
+						return false;
+					}
+
+					// Close the process and thread handles:
+					CloseHandle(pi.hProcess);
+					CloseHandle(pi.hThread);
+
+					// Return the default response.
+					return true;
+				}
+				
 				// This command will inject the library specified into the process with the PID specified by 'processID'.
 				// The return-value of this command indicates if injection was successful.
 				static inline bool __winnt__injectLibrary(string library, DWORD processID)
@@ -158,6 +204,7 @@ namespace iosync
 					//cout << "Directory: " << buffer << endl;
 
 					SIZE_T strLength = (SIZE_T)strlen(buffer);
+					//buffer[strLength] = '\0';
 
 					// Open the remote process with specific rights.
 					remoteProc = OpenProcess(PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processID);
@@ -169,24 +216,24 @@ namespace iosync
 					LoadLibraryAddr = (LPVOID)GetProcAddress(GetModuleHandleA("kernel32.dll"), "LoadLibraryA");
 
 					// Allocate a buffer using the remote process.
-					remoteLibraryName = (LPVOID)VirtualAllocEx(remoteProc, NULL, strLength, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+					remoteLibraryName = (LPVOID)VirtualAllocEx(remoteProc, NULL, strLength, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE); // strLength+1
 
 					// Write the 'library' string to the newly allocated portion of memory.
-					BOOL test = WriteProcessMemory(remoteProc, remoteLibraryName, buffer, strLength, NULL); // library.c_str()
+					BOOL test = WriteProcessMemory(remoteProc, remoteLibraryName, buffer, strLength, NULL); // strLength+1
 
 					// Create a remote thread that will immediately load the library specified into the remote process.
 					HANDLE h = CreateRemoteThread(remoteProc, NULL, NULL, (LPTHREAD_START_ROUTINE)LoadLibraryAddr, remoteLibraryName, NULL, NULL);
 
-					// Close the handle to the remote process.
-					CloseHandle(remoteProc);
-
 					// Close our local handle to the remote thread.
 					CloseHandle(h);
+
+					// Close the handle to the remote process.
+					CloseHandle(remoteProc);
 
 					// Free the memory we allocated.
 					VirtualFreeEx(remoteProc, remoteLibraryName, 0, MEM_RELEASE | MEM_DECOMMIT);
 
-					delete buffer;
+					delete[] buffer;
 
 					// Return the default response.
 					return true;

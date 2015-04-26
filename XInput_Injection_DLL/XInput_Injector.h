@@ -13,17 +13,8 @@
 // Other:
 //#define DLLExport // __declspec( dllexport )
 
-//#define DLL_DEBUG
-#define DLL_CONFIRMATION_MESSAGE
-
-/*
-#ifdef DLL_DEBUG
-	#define PROCESS_MANAGER_DEBUG
-#endif
-*/
-
 // Includes:
-// Nothing so far.
+#include "settings.h"
 
 // Windows-specific:
 #include <windows.h>
