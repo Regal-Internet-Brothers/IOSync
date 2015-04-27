@@ -164,7 +164,7 @@ extern "C"
 		return REAL_XINPUT::XInputGetCapabilities(dwUserIndex, dwFlags, pCapabilities);
 	}
 
-	BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
+	BOOL CALLBACK DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 	{
 		// Namespace(s):
 		using namespace std;

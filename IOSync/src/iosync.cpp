@@ -40,7 +40,11 @@ namespace iosync
 				);
 
 				if (windowInstance == WINDOW_NONE)
+				{
 					MessageBox(NULL, "O_O", "Snooping as usual, I see.", MB_ICONEXCLAMATION | MB_OK);
+
+					return WINDOW_NONE;
+				}
 
 				//ShowWindow(windowInstance, OSInfo.nCmdShow);
 				UpdateWindow(windowInstance);
@@ -173,7 +177,9 @@ namespace iosync
 
 		void connectedDevices::destroyGamepad(gp* pad, bool checkArray)
 		{
-			delete pad;
+			// Check for errors:
+			if (pad == nullptr)
+				return;
 
 			if (checkArray)
 			{
@@ -187,6 +193,8 @@ namespace iosync
 					}
 				}
 			}
+
+			delete pad;
 
 			return;
 		}
@@ -2177,10 +2185,13 @@ namespace iosync
 						// This routine still needs to be optimized:
 						GetRawInputData((HRAWINPUT)message.lParam, RID_INPUT, NULL, &dwSize, sizeof(RAWINPUTHEADER));
 
+						if (dwSize == 0)
+							continue;
+
 						lpb = new BYTE[dwSize];
 
 						// Check if we could allocate the structure:
-						if (lpb == NULL)
+						if (lpb == nullptr)
 							continue;
 
 						if (GetRawInputData((HRAWINPUT)message.lParam, RID_INPUT, lpb, &dwSize, sizeof(RAWINPUTHEADER)) != dwSize)

@@ -196,7 +196,7 @@ namespace iosync
 
 					char* buffer = new char[MAX_PATH];
 
-					if (GetFullPathNameA(library.c_str(), MAX_PATH, (LPSTR)buffer, NULL) == 0)
+					if (buffer == nullptr || GetFullPathNameA(library.c_str(), MAX_PATH, (LPSTR)buffer, NULL) == 0)
 						return false;
 
 					//const char* buffer = library.c_str();
@@ -218,11 +218,22 @@ namespace iosync
 					// Allocate a buffer using the remote process.
 					remoteLibraryName = (LPVOID)VirtualAllocEx(remoteProc, NULL, strLength, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE); // strLength+1
 
+					if (remoteLibraryName == NULL)
+						return false;
+
 					// Write the 'library' string to the newly allocated portion of memory.
 					BOOL test = WriteProcessMemory(remoteProc, remoteLibraryName, buffer, strLength, NULL); // strLength+1
 
-					// Create a remote thread that will immediately load the library specified into the remote process.
-					HANDLE h = CreateRemoteThread(remoteProc, NULL, NULL, (LPTHREAD_START_ROUTINE)LoadLibraryAddr, remoteLibraryName, NULL, NULL);
+					HANDLE h;
+
+					// Check for errors, then create a remote thread that will immediately load the library specified into the remote process:
+					if (test == FALSE || (h = CreateRemoteThread(remoteProc, NULL, NULL, (LPTHREAD_START_ROUTINE)LoadLibraryAddr, remoteLibraryName, NULL, NULL)) == NULL)
+					{
+						// Free the memory we allocated.
+						VirtualFreeEx(remoteProc, remoteLibraryName, 0, MEM_RELEASE); // MEM_DECOMMIT
+
+						return false;
+					}
 
 					// Close our local handle to the remote thread.
 					CloseHandle(h);
@@ -231,7 +242,7 @@ namespace iosync
 					CloseHandle(remoteProc);
 
 					// Free the memory we allocated.
-					VirtualFreeEx(remoteProc, remoteLibraryName, 0, MEM_RELEASE | MEM_DECOMMIT);
+					VirtualFreeEx(remoteProc, remoteLibraryName, 0, MEM_RELEASE); // MEM_DECOMMIT
 
 					delete[] buffer;
 
@@ -245,9 +256,15 @@ namespace iosync
 					typedef decltype(&IsWow64Process) IsWow64Process_t;
 
 					// Local variable(s):
+					auto k32Handle = GetModuleHandle(TEXT("kernel32"));
 
 					// Attempt to retrieve a remote kernel function.
-					IsWow64Process_t fnIsWow64Process = (IsWow64Process_t)GetProcAddress(GetModuleHandle(TEXT("kernel32")), "IsWow64Process");
+					IsWow64Process_t fnIsWow64Process = NULL;
+
+					if (k32Handle != NULL)
+					{
+						fnIsWow64Process = (IsWow64Process_t)GetProcAddress(k32Handle, "IsWow64Process");
+					}
 
 					if (fnIsWow64Process != NULL)
 					{

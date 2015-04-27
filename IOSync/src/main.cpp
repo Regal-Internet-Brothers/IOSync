@@ -88,7 +88,7 @@ int runProgram(OSINFO OSInfo, rate updateRate=DEFAULT_UPDATERATE)
 }
 
 #ifdef PLATFORM_WINDOWS_EXTENSIONS
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 #else
 int main(int argc, char** argv)
 #endif
@@ -131,8 +131,8 @@ int main(int argc, char** argv)
 			parentConsoleAttached = true;
 		}
 
-		freopen("CONOUT$", "w", stdout);
-		freopen("CONIN$", "r", stdin);
+		auto consoleOutput = freopen("CONOUT$", "w", stdout);
+		auto consoleInput = freopen("CONIN$", "r", stdin);
 
 		//freopen("CONOUT$", "w", stderr);
 
@@ -194,9 +194,14 @@ int main(int argc, char** argv)
 		#endif
 	#endif
 
+	#ifdef PLATFORM_WINDOWS_EXTENSIONS
+		fclose(consoleOutput);
+		fclose(consoleOutput);
+	#endif
+
 	// Deinitialize networking functionality.
 	QSocket::deinitSockets();
-	
+
 	#if defined(IOSYNC_LIVE_COMMAND_INPUT_ON_MAIN_THREAD)
 		delete programData;
 		
