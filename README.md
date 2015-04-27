@@ -2,18 +2,9 @@
 IOSync is a console-application which allows you to synchronize input events from several computers to a single host machine.
 The main purpose of this application is to send keyboard and gamepad messages to a remote machine, in order to play local multiplayer games over the internet.
 
-Couple this with a quick enough streaming solution (See: ["Streaming (Audio and Video)"](https://github.com/Regal-Internet-Brothers/IOSync/wiki/Streaming-(Audio-and-Video))), and any games that support keyboard, or gamepad (XInput) input, and you should have an experience almost as good as [Steam's in-home streaming](http://store.steampowered.com/streaming). The catch is, this can be done over the internet, rather than a home network. No VPN required, just a bit of setup, and a decent internet connection. Setting up audio and video solutions can be a daunting task for some, but the outcome can definitely be worth it. This isn't a replacement for "in-home streaming", but it is a replacement for tricking Steam with a VPN service. This project may not be as elegant as Valve's solutions, but it has some major benefits.
-
 This is an early version of the project; some features haven't been thoroughly tested. Compiled binaries may be found in the **[releases section](https://github.com/Regal-Internet-Brothers/IOSync/releases)**; use at your own risk. If you would like to help, feel free to make a pull request. Just realize that I may fix the formatting of submissions.
 
-**Supported "devices":**
-* Keyboard (I/O)
-* Virtual 'XInput' device integration. (Semi-experimental; I/O)
-
-**TO-DO List:**
-* Rumble simulation for 'XInput' gamepads.
-* Explicit 'XInput' gamepad/device support synchronization.
-* DirectInput integration.
+Couple this with a quick enough streaming solution (See: ["Streaming (Audio and Video)"](https://github.com/Regal-Internet-Brothers/IOSync/wiki/Streaming-(Audio-and-Video))), and any games that support keyboard, or gamepad (XInput) input, and you should have an experience almost as good as [Steam's in-home streaming](http://store.steampowered.com/streaming). The catch is, this can be done over the internet, rather than a home network. No VPN required, just a bit of setup, and a decent internet connection. Setting up audio and video solutions can be a daunting task for some, but the outcome can definitely be worth it. This isn't a replacement for "in-home streaming", but it is a replacement for tricking Steam with a VPN service. This project may not be as elegant as Valve's solutions, but it has some major benefits.
 
 ##Getting Started##
 
@@ -72,3 +63,12 @@ At this time, this includes keys such as the CTRL, ALT, and SHIFT keys. Keyboard
 
 When connecting to a host, you can rest assured that input is being detected, but not simulated.
 However, *hosts* simulate input at this time. [Explicit "virtual device" configuration](https://github.com/Regal-Internet-Brothers/IOSync/wiki/Configuring-IOSync) may be used to change this behavior. Groundwork has been done to support intermediate network-nodes, which carry traffic back and forth. This has not been fully implemented at this time.
+
+**Supported "devices":**
+* Keyboard (I/O)
+* Virtual 'XInput' device integration. (Semi-experimental; I/O)
+
+**TO-DO List:**
+* Rumble simulation for 'XInput' gamepads.
+* Explicit 'XInput' gamepad/device support synchronization.
+* DirectInput integration.
