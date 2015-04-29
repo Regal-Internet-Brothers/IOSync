@@ -142,6 +142,27 @@ namespace iosync
 	{
 		// Structures:
 
+		// Constructor(s):
+		deviceConfiguration::deviceConfiguration
+		(
+			bool kbdEnabled,
+			bool gpdsEnabled,
+			unsigned char maximum_gpds
+
+			// Extensions:
+			#ifdef GAMEPAD_VJOY_ENABLED
+				, bool vJoy
+			#endif
+		) : keyboardEnabled(kbdEnabled), gamepadsEnabled(gpdsEnabled), max_gamepads(maximum_gpds)
+
+		// Extensions:
+		#ifdef GAMEPAD_VJOY_ENABLED
+			, vJoyEnabled(vJoy)
+		#endif
+		{
+			// Nothing so far.
+		}
+
 		// connectedDevices:
 
 		// Constructor(s):
@@ -150,9 +171,8 @@ namespace iosync
 			milliseconds gpTimeout,
 			bool kbdEnabled,
 			bool gpdsEnabled,
-			unsigned char max_gamepads
-		) : keyboard(nullptr), keyboardEnabled(kbdEnabled), gamepadsEnabled(gpdsEnabled),
-			max_virtual_gamepads(max_gamepads), gamepadTimeout(gpTimeout)
+			unsigned char max_gpds
+		) : deviceConfiguration(kbdEnabled, gpdsEnabled, max_gpds), keyboard(nullptr), gamepadTimeout(gpTimeout)
 		{
 			for (auto i = 0; i < MAX_GAMEPADS; i++)
 				gamepads[i] = nullptr;
@@ -455,14 +475,6 @@ namespace iosync
 			// Check if we need to create a new 'gp' object:
 			if (gamepads[identifier] == nullptr)
 			{
-				#ifdef PLATFORM_WINDOWS
-					if (program->allowDeviceSimulation())
-					{
-						if (!gp::__winnt__autoOpenSharedMemory())
-							return nullptr;
-					}
-				#endif
-
 				deviceInfo << "Attempting to create gamepad-instance..." << endl;
 
 				// Allocate a new 'gp' on the heap.
@@ -492,6 +504,28 @@ namespace iosync
 				// Tell the user we couldn't connect it.
 				return nullptr;
 			}
+
+			#ifdef PLATFORM_WINDOWS
+				if (program->allowDeviceSimulation())
+				{
+					#ifdef GAMEPAD_VJOY_ENABLED
+						// If vJoy isn't already initialized, do so:
+						if (gp::vJoyInfo == gp::VJOY_UNDEFINED)
+						{
+							gp::__winnt__vJoy__init();
+						}
+					#endif
+
+					if (!gp::__winnt__autoOpenSharedMemory())
+					{
+						/*
+						delete gamepads[identifier];
+
+						return nullptr;
+						*/
+					}
+				}
+			#endif
 
 			onGamepadConnected(program, gamepads[identifier]);
 
@@ -1047,6 +1081,10 @@ namespace iosync
 	const wstring iosync_application::applicationConfiguration::DEVICES_GAMEPADS = L"gamepads";
 	const wstring iosync_application::applicationConfiguration::DEVICES_MAX_GAMEPADS = L"max_controllers";
 
+	#ifdef GAMEPAD_VJOY_ENABLED
+		const wstring iosync_application::applicationConfiguration::DEVICES_VJOY = L"vjoy";
+	#endif
+
 	// Networking:
 	const wstring iosync_application::applicationConfiguration::NETWORK_ADDRESS = L"address";
 	const wstring iosync_application::applicationConfiguration::NETWORK_PORT = L"port";
@@ -1074,7 +1112,7 @@ namespace iosync
 		bool kbdEnabled,
 		bool gpdsEnabled,
 		unsigned char max_gpds
-	) : mode(internal_mode), useCmd(cmdOnly), keyboardEnabled(kbdEnabled), gamepadsEnabled(gpdsEnabled), max_gamepads(max_gpds) { /* Nothing so far. */ }
+	) : deviceConfiguration(kbdEnabled, gpdsEnabled, max_gpds), mode(internal_mode), useCmd(cmdOnly) { /* Nothing so far. */ }
 
 	// Destructor(s):
 	iosync_application::applicationConfiguration::~applicationConfiguration() { /* Nothing so far. */ }
@@ -1230,6 +1268,19 @@ namespace iosync
 							gamepadsEnabled = false;
 						}
 					}
+
+					#ifdef GAMEPAD_VJOY_ENABLED
+						// Ensure gamepads are still enabled:
+						if (gamepadsEnabled)
+						{
+							auto vjoyIterator = devices.find(DEVICES_VJOY);
+
+							if (vjoyIterator != devices.end())
+							{
+								vJoyEnabled = wstrEnabled(vjoyIterator->second);
+							}
+						}
+					#endif
 				}
 			}
 		}
@@ -1382,6 +1433,10 @@ namespace iosync
 			devices[DEVICES_MAX_GAMEPADS] = DEVICES_GAMEPADS_MAXIMUM;
 		else
 			devices[DEVICES_MAX_GAMEPADS] = to_wstring(max_gamepads);
+
+		#ifdef GAMEPAD_VJOY_ENABLED
+			devices[DEVICES_VJOY] = to_wstring(vJoyEnabled);
+		#endif
 
 		// Networking:
 
@@ -1918,9 +1973,14 @@ namespace iosync
 		#endif
 
 		// Apply device configurations:
+		devices.max_gamepads = configuration.max_gamepads;
+
 		devices.keyboardEnabled = configuration.keyboardEnabled;
 		devices.gamepadsEnabled = configuration.gamepadsEnabled;
-		devices.max_virtual_gamepads = configuration.max_gamepads;
+
+		#ifdef GAMEPAD_VJOY_ENABLED
+			devices.vJoyEnabled = configuration.vJoyEnabled;
+		#endif
 
 		switch (configuration.mode)
 		{

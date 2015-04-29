@@ -164,6 +164,9 @@
     <ClInclude Include="src\devices\native\winnt\Real_XInput_Wrapper.h">
       <Filter>Header Files\devices\native\winnt</Filter>
     </ClInclude>
+    <ClInclude Include="src\names.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Icon.rc">

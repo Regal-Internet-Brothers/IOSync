@@ -180,18 +180,39 @@ namespace iosync
 		};
 
 		// Structures:
-		struct connectedDevices final
+		struct deviceConfiguration
+		{
+			// Constructor(s):
+			deviceConfiguration
+			(
+				bool kbdEnabled=true,
+				bool gpdsEnabled=true,
+				unsigned char maximum_gpds=(unsigned char)MAX_GAMEPADS
+
+				// Extensions:
+				#ifdef GAMEPAD_VJOY_ENABLED
+					, bool vJoy=true
+				#endif
+			);
+
+			// Fields:
+			unsigned char max_gamepads; // gamepadID
+
+			bool keyboardEnabled;
+			bool gamepadsEnabled;
+
+			#ifdef GAMEPAD_VJOY_ENABLED
+				bool vJoyEnabled;
+			#endif
+		};
+
+		struct connectedDevices final : deviceConfiguration
 		{
 			// Fields:
 
 			// Devices:
 			kbd* keyboard;
 			gp* gamepads[MAX_GAMEPADS];
-
-			// Meta:
-			bool keyboardEnabled;
-			bool gamepadsEnabled;
-			unsigned char max_virtual_gamepads; // gamepadID
 
 			// A set of reserved gamepad device-identifiers. This is used
 			// to ensure clients don't repeatedly request to connect a gamepad.
@@ -206,9 +227,9 @@ namespace iosync
 				milliseconds gamepadTimeout=(milliseconds)GAMEPAD_DEFAULT_TIMEOUT,
 				bool kbdEnabled=true,
 				bool gpdsEnabled=true,
-				unsigned char max_gamepads=(unsigned char)MAX_GAMEPADS
+				unsigned char max_gpds=(unsigned char)MAX_GAMEPADS
 			);
-
+			
 			// Destructor(s):
 			~connectedDevices();
 
@@ -273,7 +294,7 @@ namespace iosync
 			inline bool interruptGamepad(iosync_application* program, gamepadID identifier, gamepadID remoteIdentifier) const
 			{
 				// Check if everything's normal:
-				if (gamepadsEnabled && gamepadsConnected() < max_virtual_gamepads)
+				if (gamepadsEnabled && gamepadsConnected() < max_gamepads)
 					return false;
 
 				onGamepadConnectionDisrupted(program, identifier, remoteIdentifier);
@@ -729,7 +750,7 @@ namespace iosync
 				};
 			#endif
 			
-			struct applicationConfiguration
+			struct applicationConfiguration final : deviceManagement::deviceConfiguration
 			{
 				// Constant variable(s):
 				static const wstring DEFAULT_PATH;
@@ -756,6 +777,10 @@ namespace iosync
 				static const wstring DEVICES_KEYBOARD;
 				static const wstring DEVICES_GAMEPADS;
 				static const wstring DEVICES_MAX_GAMEPADS;
+
+				#ifdef GAMEPAD_VJOY_ENABLED
+					static const wstring DEVICES_VJOY;
+				#endif
 
 				// Networking:
 
@@ -813,17 +838,12 @@ namespace iosync
 
 				applicationMode mode;
 
-				unsigned char max_gamepads; // gamepadID
-
 				#ifdef PLATFORM_WINDOWS
 					queue<DWORD> PIDs;
 				#endif
 
 				// Booleans / Flags:
 				bool useCmd;
-
-				bool keyboardEnabled;
-				bool gamepadsEnabled;
 			};
 
 			// Global variable(s):

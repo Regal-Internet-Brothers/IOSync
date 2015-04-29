@@ -13,19 +13,31 @@
 // Includes:
 #include "../platform.h"
 
-#if defined(PLATFORM_X86) || defined(PLATFORM_X64)
-	#define INJECTION_DLL_NAME_X86 "xinput_injector_x86.dll"
-	#define INJECTION_DLL_NAME_X64 "xinput_injector_x64.dll"
-#elif defined(PLATFORM_ARM) || defined(PLATFORM_ARM64)
-	#define INJECTION_DLL_NAME_ARM "xinput_injector_ARM.dll"
-	#define INJECTION_DLL_NAME_ARM64 "xinput_injector_ARM64.dll"
+// The 'GAMEPAD_VJOY_ENABLED' preprocessor-variable should
+// only ever be defined when 'PLATFORM_WINDOWS' is defined.
+// Any other behavior should be considered non-standard.
+#ifdef PLATFORM_WINDOWS
+	// Disable this if needed; toggles optional vJoy support.
+	#define GAMEPAD_VJOY_ENABLED
+
+	#ifdef GAMEPAD_VJOY_ENABLED
+		#define GAMEPAD_VJOY_SAFE
+	#endif
 #endif
 
+#include "../names.h"
+
 #include "devices.h"
+
+#ifdef GAMEPAD_VJOY_ENABLED
+	#include <vJoy/vjoyinterface.h>
+	#include <vJoy/public.h>
+#endif
 
 // Standard library:
 #include <thread>
 #include <chrono>
+#include <climits>
 
 // DirectX:
 #ifdef GAMEPAD_EXTERNAL_ORIGIN
@@ -39,12 +51,13 @@
 	#include "native/winnt/Real_XInput_Wrapper.h"
 #endif
 
-// Standard library:
-#include <climits>
-
 // Libraries:
 #if defined(PLATFORM_WINDOWS) && !defined(GAMEPAD_EXTERNAL_ORIGIN)
 	//#pragma comment(lib, "Xinput.lib")
+#endif
+
+#ifdef GAMEPAD_VJOY_ENABLED
+	#pragma comment(lib, "VJOYINTERFACE")
 #endif
 
 // Namespace(s):
@@ -160,9 +173,23 @@ namespace iosync
 		class gamepad : public IODevice
 		{
 			public:
+				// Enumerator(s):
+				#ifdef GAMEPAD_VJOY_ENABLED
+					enum vJoyDriverState
+					{
+						VJOY_UNDEFINED,
+						VJOY_ENABLED,
+						VJOY_DISABLED,
+					};
+				#endif
+
 				// Global variable(s):
 				#ifdef PLATFORM_WINDOWS
 					static HANDLE sharedMemory;
+				#endif
+
+				#ifdef GAMEPAD_VJOY_ENABLED
+					static vJoyDriverState vJoyInfo;
 				#endif
 
 				// Functions:
@@ -240,6 +267,31 @@ namespace iosync
 
 					// This will detect the architecture of the process specified, then use the correct DLL/module accordingly.
 					static bool __winnt__injectLibrary(DWORD processID);
+
+					#ifdef GAMEPAD_VJOY_ENABLED
+						// This command returns the new state of 'vJoyInfo', after modifying it.
+						static vJoyDriverState __winnt__vJoy__init();
+
+						// This will retrieve the status of the vJoy-device mapped to the local identifier specified.
+						static VjdStat __winnt__vJoy__getStatus(const gamepadID internal_identifier);
+
+						// This will cap an axial value to the axis's metrics as polled from vJoy.
+						static LONG __winnt__vJoy__capAxis(const UINT vJoyDevice, const LONG value, const UINT axis=HID_USAGE_X);
+
+						// This command "transfers" the state of an axis from the abstract internal format into vJoy's format.
+						static void __winnt__vJoy__transferAxis(const UINT vJoyDevice, const gamepadState& state, JOYSTICK_POSITION& vState, const UINT axis);
+
+						static void __winnt__vJoy__autoTransferAxis(const UINT vJoyDevice, const gamepadState& state, JOYSTICK_POSITION& vState, const UINT axis);
+
+						// This simulates a gamepad-state using vJoy.
+						static void __winnt__vJoy__simulateState(const gamepadState& state, const UINT vJoyDevice, const VjdStat status);
+
+						// This converts/maps a standard local-identifier into a vJoy device-identifier.
+						static inline UINT __winnt__vJoy__vDevice(const gamepadID identifier)
+						{
+							return (UINT)(identifier);
+						}
+					#endif
 
 					static inline sharedMemoryState __winnt__openSharedMemory()
 					{
@@ -395,7 +447,7 @@ namespace iosync
 				}
 
 				// This command simulates the specified state.
-				static void simulateState(gamepadState& state, gamepadID localIdentifier);
+				static void simulateState(const gamepadState& state, const gamepadID localIdentifier);
 
 				// Constructor(s):
 				gamepad(gamepadID localIdentifier, gamepadID remoteIdentifier, bool canDetect=true, bool canSimulate=true, deviceFlags flagsToAdd=deviceFlags());
@@ -416,6 +468,11 @@ namespace iosync
 
 				// This command simulates the current state if 'hasState' specifies to do so.
 				bool simulateState();
+
+				#ifdef GAMEPAD_VJOY_ENABLED
+					// This will set the internal vJoy status of this device.
+					VjdStat __winnt__vJoy__calculateStatus();
+				#endif
 
 				inline high_resolution_clock::time_point updateActivityTimer()
 				{
@@ -458,6 +515,10 @@ namespace iosync
 				#ifdef PLATFORM_WINDOWS
 					DWORD __winnt__lastPacketNumber;
 					DWORD __winnt__state_meta;
+
+					#ifdef GAMEPAD_VJOY_ENABLED
+						VjdStat vJoy_status;
+					#endif
 				#endif
 		};
 	}

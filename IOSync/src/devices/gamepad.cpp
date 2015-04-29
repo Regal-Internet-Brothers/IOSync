@@ -1,8 +1,13 @@
 // Includes:
 #include "gamepad.h"
 
+#include "../platform.h"
 #include "../networking/networking.h"
 #include "../application/application.h"
+#include "../names.h"
+
+// Standard library:
+#include <cmath>
 
 // Namespace(s):
 namespace iosync
@@ -114,6 +119,10 @@ namespace iosync
 			HANDLE gamepad::sharedMemory = HANDLE();
 		#endif
 
+		#ifdef GAMEPAD_VJOY_ENABLED
+			gamepad::vJoyDriverState gamepad::vJoyInfo = gamepad::VJOY_UNDEFINED;
+		#endif
+
 		// Functions:
 
 		// Windows-specific extensions:
@@ -139,13 +148,13 @@ namespace iosync
 							#if defined(PLATFORM_X86)
 								return application::__winnt__injectLibrary(INJECTION_DLL_NAME_X86, processID);
 							#else
-								return application::__winnt__startProcess(TEXT("IOSync_x86.exe"), injectionStr());
+								return application::__winnt__startProcess(TEXT(EXECUTABLE_NAME_X86), injectionStr());
 							#endif
 						case x64:
 							#if defined(PLATFORM_X64)
 								return application::__winnt__injectLibrary(INJECTION_DLL_NAME_X64, processID);
 							#else
-								return application::__winnt__startProcess(TEXT("IOSync_x64.exe"), injectionStr());
+								return application::__winnt__startProcess(TEXT(EXECUTABLE_NAME_X64), injectionStr());
 							#endif
 					#elif defined(PLATFORM_ARM) || defined(PLATFORM_ARM64)
 						case ARM:
@@ -170,21 +179,170 @@ namespace iosync
 					return __winnt__injectLibrary(processID, (application::__winnt__process32bit(processID)) ? ARM : ARM64)
 				#endif
 			}
+
+			#ifdef GAMEPAD_VJOY_ENABLED
+				gamepad::vJoyDriverState gamepad::__winnt__vJoy__init()
+				{
+					vJoyInfo = ((vJoyEnabled() == TRUE) ? VJOY_ENABLED : VJOY_DISABLED);
+
+					if (vJoyInfo == VJOY_ENABLED)
+					{
+						WORD DLLVer, driverVer;
+
+						if (!DriverMatch(&DLLVer, &driverVer))
+						{
+							vJoyInfo = VJOY_DISABLED;
+						}
+					}
+
+					return vJoyInfo;
+				}
+
+				VjdStat gamepad::__winnt__vJoy__getStatus(const gamepadID internal_identifier)
+				{
+					return GetVJDStatus(__winnt__vJoy__vDevice(internal_identifier));
+				}
+
+				LONG gamepad::__winnt__vJoy__capAxis(const UINT vJoyDevice, const LONG value, const UINT axis)
+				{
+					#ifdef GAMEPAD_VJOY_SAFE
+						LONG axis_min, axis_max;
+
+						GetVJDAxisMin(vJoyDevice, axis, &axis_min);
+						GetVJDAxisMax(vJoyDevice, axis, &axis_max);
+
+						return max(axis_min, min(value, axis_max));
+					#else
+						return value;
+					#endif
+				}
+
+				void gamepad::__winnt__vJoy__transferAxis(const UINT vJoyDevice, const gamepadState& state, JOYSTICK_POSITION& vState, const UINT axis)
+				{
+					switch (axis)
+					{
+						case HID_USAGE_X:
+							vState.wAxisX = __winnt__vJoy__capAxis(vJoyDevice, state.native.Gamepad.sThumbLX, axis);
+
+							break;
+						case HID_USAGE_Y:
+							vState.wAxisX = __winnt__vJoy__capAxis(vJoyDevice, state.native.Gamepad.sThumbLY, axis);
+
+							break;
+						case HID_USAGE_Z:
+							vState.wAxisZ = __winnt__vJoy__capAxis(vJoyDevice, state.native.Gamepad.bRightTrigger-state.native.Gamepad.bLeftTrigger, axis);
+
+							break;
+						case HID_USAGE_RX:
+							vState.wAxisXRot = __winnt__vJoy__capAxis(vJoyDevice, state.native.Gamepad.sThumbRX, axis);
+
+							break;
+						case HID_USAGE_RY:
+							vState.wAxisYRot = __winnt__vJoy__capAxis(vJoyDevice, state.native.Gamepad.sThumbRY, axis);
+
+							break;
+						case HID_USAGE_RZ:
+							vState.wAxisZRot = __winnt__vJoy__capAxis(vJoyDevice, -(state.native.Gamepad.bRightTrigger-state.native.Gamepad.bLeftTrigger), axis);
+
+							break;
+					}
+
+					return;
+				}
+
+				void gamepad::__winnt__vJoy__autoTransferAxis(const UINT vJoyDevice, const gamepadState& state, JOYSTICK_POSITION& vState, const UINT axis)
+				{
+					if (GetVJDAxisExist(vJoyDevice, axis))
+					{
+						__winnt__vJoy__transferAxis(vJoyDevice, state, vState, axis);
+					}
+
+					return;
+				}
+
+				void gamepad::__winnt__vJoy__simulateState(const gamepadState& state, const UINT vJoyDevice, const VjdStat status)
+				{
+					if (status == VJD_STAT_FREE)
+					{
+						// Acquire control over the device:
+						if (!AcquireVJD(vJoyDevice))
+							return;
+					}
+
+					ResetVJD(vJoyDevice);
+					
+					JOYSTICK_POSITION vState;
+
+					ZeroVar(vState);
+
+					vState.bDevice = vJoyDevice;
+
+					// Automatically transfer the axes to the output-state:
+					__winnt__vJoy__autoTransferAxis(vJoyDevice, state, vState, HID_USAGE_X);
+					__winnt__vJoy__autoTransferAxis(vJoyDevice, state, vState, HID_USAGE_Y);
+
+					__winnt__vJoy__autoTransferAxis(vJoyDevice, state, vState, HID_USAGE_RX);
+					__winnt__vJoy__autoTransferAxis(vJoyDevice, state, vState, HID_USAGE_RY);
+
+					__winnt__vJoy__autoTransferAxis(vJoyDevice, state, vState, HID_USAGE_Z);
+					__winnt__vJoy__autoTransferAxis(vJoyDevice, state, vState, HID_USAGE_RZ);
+
+					vState.lButtons = state.native.Gamepad.wButtons;
+
+					#ifdef GAMEPAD_VJOY_SAFE
+						//vState.lButtons &= (int)pow(2, GetVJDButtonNumber(vJoyDevice));
+					#endif
+
+					// Update the vJoy-device.
+					UpdateVJD(vJoyDevice, &vState);
+
+					// Relinquish control over the device.
+					RelinquishVJD(vJoyDevice);
+
+					return;
+				}
+			#endif
 		#endif
 
-		void gamepad::simulateState(gamepadState& state, gamepadID localIdentifier)
+		void gamepad::simulateState(const gamepadState& state, const gamepadID localIdentifier)
 		{
 			#ifdef PLATFORM_WINDOWS
-				if (!__winnt__sharedMemoryOpen())
+				#ifdef GAMEPAD_VJOY_ENABLED
+					// Check the current state of vJoy:
+					if (vJoyInfo == VJOY_ENABLED)
+					{
+						// Calculate the internal status.
+						auto status = __winnt__vJoy__getStatus(localIdentifier);
+
+						switch (status)
+						{
+							case VJD_STAT_OWN:
+							case VJD_STAT_FREE:
+								__winnt__vJoy__simulateState(state, __winnt__vJoy__vDevice(localIdentifier), status);
+
+								break;
+							case VJD_STAT_BUSY:
+								break;
+							case VJD_STAT_MISS:
+								break;
+							default:
+								break;
+						}
+					}
+				#endif
+				
+				if (__winnt__sharedMemoryOpen())
+				{
 					return;
 
-				auto buffer = __winnt__map_States_Memory(FILE_MAP_WRITE);
+					auto buffer = __winnt__map_States_Memory(FILE_MAP_WRITE);
 
-				nativeGamepad* statePtr = (((nativeGamepad*)__winnt__sharedMemory_getStatesOffset(buffer)) + localIdentifier); // FILE_MAP_ALL_ACCESS
+					nativeGamepad* statePtr = (((nativeGamepad*)__winnt__sharedMemory_getStatesOffset(buffer)) + localIdentifier); // FILE_MAP_ALL_ACCESS
 
-				*statePtr = state.native;
+					*statePtr = state.native;
 				
-				__winnt__unmapSharedMemory(buffer);
+					__winnt__unmapSharedMemory(buffer);
+				}
 			#endif
 
 			return;
@@ -306,5 +464,13 @@ namespace iosync
 			// Return the default response.
 			return true;
 		}
+
+		#ifdef GAMEPAD_VJOY_ENABLED
+			VjdStat gamepad::__winnt__vJoy__calculateStatus()
+			{
+				// Assign the internal vJoy status, then return it.
+				return vJoy_status = __winnt__vJoy__getStatus(localGamepadNumber);
+			}
+		#endif
 	}
 }

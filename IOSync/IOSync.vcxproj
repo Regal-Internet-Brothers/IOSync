@@ -52,6 +52,7 @@
     <ClInclude Include="src\devices\keyboard.h" />
     <ClInclude Include="src\exceptions.h" />
     <ClInclude Include="src\iosync.h" />
+    <ClInclude Include="src\names.h" />
     <ClInclude Include="src\native\winnt\processManagement.h" />
     <ClInclude Include="src\networking\address.h" />
     <ClInclude Include="src\networking\forwardSocket.h" />
