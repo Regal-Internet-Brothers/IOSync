@@ -10,6 +10,8 @@
 	#define GAMEPAD_FAST_NETWORK_IO
 #endif
 
+#define _USE_MATH_DEFINES
+
 // Includes:
 #include "../platform.h"
 
@@ -30,14 +32,16 @@
 #include "devices.h"
 
 #ifdef GAMEPAD_VJOY_ENABLED
-	#include <vJoy/vjoyinterface.h>
-	#include <vJoy/public.h>
+	// vJoy functionality.
+	#include "native/winnt/vJoyDriver.h"
 #endif
 
 // Standard library:
 #include <thread>
 #include <chrono>
+
 #include <climits>
+#include <cmath>
 
 // DirectX:
 #ifdef GAMEPAD_EXTERNAL_ORIGIN
@@ -152,6 +156,12 @@ namespace iosync
 		// Structures:
 		struct gamepadState
 		{
+			// Constant variable(s):
+			#ifdef PLATFORM_WINDOWS
+				static const DWORD padMask = (XINPUT_GAMEPAD_DPAD_UP|XINPUT_GAMEPAD_DPAD_DOWN|XINPUT_GAMEPAD_DPAD_LEFT|XINPUT_GAMEPAD_DPAD_RIGHT);
+				static const DWORD faceMask = (XINPUT_GAMEPAD_A|XINPUT_GAMEPAD_B|XINPUT_GAMEPAD_X|XINPUT_GAMEPAD_Y);
+			#endif
+
 			// Global variable(s):
 			// Nothing so far.
 
@@ -173,23 +183,13 @@ namespace iosync
 		class gamepad : public IODevice
 		{
 			public:
-				// Enumerator(s):
-				#ifdef GAMEPAD_VJOY_ENABLED
-					enum vJoyDriverState
-					{
-						VJOY_UNDEFINED,
-						VJOY_ENABLED,
-						VJOY_DISABLED,
-					};
-				#endif
-
 				// Global variable(s):
 				#ifdef PLATFORM_WINDOWS
 					static HANDLE sharedMemory;
 				#endif
 
 				#ifdef GAMEPAD_VJOY_ENABLED
-					static vJoyDriverState vJoyInfo;
+					static vJoy::vJoyDriver vJoyInfo;
 				#endif
 
 				// Functions:
@@ -270,21 +270,24 @@ namespace iosync
 
 					#ifdef GAMEPAD_VJOY_ENABLED
 						// This command returns the new state of 'vJoyInfo', after modifying it.
-						static vJoyDriverState __winnt__vJoy__init();
+						static vJoy::vJoyDriver::vJoyDriverState __winnt__vJoy__init();
+
+						// This command returns the new state of 'vJoyInfo', after modifying it.
+						static vJoy::vJoyDriver::vJoyDriverState __winnt__vJoy__deinit();
 
 						// This will retrieve the status of the vJoy-device mapped to the local identifier specified.
 						static VjdStat __winnt__vJoy__getStatus(const gamepadID internal_identifier);
 
 						// This will cap an axial value to the axis's metrics as polled from vJoy.
-						static LONG __winnt__vJoy__capAxis(const UINT vJoyDevice, const LONG value, const UINT axis=HID_USAGE_X);
+						static LONG __winnt__vJoy__capAxis(const UINT vJoyID, const LONG value, const UINT axis=HID_USAGE_X, const UINT maximum_value=SHRT_MAX);
 
 						// This command "transfers" the state of an axis from the abstract internal format into vJoy's format.
-						static void __winnt__vJoy__transferAxis(const UINT vJoyDevice, const gamepadState& state, JOYSTICK_POSITION& vState, const UINT axis);
+						static void __winnt__vJoy__transferAxis(const UINT vJoyID, const gamepadState& state, JOYSTICK_POSITION& vState, const UINT axis);
 
-						static void __winnt__vJoy__autoTransferAxis(const UINT vJoyDevice, const gamepadState& state, JOYSTICK_POSITION& vState, const UINT axis);
+						static void __winnt__vJoy__autoTransferAxis(const UINT vJoyID, const gamepadState& state, JOYSTICK_POSITION& vState, const UINT axis);
 
 						// This simulates a gamepad-state using vJoy.
-						static void __winnt__vJoy__simulateState(const gamepadState& state, const UINT vJoyDevice, const VjdStat status);
+						static void __winnt__vJoy__simulateState(const gamepadState& state, const UINT vJoyID, const VjdStat status);
 
 						// This converts/maps a standard local-identifier into a vJoy device-identifier.
 						static inline UINT __winnt__vJoy__vDevice(const gamepadID identifier)
@@ -443,6 +446,38 @@ namespace iosync
 						return (__winnt__realDeviceStateResponse(identifier) == ERROR_SUCCESS);
 					#else
 						return false;
+					#endif
+				}
+
+				template <typename format=double>
+				static inline format joyHat(bool up, bool down, bool left, bool right)
+				{
+					// Local variable(s):
+					format X = 0.0;
+					format Y = 0.0;
+
+					if (up)
+						Y = 1.0;
+					else if (down)
+						Y = -1.0;
+
+					if (left)
+						X = -1.0;
+					else if (right)
+						X = 1.0;
+
+					return (format)fmod(360.0 + (atan2(X, Y) * (180.0 / M_PI)), 360.0); // (format)(atan2(Y, X) * (180.0 / M_PI));
+				}
+
+				template <typename format=double>
+				static inline format joyHat(const gamepadState& state)
+				{
+					#ifdef PLATFORM_WINDOWS
+						const auto& gp = state.native.Gamepad;
+						
+						return joyHat<format>(((gp.wButtons & XINPUT_GAMEPAD_DPAD_UP) > 0), ((gp.wButtons & XINPUT_GAMEPAD_DPAD_DOWN) > 0), ((gp.wButtons & XINPUT_GAMEPAD_DPAD_LEFT) > 0), ((gp.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT) > 0));
+					#else
+						return 0.0;
 					#endif
 				}
 

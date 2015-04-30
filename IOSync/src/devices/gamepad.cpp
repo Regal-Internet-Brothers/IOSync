@@ -6,9 +6,6 @@
 #include "../application/application.h"
 #include "../names.h"
 
-// Standard library:
-#include <cmath>
-
 // Namespace(s):
 namespace iosync
 {
@@ -120,7 +117,7 @@ namespace iosync
 		#endif
 
 		#ifdef GAMEPAD_VJOY_ENABLED
-			gamepad::vJoyDriverState gamepad::vJoyInfo = gamepad::VJOY_UNDEFINED;
+			vJoy::vJoyDriver gamepad::vJoyInfo = { vJoy::vJoyDriver::VJOY_UNDEFINED };
 		#endif
 
 		// Functions:
@@ -181,21 +178,39 @@ namespace iosync
 			}
 
 			#ifdef GAMEPAD_VJOY_ENABLED
-				gamepad::vJoyDriverState gamepad::__winnt__vJoy__init()
+				vJoy::vJoyDriver::vJoyDriverState gamepad::__winnt__vJoy__init()
 				{
-					vJoyInfo = ((vJoyEnabled() == TRUE) ? VJOY_ENABLED : VJOY_DISABLED);
+					// Namespace(s):
+					using namespace vJoy;
 
-					if (vJoyInfo == VJOY_ENABLED)
+					vJoyInfo.state = ((vJoyEnabled() == TRUE) ? vJoyDriver::VJOY_ENABLED : vJoyDriver::VJOY_DISABLED);
+
+					if (vJoyInfo.state == vJoyDriver::VJOY_ENABLED)
 					{
 						WORD DLLVer, driverVer;
 
 						if (!DriverMatch(&DLLVer, &driverVer))
 						{
-							vJoyInfo = VJOY_DISABLED;
+							vJoyInfo.state = vJoyDriver::VJOY_DISABLED;
 						}
 					}
 
-					return vJoyInfo;
+					return vJoyInfo.state;
+				}
+
+				vJoy::vJoyDriver::vJoyDriverState gamepad::__winnt__vJoy__deinit()
+				{
+					// Namespace(s):
+					using namespace vJoy;
+
+					if (vJoyInfo.state == vJoyDriver::VJOY_ENABLED)
+					{
+						// Nothing so far.
+
+						vJoyInfo.state = vJoyDriver::VJOY_DISABLED;
+					}
+
+					return vJoyInfo.state;
 				}
 
 				VjdStat gamepad::__winnt__vJoy__getStatus(const gamepadID internal_identifier)
@@ -203,46 +218,100 @@ namespace iosync
 					return GetVJDStatus(__winnt__vJoy__vDevice(internal_identifier));
 				}
 
-				LONG gamepad::__winnt__vJoy__capAxis(const UINT vJoyDevice, const LONG value, const UINT axis)
+				LONG gamepad::__winnt__vJoy__capAxis(const UINT vJoyID, const LONG value, const UINT axis, const UINT maximum_value)
 				{
 					#ifdef GAMEPAD_VJOY_SAFE
-						LONG axis_min, axis_max;
+						auto& device = vJoyInfo.getDevice(vJoyID);
+						auto axisInfo = device.getAxis(axis)->second;
+						auto axis_mid = ((axisInfo.max - axisInfo.min) / 2);
 
-						GetVJDAxisMin(vJoyDevice, axis, &axis_min);
-						GetVJDAxisMax(vJoyDevice, axis, &axis_max);
+						//return axis_mid + value;
+						//return axis_mid + max(axis_min, min(value, axis_max));
+						
+						auto scalar = max(axis_mid / maximum_value, 1);
 
-						return max(axis_min, min(value, axis_max));
+						return max(axisInfo.min, min((LONG)(axis_mid + (value * scalar)), axisInfo.max));
 					#else
 						return value;
 					#endif
 				}
 
-				void gamepad::__winnt__vJoy__transferAxis(const UINT vJoyDevice, const gamepadState& state, JOYSTICK_POSITION& vState, const UINT axis)
+				void gamepad::__winnt__vJoy__transferAxis(const UINT vJoyID, const gamepadState& state, JOYSTICK_POSITION& vState, const UINT axis)
 				{
 					switch (axis)
 					{
 						case HID_USAGE_X:
-							vState.wAxisX = __winnt__vJoy__capAxis(vJoyDevice, state.native.Gamepad.sThumbLX, axis);
+							vState.wAxisX = __winnt__vJoy__capAxis(vJoyID, state.native.Gamepad.sThumbLX, axis);
 
 							break;
 						case HID_USAGE_Y:
-							vState.wAxisX = __winnt__vJoy__capAxis(vJoyDevice, state.native.Gamepad.sThumbLY, axis);
+							vState.wAxisY = __winnt__vJoy__capAxis(vJoyID, -state.native.Gamepad.sThumbLY, axis);
 
 							break;
 						case HID_USAGE_Z:
-							vState.wAxisZ = __winnt__vJoy__capAxis(vJoyDevice, state.native.Gamepad.bRightTrigger-state.native.Gamepad.bLeftTrigger, axis);
+							{
+								LONG m = vJoyInfo.getDevice(vJoyID).axisMax(axis);
+
+								m = ((m+1)/2);
+								//m = m+1;
+
+								auto value = m;
+								
+								int scalar = max(m / (UCHAR_MAX), 1);
+
+								if (state.native.Gamepad.bRightTrigger != 0)
+									value += ((state.native.Gamepad.bRightTrigger * scalar) + scalar);
+
+								if (state.native.Gamepad.bLeftTrigger != 0)
+									value -= ((state.native.Gamepad.bLeftTrigger * scalar) + scalar);
+
+								vState.wAxisZ = value;
+								//vState.wAxisZ = __winnt__vJoy__capAxis(vJoyID, value, axis);
+							}
 
 							break;
 						case HID_USAGE_RX:
-							vState.wAxisXRot = __winnt__vJoy__capAxis(vJoyDevice, state.native.Gamepad.sThumbRX, axis);
+							vState.wAxisXRot = __winnt__vJoy__capAxis(vJoyID, state.native.Gamepad.sThumbRX, axis);
 
 							break;
 						case HID_USAGE_RY:
-							vState.wAxisYRot = __winnt__vJoy__capAxis(vJoyDevice, state.native.Gamepad.sThumbRY, axis);
+							vState.wAxisYRot = __winnt__vJoy__capAxis(vJoyID, -state.native.Gamepad.sThumbRY, axis);
 
 							break;
-						case HID_USAGE_RZ:
-							vState.wAxisZRot = __winnt__vJoy__capAxis(vJoyDevice, -(state.native.Gamepad.bRightTrigger-state.native.Gamepad.bLeftTrigger), axis);
+						case HID_USAGE_POV:
+							{
+								// Local variable(s):
+
+								// Get a reference to the vJoy-device.
+								auto& device = vJoyInfo.getDevice(vJoyID);
+
+								// Check the POV mode:
+								if (device.contPOVNumber > 0)
+								{
+									if ((state.native.Gamepad.wButtons & gamepadState::padMask) > 0)
+									{
+										vState.bHats = (((int)joyHat(state))*100);
+									}
+									else
+									{
+										// Disable the HAT.
+										vState.bHats = 36001;
+									}
+								}
+								else
+								{
+									vState.bHats = 4;
+
+									if (state.native.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT)
+										vState.bHats = 1;
+									else if (state.native.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT)
+										vState.bHats = 3;
+									else if (state.native.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN)
+										vState.bHats = 2;
+									else if (state.native.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_UP)
+										vState.bHats = 0;
+								}
+							}
 
 							break;
 					}
@@ -250,54 +319,47 @@ namespace iosync
 					return;
 				}
 
-				void gamepad::__winnt__vJoy__autoTransferAxis(const UINT vJoyDevice, const gamepadState& state, JOYSTICK_POSITION& vState, const UINT axis)
+				void gamepad::__winnt__vJoy__autoTransferAxis(const UINT vJoyID, const gamepadState& state, JOYSTICK_POSITION& vState, const UINT axis)
 				{
-					if (GetVJDAxisExist(vJoyDevice, axis))
+					// Local variable(s):
+					auto& device = vJoyInfo.getDevice(vJoyID);
+
+					if (device.hasAxis(axis))
 					{
-						__winnt__vJoy__transferAxis(vJoyDevice, state, vState, axis);
+						__winnt__vJoy__transferAxis(vJoyID, state, vState, axis);
 					}
 
 					return;
 				}
 
-				void gamepad::__winnt__vJoy__simulateState(const gamepadState& state, const UINT vJoyDevice, const VjdStat status)
+				void gamepad::__winnt__vJoy__simulateState(const gamepadState& state, const UINT vJoyID, const VjdStat status)
 				{
-					if (status == VJD_STAT_FREE)
-					{
-						// Acquire control over the device:
-						if (!AcquireVJD(vJoyDevice))
-							return;
-					}
-
-					ResetVJD(vJoyDevice);
+					//ResetVJD(vJoyID);
 					
+					// Local variable(s):
 					JOYSTICK_POSITION vState;
 
 					ZeroVar(vState);
 
-					vState.bDevice = vJoyDevice;
+					vState.bDevice = vJoyID;
 
 					// Automatically transfer the axes to the output-state:
-					__winnt__vJoy__autoTransferAxis(vJoyDevice, state, vState, HID_USAGE_X);
-					__winnt__vJoy__autoTransferAxis(vJoyDevice, state, vState, HID_USAGE_Y);
+					__winnt__vJoy__autoTransferAxis(vJoyID, state, vState, HID_USAGE_X);
+					__winnt__vJoy__autoTransferAxis(vJoyID, state, vState, HID_USAGE_Y);
 
-					__winnt__vJoy__autoTransferAxis(vJoyDevice, state, vState, HID_USAGE_RX);
-					__winnt__vJoy__autoTransferAxis(vJoyDevice, state, vState, HID_USAGE_RY);
+					__winnt__vJoy__autoTransferAxis(vJoyID, state, vState, HID_USAGE_RX);
+					__winnt__vJoy__autoTransferAxis(vJoyID, state, vState, HID_USAGE_RY);
 
-					__winnt__vJoy__autoTransferAxis(vJoyDevice, state, vState, HID_USAGE_Z);
-					__winnt__vJoy__autoTransferAxis(vJoyDevice, state, vState, HID_USAGE_RZ);
+					__winnt__vJoy__autoTransferAxis(vJoyID, state, vState, HID_USAGE_POV);
+					__winnt__vJoy__autoTransferAxis(vJoyID, state, vState, HID_USAGE_Z);
 
-					vState.lButtons = state.native.Gamepad.wButtons;
+					vState.lButtons = (state.native.Gamepad.wButtons ^ (state.native.Gamepad.wButtons & gamepadState::padMask));
+					vState.lButtons = ((((vState.lButtons >> 12) & SHRT_MAX) | (vState.lButtons ^ (vState.lButtons & gamepadState::faceMask))) & SHRT_MAX);
 
-					#ifdef GAMEPAD_VJOY_SAFE
-						//vState.lButtons &= (int)pow(2, GetVJDButtonNumber(vJoyDevice));
-					#endif
+					//cout << "vState.lButtons: "  << vState.lButtons << endl;
 
 					// Update the vJoy-device.
-					UpdateVJD(vJoyDevice, &vState);
-
-					// Relinquish control over the device.
-					RelinquishVJD(vJoyDevice);
+					UpdateVJD(vJoyID, &vState);
 
 					return;
 				}
@@ -307,30 +369,6 @@ namespace iosync
 		void gamepad::simulateState(const gamepadState& state, const gamepadID localIdentifier)
 		{
 			#ifdef PLATFORM_WINDOWS
-				#ifdef GAMEPAD_VJOY_ENABLED
-					// Check the current state of vJoy:
-					if (vJoyInfo == VJOY_ENABLED)
-					{
-						// Calculate the internal status.
-						auto status = __winnt__vJoy__getStatus(localIdentifier);
-
-						switch (status)
-						{
-							case VJD_STAT_OWN:
-							case VJD_STAT_FREE:
-								__winnt__vJoy__simulateState(state, __winnt__vJoy__vDevice(localIdentifier), status);
-
-								break;
-							case VJD_STAT_BUSY:
-								break;
-							case VJD_STAT_MISS:
-								break;
-							default:
-								break;
-						}
-					}
-				#endif
-				
 				if (__winnt__sharedMemoryOpen())
 				{
 					return;
@@ -458,6 +496,28 @@ namespace iosync
 			simulateState(state, localGamepadNumber);
 
 			#ifdef PLATFORM_WINDOWS
+				#ifdef GAMEPAD_VJOY_ENABLED
+					// Check the current state of vJoy:
+					if (vJoyInfo.state == vJoy::vJoyDriver::VJOY_ENABLED)
+					{
+						// Calculate the internal status.
+						switch (vJoy_status)
+						{
+							case VJD_STAT_OWN:
+							case VJD_STAT_FREE:
+								__winnt__vJoy__simulateState(state, __winnt__vJoy__vDevice(localGamepadNumber), vJoy_status);
+
+								break;
+							case VJD_STAT_BUSY:
+								break;
+							case VJD_STAT_MISS:
+								break;
+							default:
+								break;
+						}
+					}
+				#endif
+				
 				__winnt__lastPacketNumber = state.native.dwPacketNumber;
 			#endif
 

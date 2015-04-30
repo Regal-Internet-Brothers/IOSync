@@ -357,7 +357,37 @@ namespace iosync
 		{
 			#ifdef PLATFORM_WINDOWS
 				if (program->allowDeviceSimulation())
+				{
+					#ifdef GAMEPAD_VJOY_ENABLED
+						// Namespace(s):
+						using namespace vJoy;	
+
+						// If vJoy isn't already initialized, do so:
+						if (gp::vJoyInfo.state == vJoyDriver::VJOY_UNDEFINED)
+						{
+							gp::__winnt__vJoy__init();
+						}
+
+						// Check the current state of vJoy:
+						if (gp::vJoyInfo.state == vJoyDriver::VJOY_ENABLED)
+						{
+							if (pad->__winnt__vJoy__calculateStatus() == VJD_STAT_FREE)
+							{
+								// Acquire control over the device:
+								if (!AcquireVJD(gp::__winnt__vJoy__vDevice(pad->localGamepadNumber)))
+								{
+									pad->vJoy_status = VJD_STAT_MISS;
+								}
+							}
+						}
+					#endif
+
+					// Ensure shared memory is "open".
+					gp::__winnt__autoOpenSharedMemory();
+
+					// Activate the virtual gamepad.
 					gp::__winnt__activateGamepad(pad->localGamepadNumber);
+				}
 			#endif
 
 			return;
@@ -370,9 +400,29 @@ namespace iosync
 				{
 					gp::__winnt__deactivateGamepad(pad->localGamepadNumber);
 
+					// Local variable(s):
+					bool hasPadConnected = hasGamepadConnected();
+
+					#ifdef GAMEPAD_VJOY_ENABLED
+						// Namespace(s):
+						using namespace vJoy;
+						
+						// Check for vJoy functionality:
+						if (gp::vJoyInfo.state == vJoyDriver::VJOY_ENABLED)	
+						{
+							// Relinquish control over the device.
+							RelinquishVJD(gp::__winnt__vJoy__vDevice(pad->localGamepadNumber));
+
+							if (!hasPadConnected)
+							{
+								gp::__winnt__vJoy__deinit();
+							}
+						}
+					#endif
+
 					// We don't have any gamepads connected,
 					// close the shared memory segment:
-					if (!hasGamepadConnected())
+					if (!hasPadConnected)
 						gp::__winnt__closeSharedMemory();
 				}
 			#endif
@@ -504,28 +554,6 @@ namespace iosync
 				// Tell the user we couldn't connect it.
 				return nullptr;
 			}
-
-			#ifdef PLATFORM_WINDOWS
-				if (program->allowDeviceSimulation())
-				{
-					#ifdef GAMEPAD_VJOY_ENABLED
-						// If vJoy isn't already initialized, do so:
-						if (gp::vJoyInfo == gp::VJOY_UNDEFINED)
-						{
-							gp::__winnt__vJoy__init();
-						}
-					#endif
-
-					if (!gp::__winnt__autoOpenSharedMemory())
-					{
-						/*
-						delete gamepads[identifier];
-
-						return nullptr;
-						*/
-					}
-				}
-			#endif
 
 			onGamepadConnected(program, gamepads[identifier]);
 
@@ -1805,9 +1833,14 @@ namespace iosync
 				#endif
 		#endif
 				#ifdef IOSYNC_CONSOLE_INPUT
-					wstring output_file = applicationConfiguration::DEFAULT_PATH;
-
-					cout << "Unable to load configuration: ";
+					#ifndef IOSYNC_FAST_TESTMODE
+						wstring output_file = applicationConfiguration::DEFAULT_PATH;	
+						
+						cout << "Unable to load configuration: ";
+					#else
+						// Allocate a blank string on the stack.
+						wstring output_file;
+					#endif
 
 					do
 					{
@@ -2063,6 +2096,8 @@ namespace iosync
 					requestAddress(configuration.remoteAddress);
 
 					cout << "Please enter a username (No spaces): "; wcin >> configuration.username; // cout << endl;
+				#else
+					//configuration.remoteAddress.IP = "127.0.0.1";
 				#endif
 
 				if (logChoices)

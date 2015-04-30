@@ -167,6 +167,9 @@
     <ClInclude Include="src\names.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\devices\native\winnt\vJoyDriver.h">
+      <Filter>Header Files\devices\native\winnt</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Icon.rc">

@@ -47,6 +47,7 @@
     <ClInclude Include="src\application\application_exceptions.h" />
     <ClInclude Include="src\devices\gamepad.h" />
     <ClInclude Include="src\devices\native\winnt\Real_XInput_Wrapper.h" />
+    <ClInclude Include="src\devices\native\winnt\vJoyDriver.h" />
     <ClInclude Include="src\iosync_application_exceptions.h" />
     <ClInclude Include="src\devices\devices.h" />
     <ClInclude Include="src\devices\keyboard.h" />
