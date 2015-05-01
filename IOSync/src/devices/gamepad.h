@@ -97,6 +97,10 @@ namespace iosync
 			#endif
 
 			DEFAULT_DEBUG_RUMBLE_TIME = 500,
+
+			#ifdef GAMEPAD_VJOY_ENABLED
+				MAX_VJOY_DEVICES = 16,
+			#endif
 		};
 
 		#ifdef PLATFORM_WINDOWS
@@ -271,12 +275,6 @@ namespace iosync
 
 						// This simulates a gamepad-state using vJoy.
 						static void __winnt__vJoy__simulateState(const gamepadState& state, const UINT vJoyID, const VjdStat status);
-
-						// This converts/maps a standard local-identifier into a vJoy device-identifier.
-						static inline UINT __winnt__vJoy__vDevice(const gamepadID identifier)
-						{
-							return (UINT)(identifier);
-						}
 					#endif
 
 					static inline sharedMemoryState __winnt__openSharedMemory()
@@ -536,6 +534,7 @@ namespace iosync
 
 					#ifdef GAMEPAD_VJOY_ENABLED
 						VjdStat vJoy_status;
+						UINT local_vJoyID;
 					#endif
 				#endif
 		};

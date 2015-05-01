@@ -185,13 +185,13 @@ namespace iosync
 			// Constructor(s):
 			deviceConfiguration
 			(
-				bool kbdEnabled=true,
+				bool kbdEnabled=false,
 				bool gpdsEnabled=true,
 				unsigned char maximum_gpds=(unsigned char)MAX_GAMEPADS
 
 				// Extensions:
 				#ifdef GAMEPAD_VJOY_ENABLED
-					, bool vJoy=true
+					, bool vJoy=true, UINT vJoy_DevOffset=0
 				#endif
 			);
 
@@ -202,6 +202,8 @@ namespace iosync
 			bool gamepadsEnabled;
 
 			#ifdef GAMEPAD_VJOY_ENABLED
+				UINT vJoy_DeviceOffset;
+				
 				bool vJoyEnabled;
 			#endif
 		};
@@ -225,7 +227,7 @@ namespace iosync
 			connectedDevices
 			(
 				milliseconds gamepadTimeout=(milliseconds)GAMEPAD_DEFAULT_TIMEOUT,
-				bool kbdEnabled=true,
+				bool kbdEnabled=false,
 				bool gpdsEnabled=true,
 				unsigned char max_gpds=(unsigned char)MAX_GAMEPADS
 			);
@@ -780,6 +782,7 @@ namespace iosync
 
 				#ifdef GAMEPAD_VJOY_ENABLED
 					static const wstring DEVICES_VJOY;
+					static const wstring DEVICES_VJOY_OFFSET;
 				#endif
 
 				// Networking:
@@ -813,7 +816,7 @@ namespace iosync
 				(
 					applicationMode internal_mode=MODE_SERVER,
 					bool cmdOnly=false,
-					bool kbdEnabled=true,
+					bool kbdEnabled=false,
 					bool gpdsEnabled=true,
 					unsigned char max_gpds=(unsigned char)devices::metrics::MAX_GAMEPADS
 				);

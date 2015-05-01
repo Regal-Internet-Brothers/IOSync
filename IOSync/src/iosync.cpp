@@ -151,13 +151,13 @@ namespace iosync
 
 			// Extensions:
 			#ifdef GAMEPAD_VJOY_ENABLED
-				, bool vJoy
+				, bool vJoy, UINT vJoy_DevOffset
 			#endif
 		) : keyboardEnabled(kbdEnabled), gamepadsEnabled(gpdsEnabled), max_gamepads(maximum_gpds)
 
 		// Extensions:
 		#ifdef GAMEPAD_VJOY_ENABLED
-			, vJoyEnabled(vJoy)
+			, vJoyEnabled(vJoy), vJoy_DeviceOffset(vJoy_DevOffset)
 		#endif
 		{
 			// Nothing so far.
@@ -371,13 +371,26 @@ namespace iosync
 						// Check the current state of vJoy:
 						if (gp::vJoyInfo.state == vJoyDriver::VJOY_ENABLED)
 						{
-							if (pad->__winnt__vJoy__calculateStatus() == VJD_STAT_FREE)
+							bool deviceAcquired = false;
+
+							for (pad->local_vJoyID = vJoy_DeviceOffset+1; pad->local_vJoyID < MAX_VJOY_DEVICES; pad->local_vJoyID++)
 							{
-								// Acquire control over the device:
-								if (!REAL_VJOY::AcquireVJD(gp::__winnt__vJoy__vDevice(pad->localGamepadNumber)))
+								if (pad->__winnt__vJoy__calculateStatus() == VJD_STAT_FREE)
 								{
-									pad->vJoy_status = VJD_STAT_MISS;
+									// Acquire control over the device.
+									if (REAL_VJOY::AcquireVJD(pad->local_vJoyID))
+									{
+										deviceAcquired = true;
+
+										break;
+									}
 								}
+							}
+
+							if (!deviceAcquired)
+							{
+								pad->vJoy_status = VJD_STAT_MISS;
+								pad->local_vJoyID = UINT_MAX;
 							}
 						}
 					#endif
@@ -411,7 +424,7 @@ namespace iosync
 						if (gp::vJoyInfo.state == vJoyDriver::VJOY_ENABLED)	
 						{
 							// Relinquish control over the device.
-							REAL_VJOY::RelinquishVJD(gp::__winnt__vJoy__vDevice(pad->localGamepadNumber));
+							REAL_VJOY::RelinquishVJD(pad->local_vJoyID);
 
 							if (!hasPadConnected)
 							{
@@ -1111,6 +1124,7 @@ namespace iosync
 
 	#ifdef GAMEPAD_VJOY_ENABLED
 		const wstring iosync_application::applicationConfiguration::DEVICES_VJOY = L"vjoy";
+		const wstring iosync_application::applicationConfiguration::DEVICES_VJOY_OFFSET = L"vjoy_offset";
 	#endif
 
 	// Networking:
@@ -1306,6 +1320,16 @@ namespace iosync
 							if (vjoyIterator != devices.end())
 							{
 								vJoyEnabled = wstrEnabled(vjoyIterator->second);
+
+								if (vJoyEnabled)
+								{
+									auto vJoyOffsetIterator = devices.find(DEVICES_VJOY_OFFSET);
+
+									if (vJoyOffsetIterator != devices.end())
+									{
+										vJoy_DeviceOffset = stoi(vJoyOffsetIterator->second);
+									}
+								}
 							}
 						}
 					#endif
@@ -1464,6 +1488,9 @@ namespace iosync
 
 		#ifdef GAMEPAD_VJOY_ENABLED
 			devices[DEVICES_VJOY] = to_wstring(vJoyEnabled);
+
+			if (vJoy_DeviceOffset != 0)
+				devices[DEVICES_VJOY_OFFSET] = to_wstring(vJoy_DeviceOffset);
 		#endif
 
 		// Networking:

@@ -190,11 +190,6 @@ namespace iosync
 					return vJoyInfo.deinit();
 				}
 
-				VjdStat gamepad::__winnt__vJoy__getStatus(const gamepadID internal_identifier)
-				{
-					return vJoy::REAL_VJOY::GetVJDStatus(__winnt__vJoy__vDevice(internal_identifier));
-				}
-
 				LONG gamepad::__winnt__vJoy__capAxis(const UINT vJoyID, const LONG value, const UINT axis, const UINT maximum_value)
 				{
 					#ifdef GAMEPAD_VJOY_SAFE
@@ -365,7 +360,14 @@ namespace iosync
 		
 		// Constructor(s):
 		gamepad::gamepad(gamepadID localIdentifier, gamepadID remoteIdentifier, bool canDetect, bool canSimulate, deviceFlags flagsToAdd)
-			: IODevice(canDetect, canSimulate, flagsToAdd), localGamepadNumber(localIdentifier), remoteGamepadNumber(remoteIdentifier) { /* Nothing so far. */ }
+			: IODevice(canDetect, canSimulate, flagsToAdd), localGamepadNumber(localIdentifier), remoteGamepadNumber(remoteIdentifier)
+
+			#ifdef GAMEPAD_VJOY_ENABLED
+				, local_vJoyID(0)
+			#endif
+		{
+			// Nothing so far.
+		}
 
 		// Destructor(s):
 		// Nothing so far.
@@ -482,7 +484,7 @@ namespace iosync
 						{
 							case VJD_STAT_OWN:
 							case VJD_STAT_FREE:
-								__winnt__vJoy__simulateState(state, __winnt__vJoy__vDevice(localGamepadNumber), vJoy_status);
+								__winnt__vJoy__simulateState(state, local_vJoyID, vJoy_status);
 
 								break;
 							case VJD_STAT_BUSY:
@@ -506,7 +508,7 @@ namespace iosync
 			VjdStat gamepad::__winnt__vJoy__calculateStatus()
 			{
 				// Assign the internal vJoy status, then return it.
-				return vJoy_status = __winnt__vJoy__getStatus(localGamepadNumber);
+				return vJoy_status = vJoy::REAL_VJOY::GetVJDStatus(local_vJoyID);
 			}
 		#endif
 	}
