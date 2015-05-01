@@ -47,6 +47,9 @@ namespace REAL_XINPUT
 
 	process::jumpSegment mapRemoteFunction(LPCSTR name, LPCVOID function, HMODULE hDLL);
 
+	// This command restores the internal function-pointers to their original state.
+	BOOL restoreFunctions();
+
 	VOID linkTo(HMODULE hDLL);
 	
 	// The 'resolveSystemPath' argument specifies if this routine

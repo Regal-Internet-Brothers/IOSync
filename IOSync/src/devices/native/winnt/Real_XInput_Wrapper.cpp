@@ -29,14 +29,14 @@
 namespace REAL_XINPUT
 {
 	// Typedefs:
-	typedef decltype(&XInputEnable) _XInputEnable_t;
-	typedef decltype(&XInputSetState) _XInputSetState_t;
-	typedef decltype(&XInputGetState) _XInputGetState_t;
-	typedef decltype(&XInputGetCapabilities) _XInputGetCapabilities_t;
-	typedef decltype(&XInputGetBatteryInformation) _XInputGetBatteryInformation_t;
-	typedef decltype(&XInputGetKeystroke) _XInputGetKeystroke_t;
-	typedef decltype(&XInputGetAudioDeviceIds) _XInputGetAudioDeviceIds_t;
-	typedef decltype(&XInputGetState) _XInputGetStateEx_t; // XInputGetStateEx
+	typedef decltype(&::XInputEnable) _XInputEnable_t;
+	typedef decltype(&::XInputSetState) _XInputSetState_t;
+	typedef decltype(&::XInputGetState) _XInputGetState_t;
+	typedef decltype(&::XInputGetCapabilities) _XInputGetCapabilities_t;
+	typedef decltype(&::XInputGetBatteryInformation) _XInputGetBatteryInformation_t;
+	typedef decltype(&::XInputGetKeystroke) _XInputGetKeystroke_t;
+	typedef decltype(&::XInputGetAudioDeviceIds) _XInputGetAudioDeviceIds_t;
+	typedef decltype(&::XInputGetState) _XInputGetStateEx_t; // XInputGetStateEx
 
 	_XInputEnable_t _XInputEnable;
 	_XInputSetState_t _XInputSetState;
@@ -78,6 +78,22 @@ namespace REAL_XINPUT
 		jumpStates[remoteFunction] = response;
 
 		return response;
+	}
+
+	BOOL restoreFunctions()
+	{
+		// Set every function-pointer back to 'nullptr':
+		_XInputEnable = nullptr;
+		_XInputSetState = nullptr;
+		_XInputGetState = nullptr;
+		_XInputGetCapabilities = nullptr;
+		_XInputGetBatteryInformation = nullptr;
+		_XInputGetKeystroke = nullptr;
+		_XInputGetAudioDeviceIds = nullptr;
+		_XInputGetStateEx = nullptr;
+
+		// Return the default response.
+		return TRUE;
 	}
 
 	VOID linkTo(HMODULE hDLL)

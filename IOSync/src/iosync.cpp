@@ -374,7 +374,7 @@ namespace iosync
 							if (pad->__winnt__vJoy__calculateStatus() == VJD_STAT_FREE)
 							{
 								// Acquire control over the device:
-								if (!AcquireVJD(gp::__winnt__vJoy__vDevice(pad->localGamepadNumber)))
+								if (!REAL_VJOY::AcquireVJD(gp::__winnt__vJoy__vDevice(pad->localGamepadNumber)))
 								{
 									pad->vJoy_status = VJD_STAT_MISS;
 								}
@@ -411,7 +411,7 @@ namespace iosync
 						if (gp::vJoyInfo.state == vJoyDriver::VJOY_ENABLED)	
 						{
 							// Relinquish control over the device.
-							RelinquishVJD(gp::__winnt__vJoy__vDevice(pad->localGamepadNumber));
+							REAL_VJOY::RelinquishVJD(gp::__winnt__vJoy__vDevice(pad->localGamepadNumber));
 
 							if (!hasPadConnected)
 							{

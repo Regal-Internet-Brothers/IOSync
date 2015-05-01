@@ -180,42 +180,19 @@ namespace iosync
 			#ifdef GAMEPAD_VJOY_ENABLED
 				vJoy::vJoyDriver::vJoyDriverState gamepad::__winnt__vJoy__init()
 				{
-					// Namespace(s):
-					using namespace vJoy;
-
-					vJoyInfo.state = ((vJoyEnabled() == TRUE) ? vJoyDriver::VJOY_ENABLED : vJoyDriver::VJOY_DISABLED);
-
-					if (vJoyInfo.state == vJoyDriver::VJOY_ENABLED)
-					{
-						WORD DLLVer, driverVer;
-
-						if (!DriverMatch(&DLLVer, &driverVer))
-						{
-							vJoyInfo.state = vJoyDriver::VJOY_DISABLED;
-						}
-					}
-
-					return vJoyInfo.state;
+					// Call the main implementation. (Shared "driver" object)
+					return vJoyInfo.init();
 				}
 
 				vJoy::vJoyDriver::vJoyDriverState gamepad::__winnt__vJoy__deinit()
 				{
-					// Namespace(s):
-					using namespace vJoy;
-
-					if (vJoyInfo.state == vJoyDriver::VJOY_ENABLED)
-					{
-						// Nothing so far.
-
-						vJoyInfo.state = vJoyDriver::VJOY_DISABLED;
-					}
-
-					return vJoyInfo.state;
+					// Call the main implementation. (Shared "driver" object)
+					return vJoyInfo.deinit();
 				}
 
 				VjdStat gamepad::__winnt__vJoy__getStatus(const gamepadID internal_identifier)
 				{
-					return GetVJDStatus(__winnt__vJoy__vDevice(internal_identifier));
+					return vJoy::REAL_VJOY::GetVJDStatus(__winnt__vJoy__vDevice(internal_identifier));
 				}
 
 				LONG gamepad::__winnt__vJoy__capAxis(const UINT vJoyID, const LONG value, const UINT axis, const UINT maximum_value)
@@ -359,7 +336,7 @@ namespace iosync
 					//cout << "vState.lButtons: "  << vState.lButtons << endl;
 
 					// Update the vJoy-device.
-					UpdateVJD(vJoyID, &vState);
+					vJoy::REAL_VJOY::UpdateVJD(vJoyID, &vState);
 
 					return;
 				}

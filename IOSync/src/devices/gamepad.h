@@ -14,24 +14,11 @@
 
 // Includes:
 #include "../platform.h"
-
-// The 'GAMEPAD_VJOY_ENABLED' preprocessor-variable should
-// only ever be defined when 'PLATFORM_WINDOWS' is defined.
-// Any other behavior should be considered non-standard.
-#ifdef PLATFORM_WINDOWS
-	// Disable this if needed; toggles optional vJoy support.
-	#define GAMEPAD_VJOY_ENABLED
-
-	#ifdef GAMEPAD_VJOY_ENABLED
-		#define GAMEPAD_VJOY_SAFE
-	#endif
-#endif
-
 #include "../names.h"
 
 #include "devices.h"
 
-#ifdef GAMEPAD_VJOY_ENABLED
+#ifdef PLATFORM_WINDOWS
 	// vJoy functionality.
 	#include "native/winnt/vJoyDriver.h"
 #endif
@@ -58,10 +45,6 @@
 // Libraries:
 #if defined(PLATFORM_WINDOWS) && !defined(GAMEPAD_EXTERNAL_ORIGIN)
 	//#pragma comment(lib, "Xinput.lib")
-#endif
-
-#ifdef GAMEPAD_VJOY_ENABLED
-	#pragma comment(lib, "VJOYINTERFACE")
 #endif
 
 // Namespace(s):
@@ -157,7 +140,7 @@ namespace iosync
 		struct gamepadState
 		{
 			// Constant variable(s):
-			#ifdef PLATFORM_WINDOWS
+			#ifdef GAMEPAD_VJOY_ENABLED
 				static const DWORD padMask = (XINPUT_GAMEPAD_DPAD_UP|XINPUT_GAMEPAD_DPAD_DOWN|XINPUT_GAMEPAD_DPAD_LEFT|XINPUT_GAMEPAD_DPAD_RIGHT);
 				static const DWORD faceMask = (XINPUT_GAMEPAD_A|XINPUT_GAMEPAD_B|XINPUT_GAMEPAD_X|XINPUT_GAMEPAD_Y);
 			#endif

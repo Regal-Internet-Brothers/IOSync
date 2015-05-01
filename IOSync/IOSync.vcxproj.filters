@@ -96,6 +96,9 @@
     <ClCompile Include="src\devices\native\winnt\Real_XInput_Wrapper.cpp">
       <Filter>Source Files\devices\native\winnt</Filter>
     </ClCompile>
+    <ClCompile Include="src\devices\native\winnt\vJoyDriver.cpp">
+      <Filter>Source Files\devices\native\winnt</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\networking\address.h">

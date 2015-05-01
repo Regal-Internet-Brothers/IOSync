@@ -32,6 +32,7 @@
     <ClCompile Include="src\devices\gamepad.cpp" />
     <ClCompile Include="src\devices\keyboard.cpp" />
     <ClCompile Include="src\devices\native\winnt\Real_XInput_Wrapper.cpp" />
+    <ClCompile Include="src\devices\native\winnt\vJoyDriver.cpp" />
     <ClCompile Include="src\exceptions.cpp" />
     <ClCompile Include="src\iosync.cpp" />
     <ClCompile Include="src\main.cpp" />
