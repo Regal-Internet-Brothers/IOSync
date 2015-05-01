@@ -20,7 +20,7 @@ IOSync works immediately when a server is started. This means any client can con
 * [Please visit the wiki page regarding streaming](https://github.com/Regal-Internet-Brothers/IOSync/wiki/Streaming-(Audio-and-Video)).
 
 ###Compiling the project(s):###
-This repository only provides both source code, and compiled binaries. Pre-compiled binaries can be found in the ["releases" section](https://github.com/Regal-Internet-Brothers/IOSync/releases) (Use at your own risk). If you wish to compile the project, read on.
+This repository provides both source code, and compiled binaries. Pre-compiled binaries can be found in the ["releases" section](https://github.com/Regal-Internet-Brothers/IOSync/releases) (Use at your own risk). If you wish to compile the project, read on.
 
 This project is currently Windows-only, and it has only been tested with Visual Studio 2013 Community Edition. Builds should work for both x86 and x64.
 The only external dependency this project has is 'QuickLib'. [The experimental version in the 'QuickLib' repository should work](https://github.com/Regal-Internet-Brothers/QuickLib). That being said, all you should need after building that is Visual Studio 2013 (Community Edition).
