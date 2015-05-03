@@ -1552,6 +1552,16 @@ namespace iosync
 	}
 
 	// Global variable(s):
+	size_t iosync_application::dynamicLinks = 0;
+
+	#ifdef PLATFORM_WINDOWS
+		HMODULE iosync_application::xInputModule = NULL;
+
+		#ifdef GAMEPAD_VJOY_DYNAMIC_LINK // GAMEPAD_VJOY_ENABLED
+			HMODULE iosync_application::vJoyModule = NULL;
+		#endif
+	#endif
+
 	#ifdef IOSYNC_LIVE_COMMANDS
 		iosync_application::programList iosync_application::commandTargets;
 		queue<iosync_application::applicationCommand> iosync_application::commandQueue;
@@ -1563,6 +1573,70 @@ namespace iosync
 	#endif
 
 	// Functions:
+	void iosync_application::dynamicLink(iosync_application& application)
+	{
+		// Increment the dynamic-link counter.
+		dynamicLinks++;
+
+		#ifdef PLATFORM_WINDOWS
+			if (application.allowDeviceDetection())
+			{
+				if (xInputModule == NULL)
+				{
+					xInputModule = REAL_XINPUT::linkTo();
+				}
+			}
+
+			#ifdef GAMEPAD_VJOY_DYNAMIC_LINK
+				if (application.allowDeviceSimulation() && application.devices.vJoyEnabled)
+				{
+					if (vJoyModule == NULL)
+					{
+						vJoyModule = devices::vJoy::REAL_VJOY::linkTo();
+					}
+				}
+			#endif
+		#endif
+
+		return;
+	}
+
+	void iosync_application::dynamicUnlink(iosync_application& application)
+	{
+		// Decrement the dynamic-link counter.
+		dynamicLinks--;
+
+		// Check if there are any other applications dynamically linked:
+		if (dynamicLinks == 0)
+		{
+			#ifdef PLATFORM_WINDOWS
+				if (xInputModule != NULL)
+				{
+					FreeLibrary(xInputModule);
+					xInputModule = NULL;
+
+					#ifdef IOSYNC_SAFE
+						REAL_XINPUT::restoreFunctions();
+					#endif
+				}
+
+				#ifdef GAMEPAD_VJOY_DYNAMIC_LINK
+					if (vJoyModule != NULL)
+					{
+						FreeLibrary(vJoyModule);
+						vJoyModule = NULL;
+
+						#ifdef IOSYNC_SAFE
+							devices::vJoy::REAL_VJOY::restoreFunctions();
+						#endif
+					}
+				#endif
+			#endif
+		}
+
+		return;
+	}
+
 	#ifdef IOSYNC_LIVE_COMMANDS
 		void iosync_application::beginLocalCommandAccept()
 		{
@@ -2194,6 +2268,9 @@ namespace iosync
 		if (window == WINDOW_NONE)
 			throw noWindowException(this);
 
+		// Link with any dynamic modules we may need.
+		dynamicLink(*this);
+
 		#ifdef IOSYNC_LIVE_COMMANDS
 			openCommandThread(this);
 		#endif
@@ -2207,11 +2284,14 @@ namespace iosync
 
 		closeNetwork();
 
-		//sharedWindow::close();
-
 		#ifdef IOSYNC_LIVE_COMMANDS
 			closeCommandThread(this);
 		#endif
+
+		// Un-link any dynamic modules we're using.
+		dynamicUnlink(*this);
+
+		//sharedWindow::close();
 
 		return;
 	}

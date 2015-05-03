@@ -99,14 +99,6 @@ int main(int argc, char** argv)
 	// Initialize networking functionality.
 	QSocket::initSockets();
 
-	#ifdef PLATFORM_WINDOWS
-		auto XInputDLL = REAL_XINPUT::linkTo();
-
-		#ifdef GAMEPAD_VJOY_DYNAMIC_LINK
-			auto vJoyDLL = vJoy::REAL_VJOY::linkTo();
-		#endif
-	#endif
-
 	#ifdef PLATFORM_WINDOWS_EXTENSIONS
 		// Kept in its own scope due to large stack allocation(s):
 		{
@@ -199,19 +191,6 @@ int main(int argc, char** argv)
 	#endif
 
 	#ifdef PLATFORM_WINDOWS
-		// Free the acquired XInput module:
-		if (XInputDLL != NULL)
-		{
-			FreeLibrary(XInputDLL);
-		}
-
-		#ifdef GAMEPAD_VJOY_DYNAMIC_LINK
-			if (vJoyDLL != NULL)
-			{
-				FreeLibrary(vJoyDLL);
-			}
-		#endif
-
 		#ifdef PLATFORM_WINDOWS_EXTENSIONS
 			// Close the console-streams:
 			fclose(consoleInput);

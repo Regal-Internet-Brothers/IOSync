@@ -14,6 +14,7 @@
 */
 
 #define IOSYNC_CONSOLE_INPUT
+#define IOSYNC_SAFE
 
 #ifdef IOSYNC_TESTMODE
 	//#define IOSYNC_FAST_TESTMODE
@@ -850,6 +851,20 @@ namespace iosync
 			};
 
 			// Global variable(s):
+
+			// The number of application still linked to dynamic libraries.
+			// When an application attempts to un-link when there are no other
+			// applications linked, all dynamic modules will be discarded.
+			static size_t dynamicLinks;
+
+			#ifdef PLATFORM_WINDOWS
+				static HMODULE xInputModule;
+
+				#ifdef GAMEPAD_VJOY_DYNAMIC_LINK // GAMEPAD_VJOY_ENABLED
+					static HMODULE vJoyModule;
+				#endif
+			#endif
+
 			#ifdef IOSYNC_LIVE_COMMANDS
 				static programList commandTargets;
 				static queue<applicationCommand> commandQueue;
@@ -861,6 +876,9 @@ namespace iosync
 			#endif
 
 			// Functions:
+			static void dynamicLink(iosync_application& application);
+			static void dynamicUnlink(iosync_application& application);
+
 			#ifdef IOSYNC_LIVE_COMMANDS
 				static inline bool pruneCommand(queue<applicationCommand>& commandQueue)
 				{
