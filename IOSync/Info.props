@@ -2,7 +2,7 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros">
-    <IOSync_Version>1.0.3</IOSync_Version>
+    <IOSync_Version>1.0.4</IOSync_Version>
   </PropertyGroup>
   <PropertyGroup />
   <ItemDefinitionGroup />

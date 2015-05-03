@@ -26,14 +26,14 @@
 
 // This is just so endless keyboard loops don't occur:
 #ifndef IOSYNC_FAST_TESTMODE
-	#define XINPUT_DEVICE_KEYBOARD
+	#define IOSYNC_DEVICE_KEYBOARD
 #endif
 
-#define XINPUT_DEVICE_GAMEPAD
+#define IOSYNC_DEVICE_GAMEPAD
 
-#ifdef XINPUT_DEVICE_GAMEPAD
+#ifdef IOSYNC_DEVICE_GAMEPAD
 	// Gamepads are currently auto-detected by default.
-	#define XINPUT_DEVICE_GAMEPAD_AUTODETECT
+	#define IOSYNC_DEVICE_GAMEPAD_AUTODETECT
 #endif
 
 //#define IOSYNC_LIVE_COMMANDS
@@ -598,7 +598,7 @@ namespace iosync
 				// The socket we'll use to send messages.
 				auto& socket = engine.socket;
 
-				#if defined(XINPUT_DEVICE_KEYBOARD)
+				#if defined(IOSYNC_DEVICE_KEYBOARD)
 					if (keyboardEnabled)
 					{
 						// Request for remote-keyboard access.
@@ -606,7 +606,7 @@ namespace iosync
 					}
 				#endif
 
-				#if defined(XINPUT_DEVICE_GAMEPAD) && !defined(XINPUT_DEVICE_GAMEPAD_AUTODETECT)
+				#if defined(IOSYNC_DEVICE_GAMEPAD) && !defined(IOSYNC_DEVICE_GAMEPAD_AUTODETECT)
 					if (gamepadsEnabled)
 					{
 						// Attempt to reserve a remote gamepad-identifier,

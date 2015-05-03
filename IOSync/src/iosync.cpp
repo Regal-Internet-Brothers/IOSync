@@ -252,7 +252,7 @@ namespace iosync
 
 		void connectedDevices::updateGamepads(iosync_application* program)
 		{
-			#if defined(XINPUT_DEVICE_GAMEPAD) && defined(XINPUT_DEVICE_GAMEPAD_AUTODETECT)
+			#if defined(IOSYNC_DEVICE_GAMEPAD) && defined(IOSYNC_DEVICE_GAMEPAD_AUTODETECT)
 				// Check if we're detecting gamepads:
 				if (program->allowDeviceDetection())
 				{
@@ -2220,11 +2220,24 @@ namespace iosync
 		// Apply device configurations:
 		devices.max_gamepads = configuration.max_gamepads;
 
-		devices.keyboardEnabled = configuration.keyboardEnabled;
-		devices.gamepadsEnabled = configuration.gamepadsEnabled;
+		#ifdef IOSYNC_DEVICE_KEYBOARD
+			devices.keyboardEnabled = configuration.keyboardEnabled;
+		#else
+			devices.keyboardEnabled = false;
+		#endif
 
-		#ifdef GAMEPAD_VJOY_ENABLED
-			devices.vJoyEnabled = configuration.vJoyEnabled;
+		#ifdef IOSYNC_DEVICE_GAMEPAD
+			devices.gamepadsEnabled = configuration.gamepadsEnabled;
+
+			#ifdef GAMEPAD_VJOY_ENABLED
+				devices.vJoyEnabled = configuration.vJoyEnabled;
+			#endif
+		#else
+			devices.gamepadsEnabled = false;
+
+			#ifdef GAMEPAD_VJOY_ENABLED
+				devices.vJoyEnabled = false;
+			#endif
 		#endif
 
 		switch (configuration.mode)
