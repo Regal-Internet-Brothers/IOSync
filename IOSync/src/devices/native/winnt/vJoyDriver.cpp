@@ -149,8 +149,11 @@
 
 						HMODULE module = NULL;
 
-						SHGetSpecialFolderPath(NULL, programFiles, CSIDL_PROGRAM_FILES, FALSE);
+						// Attempt to get the program-files directory:
+						if (!SUCCEEDED(SHGetSpecialFolderPath(NULL, (LPTSTR)programFiles, CSIDL_PROGRAM_FILES, FALSE)))
+							return NULL;
 
+						// Start reading dynamic arguments.
 						va_start(local_paths, paths);
 
 						// Output to the file-path buffer.
@@ -164,8 +167,10 @@
 								break;
 						}
 
+						// Stop reading dynamic arguments.
 						va_end(local_paths);
 
+						// Return the loaded module.
 						return module;
 					}
 

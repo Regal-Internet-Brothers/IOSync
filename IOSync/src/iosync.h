@@ -850,6 +850,9 @@ namespace iosync
 				bool useCmd;
 			};
 
+			// Constant variable(s):
+			static const wstring IOSYNC_APPDATA_DIRECTORY;
+
 			// Global variable(s):
 
 			// The number of application still linked to dynamic libraries.

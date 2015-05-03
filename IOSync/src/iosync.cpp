@@ -6,6 +6,9 @@
 #include <exception>
 #include <stdexcept>
 
+// Windows API:
+#include <Shlobj.h>
+
 // Namespace(s):
 namespace iosync
 {
@@ -1551,6 +1554,9 @@ namespace iosync
 		return;
 	}
 
+	// Constant variable(s):
+	const wstring iosync_application::IOSYNC_APPDATA_DIRECTORY = L"IOSync";
+
 	// Global variable(s):
 	size_t iosync_application::dynamicLinks = 0;
 
@@ -1579,23 +1585,26 @@ namespace iosync
 		dynamicLinks++;
 
 		#ifdef PLATFORM_WINDOWS
-			if (application.allowDeviceDetection())
+			if (application.devices.gamepadsEnabled)
 			{
-				if (xInputModule == NULL)
+				if (application.allowDeviceDetection())
 				{
-					xInputModule = REAL_XINPUT::linkTo();
-				}
-			}
-
-			#ifdef GAMEPAD_VJOY_DYNAMIC_LINK
-				if (application.allowDeviceSimulation() && application.devices.vJoyEnabled)
-				{
-					if (vJoyModule == NULL)
+					if (xInputModule == NULL)
 					{
-						vJoyModule = devices::vJoy::REAL_VJOY::linkTo();
+						xInputModule = REAL_XINPUT::linkTo();
 					}
 				}
-			#endif
+
+				#ifdef GAMEPAD_VJOY_DYNAMIC_LINK
+					if (application.allowDeviceSimulation() && application.devices.vJoyEnabled)
+					{
+						if (vJoyModule == NULL)
+						{
+							vJoyModule = devices::vJoy::REAL_VJOY::linkTo();
+						}
+					}
+				#endif
+			}
 		#endif
 
 		return;
@@ -1984,7 +1993,7 @@ namespace iosync
 									{
 										INIVariables<wstring> redirectionRep;
 
-										auto& application = redirectionRep[applicationConfiguration::APPLICATION_SECTION] = INISection<wstring>();
+										auto& application = (redirectionRep[applicationConfiguration::APPLICATION_SECTION] = INISection<wstring>());
 
 										application[applicationConfiguration::APPLICATION_CONFIG] = output_file;
 
@@ -1995,16 +2004,45 @@ namespace iosync
 								{
 									return applyConfiguration(configuration);
 								}
-								else
-								{
-									wcout << L"Would you like to log to this file? (\"" << output_file << L"\", Y/N): "; logChoices = userBoolean();
+								
+								wcout << L"Would you like to log to this file? (\"" << output_file << L"\", Y/N): "; logChoices = userBoolean();
 
-									if (!logChoices)
-									{
-										// Try asking the user again.
-										continue;
-									}
+								if (!logChoices)
+								{
+									// Try asking the user again.
+									continue;
 								}
+
+								#ifdef PLATFORM_WINDOWS
+									bool useAppData;
+										
+									wcout << L"Would you like to log to your application-data, instead? (Y/N): "; useAppData = userBoolean();
+
+									if (useAppData)
+									{
+										WCHAR appData[MAX_PATH];
+
+										if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_APPDATA, NULL, 0, (LPWSTR)appData))) // CSIDL_COMMON_APPDATA
+										{
+											wstringstream ss;
+
+											ss << appData << L"\\" << IOSYNC_APPDATA_DIRECTORY << L"\\" << output_file;
+
+											output_file = ss.str();
+										}
+										else
+										{
+											wcout << L"Unable to detect application-data path, would you like to write a local configuration, instead? (Y/N): ";
+											logChoices = userBoolean<wchar_t>(wcin);
+
+											if (!logChoices)
+											{
+												// Try asking the user again.
+												continue;
+											}
+										}
+									}
+								#endif
 							}
 						#endif
 

@@ -120,7 +120,7 @@ namespace iosync
 			static inline bool userBoolean(std::basic_istream<characterType, characterTraits>& is=cin)
 			{
 				// Local variable(s):
-				char choice; is >> choice;
+				characterType choice; is >> choice;
 
 				return isEnabled(choice);
 			}
