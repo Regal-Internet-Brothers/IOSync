@@ -1165,7 +1165,29 @@ namespace iosync
 	// Methods:
 	void iosync_application::applicationConfiguration::load(const wstring& path)
 	{
-		read(INI::load(path));
+		wifstream file;
+
+		file.open(path);
+		
+		if (file.fail())
+		{
+			file.close();
+
+			wstring remote_path;
+
+			if (__winnt__applyAppDataW(path, remote_path))
+			{
+				file.open(remote_path);
+			}
+
+			if (file.fail())
+			{
+				throw INI::fileNotFound<wstring::value_type>(path);
+			}
+		}
+
+		//read(INI::load(path));
+		read(file);
 
 		return;
 	}
@@ -1184,7 +1206,7 @@ namespace iosync
 		return;
 	}
 
-	void iosync_application::applicationConfiguration::read(wistream is)
+	void iosync_application::applicationConfiguration::read(wistream& is)
 	{
 		// Allocate an INI variable-container.
 		INI::INIVariables<wstring> variables;
@@ -1198,7 +1220,7 @@ namespace iosync
 		return;
 	}
 
-	void iosync_application::applicationConfiguration::write(wostream os)
+	void iosync_application::applicationConfiguration::write(wostream& os)
 	{
 		// Allocate an INI variable-container.
 		INI::INIVariables<wstring> variables;
@@ -1555,7 +1577,7 @@ namespace iosync
 	}
 
 	// Constant variable(s):
-	const wstring iosync_application::IOSYNC_APPDATA_DIRECTORY = L"IOSync";
+	const wstring iosync_application::IOSYNC_APPDATA_FOLDER = L"IOSync";
 
 	// Global variable(s):
 	size_t iosync_application::dynamicLinks = 0;
@@ -1810,7 +1832,27 @@ namespace iosync
 	#endif
 
 	#ifdef PLATFORM_WINDOWS
-		DWORD iosync_application::__winnt__getPIDW(wstring entry)
+		bool iosync_application::__winnt__applyAppDataW(const wstring& local_path, wstring& new_path_out)
+		{
+			WCHAR appData[MAX_PATH];
+
+			if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_APPDATA, NULL, 0, (LPWSTR)appData))) // CSIDL_COMMON_APPDATA
+			{
+				wstringstream ss;
+
+				ss << appData << L"\\" << IOSYNC_APPDATA_FOLDER << L"\\" << local_path;
+				//ss << appData << L"\\" << local_path;
+
+				new_path_out = ss.str();
+
+				return true;
+			}
+
+			// Return the default response.
+			return false;
+		}
+
+		DWORD iosync_application::__winnt__getPIDW(const wstring& entry)
 		{
 			DWORD PID = 0;
 
@@ -1829,6 +1871,20 @@ namespace iosync
 			}
 
 			return PID;
+		}
+
+		bool iosync_application::__winnt__createAppDataFolder()
+		{
+			wstring full_path;
+
+			if (__winnt__applyAppDataW(full_path))
+			{
+				if (CreateDirectoryW((LPCWSTR)full_path.c_str(), NULL) == TRUE || GetLastError() == ERROR_ALREADY_EXISTS) // IOSYNC_APPDATA_FOLDER
+					return true;
+			}
+
+			// Return the default response.
+			return false;
 		}
 	#endif
 
@@ -1922,11 +1978,39 @@ namespace iosync
 			try
 			{
 				// Local variable(s):
-				applicationConfiguration configuration;
+				wifstream file;
 
-				configuration.load();
+				file.open(applicationConfiguration::DEFAULT_PATH);
+				
+				if (file.fail())
+				{
+					file.close();
 
-				return applyConfiguration(configuration);
+					wstring path;
+
+					__winnt__applyAppDataW(applicationConfiguration::DEFAULT_PATH, path);
+
+					file.open(path);
+				}
+
+				if (!file.fail())
+				{
+					cout << "Would you like to load your configuration-file? (Y/N): ";
+					bool loadConfig = userBoolean();
+
+					if (loadConfig)
+					{
+						applicationConfiguration configuration;
+						configuration.read(file);
+
+						file.close();
+
+						return applyConfiguration(configuration);
+					}
+				}
+
+				// Explicitly closing this stream is generally unneeded, but I'm doing it anyway.
+				file.close();
 			}
 			catch
 			(
@@ -1940,121 +2024,110 @@ namespace iosync
 			{
 				#ifdef IOSYNC_TESTMODE
 					cout << "Exception caught: " << e.what() << endl;
+
+					cout << "Unable to load configuration: ";
 				#endif
+			}
 		#endif
-				#ifdef IOSYNC_CONSOLE_INPUT
+
+			#ifdef IOSYNC_CONSOLE_INPUT
+				#ifndef IOSYNC_FAST_TESTMODE
+					wstring output_file = applicationConfiguration::DEFAULT_PATH;	
+				#else
+					// Allocate a blank string on the stack.
+					wstring output_file;
+				#endif
+
+				do
+				{
+					bool logChoices = false;
+					bool newFile = false;
+
 					#ifndef IOSYNC_FAST_TESTMODE
-						wstring output_file = applicationConfiguration::DEFAULT_PATH;	
-						
-						cout << "Unable to load configuration: ";
-					#else
-						// Allocate a blank string on the stack.
-						wstring output_file;
+						cout << "Would you like to specify a custom configuration-file? (Y/N): "; newFile = userBoolean();
+							
+						if (!newFile)
+						{
+							cout << "Would you like to log new settings? (Y/N): "; logChoices = userBoolean();
+						}
+						else
+						{
+							cout << "Please specifiy a configuration file: ";
+							wcin >> output_file; // cout << endl;
+
+							// Local variable(s):
+							bool loadingWorked = false;
+							applicationConfiguration configuration;
+
+							try
+							{
+								configuration.load(output_file);
+
+								loadingWorked = true;
+							}
+							catch (exception&)
+							{
+								cout << "Unable to load custom configuration file." << endl;
+							}
+
+							cout << "Would you like this to be your default file? (Y/N): "; logChoices = userBoolean();
+
+							if (logChoices)
+							{
+								// If the user used the default file-name, don't bother redirecting.
+								if (output_file != applicationConfiguration::DEFAULT_PATH)
+								{
+									INIVariables<wstring> redirectionRep;
+
+									auto& application = (redirectionRep[applicationConfiguration::APPLICATION_SECTION] = INISection<wstring>());
+
+									application[applicationConfiguration::APPLICATION_CONFIG] = output_file;
+
+									save(applicationConfiguration::DEFAULT_PATH, redirectionRep);
+								}
+							}
+							else if (loadingWorked)
+							{
+								return applyConfiguration(configuration);
+							}
+								
+							wcout << L"Would you like to log to this file? (\"" << output_file << L"\", Y/N): "; logChoices = userBoolean();
+
+							if (!logChoices)
+							{
+								// Try asking the user again.
+								continue;
+							}
+
+							#ifdef PLATFORM_WINDOWS
+								bool useAppData;
+										
+								wcout << L"Would you like to log to your application-data, instead? (Y/N): "; useAppData = userBoolean();
+
+								if (useAppData)
+								{
+									if (__winnt__createAppDataFolder() && !__winnt__applyAppDataW(output_file))
+									{
+										wcout << L"Unable to detect application-data path, would you like to write a local configuration, instead? (Y/N): ";
+										logChoices = userBoolean<wchar_t>(wcin);
+
+										if (!logChoices)
+										{
+											// Try asking the user again.
+											continue;
+										}
+									}
+								}
+							#endif
+						}
 					#endif
 
-					do
-					{
-						bool logChoices = false;
-						bool newFile = false;
+					return applyCommandlineConfiguration(applicationConfiguration(mode), logChoices, output_file);
+				} while (true);
+			#endif
 
-						#ifndef IOSYNC_FAST_TESTMODE
-							cout << "Would you like to specify a custom configuration-file? (Y/N): "; newFile = userBoolean();
-							
-							if (!newFile)
-							{
-								cout << "Would you like to log new settings? (Y/N): "; logChoices = userBoolean();
-							}
-							else
-							{
-								cout << "Please specifiy a configuration file: ";
-								wcin >> output_file; // cout << endl;
-
-								// Local variable(s):
-								bool loadingWorked = false;
-								applicationConfiguration configuration;
-
-								try
-								{
-									configuration.load(output_file);
-
-									loadingWorked = true;
-								}
-								catch (exception&)
-								{
-									cout << "Unable to load custom configuration file." << endl;
-								}
-
-								cout << "Would you like this to be your default file? (Y/N): "; logChoices = userBoolean();
-
-								if (logChoices)
-								{
-									// If the user used the default file-name, don't bother redirecting.
-									if (output_file != applicationConfiguration::DEFAULT_PATH)
-									{
-										INIVariables<wstring> redirectionRep;
-
-										auto& application = (redirectionRep[applicationConfiguration::APPLICATION_SECTION] = INISection<wstring>());
-
-										application[applicationConfiguration::APPLICATION_CONFIG] = output_file;
-
-										save(applicationConfiguration::DEFAULT_PATH, redirectionRep);
-									}
-								}
-								else if (loadingWorked)
-								{
-									return applyConfiguration(configuration);
-								}
-								
-								wcout << L"Would you like to log to this file? (\"" << output_file << L"\", Y/N): "; logChoices = userBoolean();
-
-								if (!logChoices)
-								{
-									// Try asking the user again.
-									continue;
-								}
-
-								#ifdef PLATFORM_WINDOWS
-									bool useAppData;
-										
-									wcout << L"Would you like to log to your application-data, instead? (Y/N): "; useAppData = userBoolean();
-
-									if (useAppData)
-									{
-										WCHAR appData[MAX_PATH];
-
-										if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_APPDATA, NULL, 0, (LPWSTR)appData))) // CSIDL_COMMON_APPDATA
-										{
-											wstringstream ss;
-
-											ss << appData << L"\\" << IOSYNC_APPDATA_DIRECTORY << L"\\" << output_file;
-
-											output_file = ss.str();
-										}
-										else
-										{
-											wcout << L"Unable to detect application-data path, would you like to write a local configuration, instead? (Y/N): ";
-											logChoices = userBoolean<wchar_t>(wcin);
-
-											if (!logChoices)
-											{
-												// Try asking the user again.
-												continue;
-											}
-										}
-									}
-								#endif
-							}
-						#endif
-
-						return applyCommandlineConfiguration(applicationConfiguration(mode), logChoices, output_file);
-					} while (true);
-				#endif
-		#ifndef IOSYNC_FAST_TESTMODE
-			}
-
-			// If all else fails, host with the default port.
-			return execute(DEFAULT_PORT);
-		#endif
+		// If all else fails, host with the default port.
+		return execute(DEFAULT_PORT);
 	}
 
 	int iosync_application::execute(wstring username, string remoteAddress, addressPort remotePort, addressPort localPort)

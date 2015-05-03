@@ -829,8 +829,8 @@ namespace iosync
 				void load(const wstring& path=DEFAULT_PATH);
 				void save(const wstring& path=DEFAULT_PATH);
 
-				void read(wistream is);
-				void write(wostream os);
+				void read(wistream& is);
+				void write(wostream& os);
 
 				void read(const INI::INIVariables<wstring>& variables);
 				void write(INI::INIVariables<wstring>& variables);
@@ -851,7 +851,7 @@ namespace iosync
 			};
 
 			// Constant variable(s):
-			static const wstring IOSYNC_APPDATA_DIRECTORY;
+			static const wstring IOSYNC_APPDATA_FOLDER;
 
 			// Global variable(s):
 
@@ -982,7 +982,24 @@ namespace iosync
 			}
 
 			#ifdef PLATFORM_WINDOWS
-				static DWORD __winnt__getPIDW(wstring entry);
+				// This command appends the application-data path to the beginning of the string specified.
+				// This command may not assume that 'local_path' and 'new_path_out' are different.
+				// The return-value of this command determines if it succeeded.
+				// If this fails, the 'new_path_out' argument will not be modified.
+				static bool __winnt__applyAppDataW(const wstring& local_path, wstring& new_path_out);
+
+				// This command retrieves a PID from a valid process-identification entry.
+				static DWORD __winnt__getPIDW(const wstring& entry);
+
+				// This command returns true if the folder already exists, or if a new one was created.
+				static bool __winnt__createAppDataFolder();
+
+				// This implementation acts as shorthand for the main implementation.
+				// The rules applied to that implementation apply here.
+				static inline bool __winnt__applyAppDataW(wstring& new_path_out)
+				{
+					return __winnt__applyAppDataW(new_path_out, new_path_out);
+				}
 			#endif
 
 			// Constructor(s):
