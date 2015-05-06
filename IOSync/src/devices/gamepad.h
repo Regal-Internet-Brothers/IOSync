@@ -71,7 +71,19 @@ namespace iosync
 
 			typedef DWORD gamepadID;
 		#else
-			#error 'nativeGamepad' implementation required.
+			//#ifdef PLATFORM_LINUX
+			typedef struct virtual_nativeGamepad
+			{
+				unsigned int	buttons; // unsigned short
+				unsigned char	leftTrigger;
+				unsigned char	rightTrigger;
+
+				short			thumbLX;
+				short			thumbLY;
+				short			thumbRX;
+				short			thumbRY;
+			} nativeGamepad;
+			//#endif
 			
 			typedef unsigned char gamepadID;
 		#endif

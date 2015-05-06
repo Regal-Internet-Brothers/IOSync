@@ -36,8 +36,11 @@
 #include <cstdio>
 */
 
-#include <io.h>
-#include <fcntl.h>
+// Platform-specific:
+#ifdef PLATFORM_WINDOWS
+	#include <fcntl.h>
+	#include <io.h>
+#endif
 
 // Namespace(s):
 using namespace iosync;

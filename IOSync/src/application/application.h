@@ -7,13 +7,13 @@
 #include "application_exceptions.h"
 
 #include "../platform.h"
+#include "../util.h"
 #include "../networking/networking.h"
 
 #include <cstdio>
 
 #include <vector>
 #include <string>
-#include <codecvt>
 #include <iostream>
 
 // Namespace(s):
@@ -83,24 +83,16 @@ namespace iosync
 			static std::wstring path;
 
 			// Functions:
-			static inline string wideStringToDefault(const wstring wstr)
-			{
-				std::wstring_convert<std::codecvt_utf8<wchar_t>> stringConverter;
-
-				return stringConverter.to_bytes(wstr);
-			}
-
-			static inline wstring defaultStringToWide(const string str)
-			{
-				std::wstring_convert<std::codecvt_utf8<wchar_t>> stringConverter;
-
-				return stringConverter.from_bytes(str);
-			}
-
 			static inline void clearConsole()
 			{
-				// System-dependent, but it works.
-				system("CLS");
+				#ifdef PLATFORM_WINDOWS
+					// System-dependent, but it works.
+					system("CLS");
+				#elif defined(PLATFORM_LINUX)
+					system("clear");
+				#else
+					// Nothing so far.
+				#endif
 
 				return;
 			}
@@ -151,7 +143,7 @@ namespace iosync
 
 					CHAR cmd[MAX_PATH];
 
-					memcpy(cmd, commandLine.c_str(), min(commandLine.size(), MAX_PATH));
+					memcpy(cmd, commandLine.c_str(), std::min((size_t)commandLine.size(), (size_t)MAX_PATH));
 					cmd[commandLine.length()] = '\0';
 
 					// Start the specified program:

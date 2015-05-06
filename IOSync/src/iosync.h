@@ -78,7 +78,6 @@
 #include <iostream>
 #include <stack>
 #include <queue>
-#include <algorithm>
 
 #ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
 	#include <mutex>
@@ -927,7 +926,7 @@ namespace iosync
 			static inline nativePort portFromString(string portStr)
 			{
 				// Convert the port-string to lower-case.
-				transform(portStr.begin(), portStr.end(), portStr.begin(), tolower);
+				transformToLower(portStr);
 
 				// Check if the user didn't request the default port:
 				if (portStr != "default" || portStr == "d")

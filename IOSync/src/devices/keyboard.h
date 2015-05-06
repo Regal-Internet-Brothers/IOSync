@@ -3,8 +3,12 @@
 // Includes:
 #include "../platform.h"
 
-#ifndef PLATFORM_WINDOWS
-	#error Keyboard support is currently Windows-only.
+#if defined(PLATFORM_WINDOWS) || defined(PLATFORM_LINUX)
+	#define KEYBOARD_IMPLEMENTED
+#endif
+
+#ifndef KEYBOARD_IMPLEMENTED
+	#error Keyboard support unavailable.
 #else
 	#define KEYBOARD_GLOBAL_INPUT
 	//#define KEYBOARD_ALLOW_UNLINK

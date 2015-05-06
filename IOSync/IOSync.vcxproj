@@ -41,6 +41,7 @@
     <ClCompile Include="src\networking\messages.cpp" />
     <ClCompile Include="src\networking\networking.cpp" />
     <ClCompile Include="src\networking\packets.cpp" />
+    <ClCompile Include="src\util.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h" />

@@ -6,6 +6,10 @@
 #if defined(_WIN32) || defined(_WIN64)
 	#define PLATFORM_WINDOWS
 	#define PLATFORM_WINDOWS_EXTENSIONS
+#elif defined(__linux__)
+	#define PLATFORM_LINUX
+#elif defined(__APPLE__)
+	#define PLATFORM_MAC
 #endif
 
 #if defined(_WIN64)
@@ -23,6 +27,8 @@
 #endif
 
 #ifdef PLATFORM_WINDOWS
+	#define NOMINMAX
+	
 	#include <windows.h>
 #endif
 

@@ -6,6 +6,8 @@
 #include "../application/application.h"
 #include "../names.h"
 
+#include <algorithm>
+
 // Namespace(s):
 namespace iosync
 {
@@ -195,14 +197,15 @@ namespace iosync
 					#ifdef GAMEPAD_VJOY_SAFE
 						auto& device = vJoyInfo.getDevice(vJoyID);
 						auto axisInfo = device.getAxis(axis)->second;
-						auto axis_mid = ((axisInfo.max - axisInfo.min) / 2);
+
+						LONG axis_mid = ((axisInfo.max - axisInfo.min) / 2);
 
 						//return axis_mid + value;
 						//return axis_mid + max(axis_min, min(value, axis_max));
 						
-						auto scalar = max(axis_mid / maximum_value, 1);
+						auto scalar = max(axis_mid / ((LONG)maximum_value), 1L);
 
-						return max(axisInfo.min, min((LONG)(axis_mid + (value * scalar)), axisInfo.max));
+						return max(axisInfo.min, min((axis_mid + (value * scalar)), axisInfo.max));
 					#else
 						return value;
 					#endif
@@ -229,7 +232,7 @@ namespace iosync
 
 								auto value = m;
 								
-								int scalar = max(m / (UCHAR_MAX), 1);
+								int scalar = max(m / ((LONG)UCHAR_MAX), 1L);
 
 								if (state.native.Gamepad.bRightTrigger != 0)
 									value += ((state.native.Gamepad.bRightTrigger * scalar) + scalar);

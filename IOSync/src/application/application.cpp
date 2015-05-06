@@ -80,9 +80,9 @@ namespace iosync
 				args.clear();
 
 				// Create a standard argument-container:
-				for (unsigned i = 1; i < OSInfo.argc; i++)
+				for (unsigned i = 1; i < info.argc; i++)
 				{
-					args.push_back(defaultStringToWide(argv[i]));
+					args.push_back(defaultStringToWide(info.argv[i]));
 				}
 
 				//args = arguments(OSInfo.argv + 1, OSInfo.argv + OSInfo.argc);

@@ -99,6 +99,9 @@
     <ClCompile Include="src\devices\native\winnt\vJoyDriver.cpp">
       <Filter>Source Files\devices\native\winnt</Filter>
     </ClCompile>
+    <ClCompile Include="src\util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\networking\address.h">

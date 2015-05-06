@@ -66,7 +66,7 @@ namespace iosync
 				// Ensure we have a separator.
 				if (addressDivider != basic_string<characterType, characterTraits, strAlloc>::npos)
 				{
-					IP = QSocket::StringToIntIP(quickLib::INI::abstractStringToDefault(input.substr(0, addressDivider)));
+					IP = QSocket::StringToIntIP(abstractStringToDefault(input.substr(0, addressDivider)));
 
 					try
 					{
@@ -84,7 +84,7 @@ namespace iosync
 				}
 				else
 				{
-					IP = QSocket::nonNativeToNativeIP(quickLib::INI::abstractStringToDefault(input));
+					IP = QSocket::nonNativeToNativeIP(abstractStringToDefault(input));
 				}
 
 				port = default_port;
@@ -99,7 +99,7 @@ namespace iosync
 				basic_stringstream<characterType, characterTraits, strAlloc> ss;
 				basic_string<characterType, characterTraits, strAlloc> str;
 
-				quickLib::INI::correctString(QSocket::representIP(IP) + ADDRESS_SEPARATOR, str);
+				correctString(QSocket::representIP(IP) + ADDRESS_SEPARATOR, str);
 
 				ss << str << port;
 
@@ -163,7 +163,7 @@ namespace iosync
 				// Ensure we have a separator.
 				if (addressDivider != basic_string<characterType, characterTraits, strAlloc>::npos)
 				{
-					IP = quickLib::INI::abstractStringToDefault(input.substr(0, addressDivider));
+					IP = abstractStringToDefault(input.substr(0, addressDivider));
 
 					try
 					{
@@ -181,7 +181,7 @@ namespace iosync
 				}
 				else
 				{
-					IP = quickLib::INI::abstractStringToDefault(input);
+					IP = abstractStringToDefault(input);
 				}
 
 				port = default_port;
@@ -196,7 +196,7 @@ namespace iosync
 				basic_stringstream<characterType, characterTraits, strAlloc> ss;
 				basic_string<characterType, characterTraits, strAlloc> str;
 
-				quickLib::INI::correctString(IP, str);
+				correctString(IP, str);
 
 				ss << str << ADDRESS_SEPARATOR << port;
 

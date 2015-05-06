@@ -7,7 +7,9 @@
 #include <stdexcept>
 
 // Windows API:
-#include <Shlobj.h>
+#ifdef PLATFORM_WINDOWS
+	#include <Shlobj.h>
+#endif
 
 // Namespace(s):
 namespace iosync
@@ -58,13 +60,15 @@ namespace iosync
 
 		void update(application* program)
 		{
-			MSG message;
+			#ifdef PLATFORM_WINDOWS
+				MSG message;
 
-			// The 'windowInstance' argument may cause problems.
-			GetMessage(&message, windowInstance, 0, 0);
+				// The 'windowInstance' argument may cause problems.
+				GetMessage(&message, windowInstance, 0, 0);
 
-			TranslateMessage(&message);
-			DispatchMessage(&message);
+				TranslateMessage(&message);
+				DispatchMessage(&message);
+			#endif
 
 			return;
 		}
@@ -271,16 +275,19 @@ namespace iosync
 							// Check if a gamepad with the 'i' identifier is connected:
 							if (!connected)
 							{
-								if (gp::__winnt__pluggedIn(i))
-								{
-									// Tell the remote host that a gamepad was connected.
-									sendGamepadConnectMessage(*program->network, program->network->socket, DESTINATION_HOST);
+								// This is currently Windows-only:
+								#ifdef PLATFORM_WINDOWS
+									if (gp::__winnt__pluggedIn(i))
+									{
+										// Tell the remote host that a gamepad was connected.
+										sendGamepadConnectMessage(*program->network, program->network->socket, DESTINATION_HOST);
 
-									//sendGamepadConnectMessage(*program->network, program->network->socket, i, DESTINATION_HOST);
+										//sendGamepadConnectMessage(*program->network, program->network->socket, i, DESTINATION_HOST);
 
-									// Add this identifier, so we don't bother trying to connect with it redundantly.
-									reservedGamepads.insert(i);
-								}
+										// Add this identifier, so we don't bother trying to connect with it redundantly.
+										reservedGamepads.insert(i);
+									}
+								#endif
 							}
 							else
 							{
@@ -1167,23 +1174,33 @@ namespace iosync
 	{
 		wifstream file;
 
-		file.open(path);
+		#ifdef QINI_WIDE_PATHS
+			file.open(path);
+		#else
+			file.open(wideStringToDefault(path));
+		#endif
 		
 		if (file.fail())
 		{
-			file.close();
+			#ifdef PLATFORM_WINDOWS
+				file.close();
 
-			wstring remote_path;
+				wstring remote_path;
 
-			if (__winnt__applyAppDataW(path, remote_path))
-			{
-				file.open(remote_path);
-			}
+				if (__winnt__applyAppDataW(path, remote_path))
+				{
+					#ifdef QINI_WIDE_PATHS
+						file.open(remote_path);
+					#else
+						file.open(wideStringToDefault(remote_path));
+					#endif
+				}
 
-			if (file.fail())
-			{
-				throw INI::fileNotFound<wstring::value_type>(path);
-			}
+				if (file.fail())
+				{
+					throw INI::fileNotFound<wstring::value_type>(path);
+				}
+			#endif
 		}
 
 		//read(INI::load(path));
@@ -1320,7 +1337,7 @@ namespace iosync
 					catch (std::invalid_argument&)
 					{
 						// Make the maximum-gamepads string lowercase.
-						transform(max_gpds_str.begin(), max_gpds_str.end(), max_gpds_str.begin(), tolower);
+						transformToLower(max_gpds_str);
 
 						// Compare this string against the fall-back string (Maximum number of gamepads):
 						if (max_gpds_str == DEVICES_GAMEPADS_MAXIMUM)
@@ -1964,6 +1981,27 @@ namespace iosync
 
 					return 0;
 				}
+				else
+				{
+					#ifdef IOSYNC_TESTMODE
+						devices::keyboardAction action;
+
+						if (toLower(args[0]) == L"keydown")
+						{
+							action.type = devices::keyboardActionType::ACTION_TYPE_DOWN;
+						}
+						else
+						{
+							action.type = devices::keyboardActionType::ACTION_TYPE_RELEASE;
+						}
+
+						action.key = stoi(args[1]);
+
+						devices::keyboard::simulateAction(action);
+
+						return 0;
+					#endif
+				}
 			#endif
 
 			return execute((argCount > 2) ? args[2] : DEFAULT_PLAYER_NAME, wideStringToDefault(args[0]), (addressPort)stoi(args[1]));
@@ -1980,18 +2018,28 @@ namespace iosync
 				// Local variable(s):
 				wifstream file;
 
-				file.open(applicationConfiguration::DEFAULT_PATH);
+				#ifdef QINI_WIDE_PATHS
+					file.open(applicationConfiguration::DEFAULT_PATH);
+				#else
+					file.open(wideStringToDefault(applicationConfiguration::DEFAULT_PATH));
+				#endif
 				
-				if (file.fail())
-				{
-					file.close();
+				#ifdef PLATFORM_WINDOWS
+					if (file.fail())
+					{
+						file.close();
 
-					wstring path;
+						wstring path;
 
-					__winnt__applyAppDataW(applicationConfiguration::DEFAULT_PATH, path);
+						__winnt__applyAppDataW(applicationConfiguration::DEFAULT_PATH, path);
 
-					file.open(path);
-				}
+						#ifdef QINI_WIDE_PATHS
+							file.open(path);
+						#else
+							file.open(wideStringToDefault(path));
+						#endif
+					}
+				#endif
 
 				if (!file.fail())
 				{
@@ -2122,7 +2170,11 @@ namespace iosync
 						}
 					#endif
 
-					return applyCommandlineConfiguration(applicationConfiguration(mode), logChoices, output_file);
+					{
+						applicationConfiguration output(mode);
+
+						return applyCommandlineConfiguration(output, logChoices, output_file);
+					}
 				} while (true);
 			#endif
 
@@ -2339,26 +2391,28 @@ namespace iosync
 						configuration.remoteAddress.port = requestPort(cin); // cout << endl;
 					#endif
 
-					#ifndef IOSYNC_FAST_TESTMODE_SINGLE_INPUT
-						wstring entry;
+					#ifdef PLATFORM_WINDOWS
+						#ifndef IOSYNC_FAST_TESTMODE_SINGLE_INPUT
+							wstring entry;
 
-						cout << "Please specify a PID, window, or process name to apply XInput injection (0 = None): ";
-						wcin >> entry; // cout << endl;
+							cout << "Please specify a PID, window, or process name to apply XInput injection (0 = None): ";
+							wcin >> entry; // cout << endl;
 
-						if (entry != L"0" && entry != L"None")
-						{
-							DWORD PID = __winnt__getPIDW(entry);
-
-							if (PID != 0)
+							if (entry != L"0" && entry != L"None")
 							{
-								devices::gamepad::__winnt__injectLibrary(PID);
+								DWORD PID = __winnt__getPIDW(entry);
 
-								if (logChoices)
+								if (PID != 0)
 								{
-									configuration.PIDs.push(PID);
+									devices::gamepad::__winnt__injectLibrary(PID);
+
+									if (logChoices)
+									{
+										configuration.PIDs.push(PID);
+									}
 								}
 							}
-						}
+						#endif
 					#endif
 				}
 
