@@ -112,8 +112,18 @@ namespace iosync
 		// Functions:
 		nativeResponseCode outputDevice::sendNativeSystemInput(nativeDeviceInterface* items, size_t itemCount)
 		{
-			#ifdef PLATFORM_WINDOWS
+			#if defined(PLATFORM_WINDOWS)
 				return SendInput((UINT)itemCount, (LPINPUT)items, (int)sizeof(nativeDeviceInterface));
+			#elif defined(PLATFORM_LINUX)
+				nativeResponseCode response = nativeResponseCode();
+				
+				// Send each of the input-operations specified.
+				for (size_t i = 0; i < itemCount; i++)
+				{
+					response += write(items[i].deviceDescriptor, &items[i].input, sizeof(items[i].input));
+				}
+
+				return response;
 			#else
 				return (nativeResponseCode)0;
 			#endif

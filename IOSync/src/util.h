@@ -59,6 +59,22 @@ namespace iosync
 		return;
 	}
 
+	template <typename inputStr, typename characterType, typename characterTraits = char_traits<characterType>, typename strAlloc = allocator<characterType>>
+	inline basic_string<characterType, characterTraits, strAlloc> convertString(const inputStr& str)
+	{
+		basic_string<characterType, characterTraits, strAlloc> output;
+
+		correctString(str, output);
+
+		return output;
+	}
+
+	template <typename characterType, typename characterTraits = char_traits<characterType>, typename strAlloc = allocator<characterType>>
+	inline basic_string<characterType, characterTraits, strAlloc> convertStringA(const char* str)
+	{
+		return convertString<const char*, characterType, characterTraits, strAlloc>(str);
+	}
+
 	inline string abstractStringToDefault(const string& str)
 	{
 		return str;

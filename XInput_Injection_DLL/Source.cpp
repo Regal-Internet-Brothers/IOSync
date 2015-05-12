@@ -133,7 +133,11 @@ extern "C"
 	{
 		if (pluggedIn[dwUserIndex])
 		{
-			return ::XInputGetState(dwUserIndex, pState);
+			*pState = gamepadStates[dwUserIndex];
+
+			//return ::XInputGetState(dwUserIndex, pState);
+
+			return ERROR_SUCCESS;
 		}
 
 		return REAL_XINPUT::XInputGetStateEx(dwUserIndex, pState);

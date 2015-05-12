@@ -75,8 +75,8 @@ int runProgram(OSINFO OSInfo, rate updateRate=DEFAULT_UPDATERATE)
 				cout << "Unable to continue operations; exiting..." << endl;
 				cout << "Error code thrown by application: " << responseCode << endl;
 
-				cout << "Press any key to continue..."; cin.get();
-
+				//cout << "Press any key to continue..."; getchar(); cout << endl;
+				
 				// Return the response-code.
 				return responseCode;
 			}

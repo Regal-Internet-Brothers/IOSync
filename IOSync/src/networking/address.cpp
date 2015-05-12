@@ -38,7 +38,7 @@ namespace iosync
 
 		address::address(nonNativeIP address, addressPort remotePort) : port(remotePort)
 		{
-			IP = QSocket::nonNativeToNativeIP(address);
+			IP = basic_socket::nonNativeToNativeIP(address);
 		}
 
 		address::address(const QSocket& socket) : address(socket.msgIP(), socket.msgPort())

@@ -14,115 +14,117 @@
 // Namespace(s):
 namespace iosync
 {
-	namespace sharedWindow
-	{
-		// Global variable(s):
-		nativeWindow windowInstance = WINDOW_NONE;
-
-		#ifdef PLATFORM_WINDOWS
-			bool __winnt__classRegisted = false;
-		#endif
-
-		// Functions:
-		nativeWindow open(OSINFO OSInfo)
+	#ifdef IOSYNC_SHAREDWINDOW_IMPLEMENTED
+		namespace sharedWindow
 		{
-			#ifdef PLATFORM_WINDOWS_EXTENSIONS
-				if (isOpen())
-					return windowInstance;
+			// Global variable(s):
+			nativeWindow windowInstance = WINDOW_NONE;
 
-				if (!__winnt__classRegisted)
-					__winnt__registerClass(OSInfo);
-
-				windowInstance = CreateWindowEx
-				(
-					WS_EX_CLIENTEDGE,
-					__winnt__windowClassName,
-					NULL, WS_OVERLAPPEDWINDOW,
-					CW_USEDEFAULT, CW_USEDEFAULT,
-
-					128, 128, NULL, NULL,
-					OSInfo.hInstance, NULL
-				);
-
-				if (windowInstance == WINDOW_NONE)
-				{
-					MessageBox(NULL, "O_O", "Snooping as usual, I see.", MB_ICONEXCLAMATION | MB_OK);
-
-					return WINDOW_NONE;
-				}
-
-				//ShowWindow(windowInstance, OSInfo.nCmdShow);
-				UpdateWindow(windowInstance);
-			#endif
-			
-			return windowInstance;
-		}
-
-		void update(application* program)
-		{
 			#ifdef PLATFORM_WINDOWS
-				MSG message;
-
-				// The 'windowInstance' argument may cause problems.
-				GetMessage(&message, windowInstance, 0, 0);
-
-				TranslateMessage(&message);
-				DispatchMessage(&message);
+				bool __winnt__classRegisted = false;
 			#endif
 
-			return;
-		}
-
-		bool isOpen()
-		{
-			return (windowInstance != WINDOW_NONE);
-		}
-
-		// Windows-specific:
-		#ifdef PLATFORM_WINDOWS
-			LRESULT CALLBACK __winnt__WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+			// Functions:
+			nativeWindow open(OSINFO OSInfo)
 			{
-				//networkLog << "Message: " << msg << endl;
+				#ifdef PLATFORM_WINDOWS_EXTENSIONS
+					if (isOpen())
+						return windowInstance;
 
-				switch(msg)
+					if (!__winnt__classRegisted)
+						__winnt__registerClass(OSInfo);
+
+					windowInstance = CreateWindowEx
+					(
+						WS_EX_CLIENTEDGE,
+						__winnt__windowClassName,
+						NULL, WS_OVERLAPPEDWINDOW,
+						CW_USEDEFAULT, CW_USEDEFAULT,
+
+						128, 128, NULL, NULL,
+						OSInfo.hInstance, NULL
+					);
+
+					if (windowInstance == WINDOW_NONE)
+					{
+						MessageBox(NULL, "O_O", "Snooping as usual, I see.", MB_ICONEXCLAMATION | MB_OK);
+
+						return WINDOW_NONE;
+					}
+
+					//ShowWindow(windowInstance, OSInfo.nCmdShow);
+					UpdateWindow(windowInstance);
+				#endif
+			
+				return windowInstance;
+			}
+
+			void update(application* program)
+			{
+				#ifdef PLATFORM_WINDOWS
+					MSG message;
+
+					// The 'windowInstance' argument may cause problems.
+					GetMessage(&message, windowInstance, 0, 0);
+
+					TranslateMessage(&message);
+					DispatchMessage(&message);
+				#endif
+
+				return;
+			}
+
+			bool isOpen()
+			{
+				return (windowInstance != WINDOW_NONE);
+			}
+
+			// Windows-specific:
+			#ifdef PLATFORM_WINDOWS
+				LRESULT CALLBACK __winnt__WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 				{
-					case WM_CLOSE:
-						DestroyWindow(hwnd);
+					//networkLog << "Message: " << msg << endl;
 
-						break;
-					case WM_DESTROY:
-						PostQuitMessage(0);
+					switch(msg)
+					{
+						case WM_CLOSE:
+							DestroyWindow(hwnd);
 
-						break;
-					default:
-						return DefWindowProc(hwnd, msg, wParam, lParam);
+							break;
+						case WM_DESTROY:
+							PostQuitMessage(0);
+
+							break;
+						default:
+							return DefWindowProc(hwnd, msg, wParam, lParam);
+					}
+
+					return 0;
 				}
 
-				return 0;
-			}
+				bool __winnt__registerClass(OSINFO OSInfo)
+				{
+					WNDCLASSEX wc;
 
-			bool __winnt__registerClass(OSINFO OSInfo)
-			{
-				WNDCLASSEX wc;
+					wc.cbSize        = sizeof(WNDCLASSEX);
+					wc.style         = 0;
+					wc.lpfnWndProc   = &__winnt__WndProc;
+					wc.cbClsExtra    = 0;
+					wc.cbWndExtra    = 0;
+					wc.hInstance     = OSInfo.hInstance;
+					wc.hIcon         = LoadIcon(NULL, IDI_APPLICATION);
+					wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
+					wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
+					wc.lpszMenuName  = NULL;
+					wc.lpszClassName = __winnt__windowClassName;
+					wc.hIconSm       = LoadIcon(NULL, IDI_APPLICATION);
 
-				wc.cbSize        = sizeof(WNDCLASSEX);
-				wc.style         = 0;
-				wc.lpfnWndProc   = &__winnt__WndProc;
-				wc.cbClsExtra    = 0;
-				wc.cbWndExtra    = 0;
-				wc.hInstance     = OSInfo.hInstance;
-				wc.hIcon         = LoadIcon(NULL, IDI_APPLICATION);
-				wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
-				wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
-				wc.lpszMenuName  = NULL;
-				wc.lpszClassName = __winnt__windowClassName;
-				wc.hIconSm       = LoadIcon(NULL, IDI_APPLICATION);
-
-				// Attempt to register the window-class, and return the result.
-				return __winnt__classRegisted = (RegisterClassEx(&wc) == ATOM());
-			}
-		#endif
-	}
+					// Attempt to register the window-class, and return the result.
+					return __winnt__classRegisted = (RegisterClassEx(&wc) == ATOM());
+				}
+			#endif
+		}
+	#endif
 
 	// Exception types:
 	namespace exceptions
@@ -973,6 +975,8 @@ namespace iosync
 							{
 								return DEVICE_TYPE_NOT_FOUND;
 							}
+
+							break;
 						default:
 							// Tell the user we couldn't find a device.
 							return DEVICE_TYPE_NOT_FOUND;
@@ -1626,7 +1630,8 @@ namespace iosync
 		#ifdef PLATFORM_WINDOWS
 			if (application.devices.gamepadsEnabled)
 			{
-				if (application.allowDeviceDetection())
+				// XInput is used by applications which simulate:
+				if (application.allowDeviceDetection() || application.allowDeviceSimulation())
 				{
 					if (xInputModule == NULL)
 					{
@@ -2086,6 +2091,10 @@ namespace iosync
 					wstring output_file;
 				#endif
 
+				#ifndef IOSYNC_WIDE_IO
+					string output_fileA = wideStringToDefault(output_file);
+				#endif
+
 				do
 				{
 					bool logChoices = false;
@@ -2101,7 +2110,16 @@ namespace iosync
 						else
 						{
 							cout << "Please specifiy a configuration file: ";
-							wcin >> output_file; // cout << endl;
+
+							#ifdef IOSYNC_WIDE_IO
+								wcin >> output_file;
+							#else
+								cin >> output_fileA;
+
+								output_file = defaultStringToWide(output_fileA);
+							#endif
+							
+							// cout << endl;
 
 							// Local variable(s):
 							bool loadingWorked = false;
@@ -2138,8 +2156,12 @@ namespace iosync
 							{
 								return applyConfiguration(configuration);
 							}
-								
-							wcout << L"Would you like to log to this file? (\"" << output_file << L"\", Y/N): "; logChoices = userBoolean();
+							
+							#ifdef IOSYNC_WIDE_IO
+								wcout << L"Would you like to log to this file? (\"" << output_file << L"\", Y/N): "; logChoices = userBoolean(wcin);
+							#else
+								cout << "Would you like to log to this file? (\"" << output_fileA << "\", Y/N): "; logChoices = userBoolean();
+							#endif
 
 							if (!logChoices)
 							{
@@ -2149,15 +2171,16 @@ namespace iosync
 
 							#ifdef PLATFORM_WINDOWS
 								bool useAppData;
-										
-								wcout << L"Would you like to log to your application-data, instead? (Y/N): "; useAppData = userBoolean();
+								
+								cout << "Would you like to log to your application-data, instead? (Y/N): "; useAppData = userBoolean();
 
 								if (useAppData)
 								{
 									if (__winnt__createAppDataFolder() && !__winnt__applyAppDataW(output_file))
 									{
-										wcout << L"Unable to detect application-data path, would you like to write a local configuration, instead? (Y/N): ";
-										logChoices = userBoolean<wchar_t>(wcin);
+										cout << "Unable to detect application-data path, would you like to write a local configuration, instead? (Y/N): ";
+
+										logChoices = userBoolean();
 
 										if (!logChoices)
 										{
@@ -2316,7 +2339,21 @@ namespace iosync
 							// Check if we have a username:
 							if (configuration.username.empty())
 							{
-								cout << "Please supply a username: "; wcin >> configuration.username; // cout << endl;
+								cout << "Please supply a username (No spaces): ";
+
+								#ifdef IOSYNC_WIDE_IO
+									wcin >> configuration.username;
+								#else
+									{
+										string user;
+
+										cin >> user;
+
+										configuration.username = defaultStringToWide(user);
+									}
+								#endif
+
+								//cout << endl;
 							}
 						}
 						else
@@ -2372,7 +2409,21 @@ namespace iosync
 					// Request an address from the user.
 					requestAddress(configuration.remoteAddress);
 
-					cout << "Please enter a username (No spaces): "; wcin >> configuration.username; // cout << endl;
+					cout << "Please enter a username (No spaces): ";
+					
+					#ifdef IOSYNC_WIDE_IO
+						wcin >> configuration.username;
+					#else
+						{
+							string user;
+							
+							cin >> user;
+
+							configuration.username = defaultStringToWide(user);
+						}
+					#endif
+
+					//cout << endl;
 				#else
 					//configuration.remoteAddress.IP = "127.0.0.1";
 				#endif
@@ -2396,7 +2447,18 @@ namespace iosync
 							wstring entry;
 
 							cout << "Please specify a PID, window, or process name to apply XInput injection (0 = None): ";
-							wcin >> entry; // cout << endl;
+
+							#ifdef IOSYNC_WIDE_IO
+								wcin >> entry; // cout << endl;
+							#else
+								{
+									string userInput;
+
+									cin >> userInput;
+
+									entry = defaultStringToWide(userInput);
+								}
+							#endif
 
 							if (entry != L"0" && entry != L"None")
 							{
@@ -2440,11 +2502,13 @@ namespace iosync
 		// Set the internal application-mode.
 		this->mode = mode;
 
-		// Attempt to open the internal window.
-		this->window = sharedWindow::open(OSInfo);
+		#ifdef IOSYNC_SHAREDWINDOW_IMPLEMENTED
+			// Attempt to open the internal window.
+			this->window = sharedWindow::open(OSInfo);
 
-		if (window == WINDOW_NONE)
-			throw noWindowException(this);
+			if (window == WINDOW_NONE)
+				throw noWindowException(this);
+		#endif
 
 		// Link with any dynamic modules we may need.
 		dynamicLink(*this);
@@ -2469,7 +2533,9 @@ namespace iosync
 		// Un-link any dynamic modules we're using.
 		dynamicUnlink(*this);
 
-		//sharedWindow::close();
+		#ifdef IOSYNC_SHAREDWINDOW_IMPLEMENTED
+			//sharedWindow::close();
+		#endif
 
 		return;
 	}
@@ -2546,7 +2612,7 @@ namespace iosync
 
 	void iosync_application::checkDeviceMessages()
 	{
-		#ifdef PLATFORM_WINDOWS
+		#if defined(PLATFORM_WINDOWS) && defined(IOSYNC_SHAREDWINDOW_IMPLEMENTED)
 			MSG message;
 			LPBYTE lpb;
 			UINT dwSize;
@@ -2663,6 +2729,8 @@ namespace iosync
 	// Call-backs:
 	void iosync_application::onNetworkConnected(networkEngine& engine)
 	{
+		networkLog << "Connected to server, sending device connection-requests..." << endl;
+
 		/*
 			// Handled through safe call-back messages now:
 
@@ -2672,7 +2740,14 @@ namespace iosync
 
 		// Tell the host to connect the devices we have.
 		// If they accept, we will receive messages to connect our devices.
-		devices.sendConnectionRequests(engine, DESTINATION_HOST);
+		if (devices.sendConnectionRequests(engine, DESTINATION_HOST) > 0)
+		{
+			networkLog << "Device messages sent, waiting for a response." << endl;
+		}
+		else
+		{
+			networkLog << "Initial device-messages unneeded." << endl;
+		}
 
 		return;
 	}
@@ -2724,10 +2799,12 @@ namespace iosync
 		return;
 	}
 
-	nativeWindow iosync_application::getWindow() const
-	{
-		return sharedWindow::windowInstance;
-	}
+	#ifdef IOSYNC_SHAREDWINDOW_IMPLEMENTED
+		nativeWindow iosync_application::getWindow() const
+		{
+			return sharedWindow::windowInstance;
+		}
+	#endif
 
 	#ifdef PLATFORM_WINDOWS
 		void iosync_application::__winnt__readFromDevice(RAWINPUT* rawDevice)

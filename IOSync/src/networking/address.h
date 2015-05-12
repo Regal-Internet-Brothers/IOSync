@@ -84,7 +84,7 @@ namespace iosync
 				}
 				else
 				{
-					IP = QSocket::nonNativeToNativeIP(abstractStringToDefault(input));
+					IP = basic_socket::nonNativeToNativeIP(abstractStringToDefault(input));
 				}
 
 				port = default_port;
@@ -158,6 +158,9 @@ namespace iosync
 			template <typename characterType=char, typename characterTraits=char_traits<characterType>, typename strAlloc=allocator<characterType>>
 			inline bool parse(const basic_string<characterType, characterTraits, strAlloc>& input, addressPort default_port)
 			{
+				// Constant variable(s):
+				static const auto defaultPortStr = convertStringA<characterType, characterTraits, strAlloc>("default");
+
 				auto addressDivider = input.find(ADDRESS_SEPARATOR);
 
 				// Ensure we have a separator.
@@ -167,7 +170,18 @@ namespace iosync
 
 					try
 					{
-						port = stoi(input.substr(addressDivider+1));
+						auto portStr = input.substr(addressDivider+1);
+
+						transformToLower<characterType, characterTraits, strAlloc>(portStr);
+
+						if (portStr == defaultPortStr)
+						{
+							port = default_port;
+
+							return true;
+						}
+
+						port = stoi(portStr);
 
 						if (port == 0)
 							port = default_port;
@@ -176,7 +190,7 @@ namespace iosync
 					}
 					catch (invalid_argument&)
 					{
-						//port = 0;
+						// Nothing so far.
 					}
 				}
 				else

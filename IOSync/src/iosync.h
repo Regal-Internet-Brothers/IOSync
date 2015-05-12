@@ -92,6 +92,15 @@
 	#include <mutex>
 #endif
 
+#ifdef PLATFORM_WINDOWS
+	// This specifies if 'sharedWindow' is implemented.
+	#define IOSYNC_SHAREDWINDOW_IMPLEMENTED
+	
+	// If disabled, fallbacks may be used to compensate for the lack of wide I/O streams.
+	// Behavior with this disabled is partially undefined.
+	#define IOSYNC_WIDE_IO
+#endif
+
 // Libraries:
 #ifdef PLATFORM_WINDOWS
 	// Required for advanced process management.
@@ -1072,7 +1081,9 @@ namespace iosync
 			void onNetworkClientTimedOut(networkEngine& engine, player& p) override;
 			void onNetworkClosed(networkEngine& engine) override;
 
-			nativeWindow getWindow() const override;
+			#ifdef IOSYNC_SHAREDWINDOW_IMPLEMENTED
+				nativeWindow getWindow() const override;
+			#endif
 
 			// Platform-specific extensions:
 			#ifdef PLATFORM_WINDOWS
@@ -1110,8 +1121,10 @@ namespace iosync
 			// The "mode" of this application.
 			applicationMode mode;
 
-			// The window this application is tied to.
-			nativeWindow window;
+			#ifdef IOSYNC_SHAREDWINDOW_IMPLEMENTED
+				// The window this application is tied to.
+				nativeWindow window;
+			#endif
 
 			#ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
 				mutex asyncExecutionMutex;

@@ -6,7 +6,7 @@
 
 #include "../application/application.h"
 
-#include <iostream>
+//#include <iostream>
 
 // Namespace(s):
 using namespace std;
@@ -234,9 +234,9 @@ namespace iosync
 
 		bool networkEngine::updateSocket(QSocket& socket)
 		{
-			socket.update();
+			auto received = socket.update();
 
-			return socket.msgAvail();
+			return (socket.msgAvail());
 		}
 
 		void networkEngine::updatePacketsInTransit(QSocket& socket)
@@ -635,7 +635,7 @@ namespace iosync
 			if (!socket.connect(remoteAddress, remotePort, localPort))
 				return false;
 
-			master.IP = QSocket::nonNativeToNativeIP(remoteAddress);
+			master.IP = basic_socket::nonNativeToNativeIP(remoteAddress);
 			master.port = remotePort;
 
 			// Set the remote address of this object to the master-address.
@@ -955,8 +955,22 @@ namespace iosync
 		// Simple messages:
 		void serverNetworkEngine::pingRemoteConnection(QSocket& socket)
 		{
-			// Send "ping" messages to every player.
-			sendPing(socket);
+			// Generate a ping-message.
+			generatePingMessage(socket);
+
+			// Send "ping" messages to every player:
+			for (auto p : players)
+			{
+				sendMessage(socket, p->remoteAddress, false);
+
+				// Update this player's connection-snapshot.
+				p->updateSnapshot();
+			}
+
+			// Flush the output-stream.
+			socket.flushOutput();
+
+			//sendPing(socket);
 
 			return;
 		}
@@ -1011,11 +1025,10 @@ namespace iosync
 					p->updateSnapshot();
 
 					break;
-
 				case MESSAGE_TYPE_PONG:
 					// Set this player's ping to the number
 					// of milliseconds since it was requested.
-					p->ping = connectionTime();
+					p->ping = p->connectionTime();
 
 					// Update the time-snapshot of this player, so they don't time-out.
 					p->updateSnapshot();

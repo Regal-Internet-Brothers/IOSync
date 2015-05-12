@@ -630,7 +630,18 @@ namespace iosync
 				}
 
 				// This command allows you to retrieve a player-entry from the 'players' list.
-				inline player* getPlayer(address addr, address vaddr = address())
+				inline player* getPlayer(address addr)
+				{
+					for (auto p : players)
+					{
+						if (p->remoteAddress == addr)
+							return p;
+					}
+
+					return nullptr;
+				}
+
+				inline player* getPlayer(address addr, address vaddr)
 				{
 					for (auto p : players)
 					{

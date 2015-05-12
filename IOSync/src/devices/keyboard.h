@@ -11,7 +11,12 @@
 	#error Keyboard support unavailable.
 #else
 	#define KEYBOARD_GLOBAL_INPUT
-	//#define KEYBOARD_ALLOW_UNLINK
+	
+	#ifdef KEYBOARD_GLOBAL_INPUT
+		#ifdef PLATFORM_LINUX
+			#define KEYBOARD_ALLOW_UNLINK
+		#endif
+	#endif
 #endif
 
 #define KEYBOARD_DEBUG
@@ -88,26 +93,33 @@ namespace iosync
 				// This is used to represent all actively held keys.
 				typedef unordered_set<keyboardKey> deviceRepresentation;
 
-				// Global variable(s):
-				#ifdef PLATFORM_WINDOWS
-					// Reserved keyboard hook.
-					//static HHOOK deviceHook;
-				#endif
+				// Enumerator(s):
+				enum defaultNativeFlags : nativeFlags
+				{
+					DEFAULT_NATIVE_FLAGS = 0,
+				};
 
+				// Global variable(s):
 				#ifdef KEYBOARD_GLOBAL_INPUT
 					static bool registered;
+				#endif
+
+				#ifdef KEYBOARD_ALLOW_UNLINK
+					static size_t globalDeviceCounter;
+				#endif
+
+				#if defined(PLATFORM_WINDOWS)
+					// Reserved keyboard hook.
+					//static HHOOK deviceHook;
+				#elif defined(PLATFORM_LINUX)
+					static int keyboardDescriptor;
 				#endif
 
 				// Functions:
 				
 				// This overload is a platform-specific extension to the standard implementation:
-				#ifdef PLATFORM_WINDOWS
-					static nativeResponseCode sendNativeKeyboardInput(nativeDeviceInterface* items, nativeFlags flags, size_t itemCount=1);
-
-					static inline nativeResponseCode sendNativeKeyboardInput(nativeDeviceInterface& item)
-					{
-						return sendNativeSystemInput(&item, 1);
-					}
+				#if defined(PLATFORM_WINDOWS)
+					static nativeResponseCode sendNativeKeyboardInput(nativeDeviceInterface* items, size_t itemCount, nativeFlags flags=DEFAULT_NATIVE_FLAGS);
 
 					static bool __winnt__registerHardware(HWND window);
 
@@ -118,6 +130,21 @@ namespace iosync
 						static HHOOK __winnt_set_keyboard_hook(HINSTANCE hook_proc=HINSTANCE());
 						static bool __winnt_unhook_keyboard();
 					*/
+				#elif defined(PLATFORM_LINUX)
+					static nativeResponseCode sendNativeKeyboardInput(nativeDeviceInterface* items, size_t itemCount, nativeFlags flags=DEFAULT_NATIVE_FLAGS);
+
+					static bool __linux__registerHardware();
+					static bool __linux__unregisterHardware();
+
+					// This re-maps a serialized virtual-key (Defined by Windows) to a hardware scan-code.
+					static __u16 __linux__virtualToRealKey(__u16 virtualKeyCode); // unsigned short
+				#endif
+
+				#if defined(PLATFORM_WINDOWS) || defined(PLATFORM_LINUX)
+					static inline nativeResponseCode sendNativeKeyboardInput(nativeDeviceInterface& item)
+					{
+						return sendNativeSystemInput(&item, 1);
+					}
 				#endif
 
 				// This command simulates the specified action.

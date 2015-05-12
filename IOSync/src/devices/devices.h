@@ -5,6 +5,16 @@
 #include "../util.h"
 #include "../networking/forwardSocket.h"
 
+// Linux-specific:
+#ifdef PLATFORM_LINUX
+	#include <fcntl.h>
+	#include <sys/ioctl.h>
+	#include <unistd.h>
+	
+	#include <linux/input.h>
+	#include <linux/uinput.h>
+#endif
+
 // Standard library:
 #include <iostream>
 
@@ -38,10 +48,21 @@ namespace iosync
 		typedef unsigned int deviceFlags;
 
 		// Platform-specific:
-		#ifdef PLATFORM_WINDOWS
+		#if defined(PLATFORM_WINDOWS)
 			typedef DWORD nativeFlags;
 			typedef INPUT nativeDeviceInterface;
 			typedef UINT nativeResponseCode;
+		#elif defined(PLATFORM_LINUX)
+			typedef __s32 nativeFlags; // unsigned short
+
+			struct nativeDeviceInterface
+			{
+				// Fields:
+				input_event input;
+				int deviceDescriptor;
+			};
+
+			typedef ssize_t nativeResponseCode;
 		#else
 			typedef unsigned long nativeFlags;
 			typedef void* nativeDeviceInterface;

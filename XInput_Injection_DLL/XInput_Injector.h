@@ -14,7 +14,7 @@
 //#define DLLExport // __declspec( dllexport )
 
 //#define DLL_DEBUG
-#define DLL_CONFIRMATION_MESSAGE
+//#define DLL_CONFIRMATION_MESSAGE
 
 // Includes:
 

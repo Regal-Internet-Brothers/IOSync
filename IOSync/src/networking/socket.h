@@ -1,12 +1,15 @@
 #pragma once
 
+// Preprocessor related:
+#define QSOCK_EXTERNAL_LIB
+
 // Includes:
 #include <QuickLib/QuickSock/QuickSock.h>
 
 #include "../platform.h"
 
 // Libraries:
-#ifdef PLATFORM_WINDOWS
+#if defined(PLATFORM_WINDOWS) && defined(QSOCK_EXTERNAL_LIB)
 	#if defined(PLATFORM_X86)
 		#ifdef _DEBUG
 			#pragma comment(lib, "QuickLib/x86/QuickSock/Debug/QuickSock.lib")
