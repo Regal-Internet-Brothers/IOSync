@@ -43,13 +43,23 @@
 #endif
 
 // Libraries:
+
+/*
 #if defined(PLATFORM_WINDOWS) && !defined(GAMEPAD_EXTERNAL_ORIGIN)
-	//#pragma comment(lib, "Xinput.lib")
+	#pragma comment(lib, "Xinput.lib")
 #endif
+*/
 
 // Namespace(s):
 namespace iosync
 {
+	// Forward declarations:
+	namespace networking
+	{
+		// Structures:
+		struct player;
+	}
+
 	namespace devices
 	{
 		// Namespace(s):
@@ -207,7 +217,7 @@ namespace iosync
 
 						// Our targeted Xinput-device's state.
 						XINPUT_STATE state;
-					
+						
 						// Return the response-code from the main state-detection routine.
 						return __winnt__realDeviceState(identifier, state);
 					}
@@ -502,12 +512,6 @@ namespace iosync
 					VjdStat __winnt__vJoy__calculateStatus();
 				#endif
 
-				inline high_resolution_clock::time_point updateActivityTimer()
-				{
-					// Set the activity snapshot, then return it to the user.
-					return activitySnapshot = high_resolution_clock::now();
-				}
-
 				inline bool hasState() const
 				{
 					#ifdef PLATFORM_WINDOWS
@@ -526,19 +530,14 @@ namespace iosync
 					#endif
 				}
 
-				// This will tell you how much time has passed since this device was last used.
-				inline milliseconds activityTime() const
-				{
-					return elapsed(activitySnapshot);
-				}
-
 				// Fields:
 				gamepadID localGamepadNumber;
 				gamepadID remoteGamepadNumber;
 
 				gamepadState state;
 
-				high_resolution_clock::time_point activitySnapshot;
+				// Used externally; a pointer to a player/connection which owns this object.
+				networking::player* owner = nullptr;
 
 				#ifdef PLATFORM_WINDOWS
 					DWORD __winnt__lastPacketNumber;

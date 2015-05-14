@@ -44,6 +44,14 @@ namespace iosync
 			virtual bool hasVirtualAddress() const;
 			virtual bool hasReliablePackets() const override;
 
+			// Operators:
+			virtual bool operator==(const QSocket& socket) const;
+
+			inline bool operator!=(const QSocket& addr) const
+			{
+				return !operator==(addr);
+			}
+
 			// Fields:
 
 			// This represents the remote address of this player object.
@@ -59,6 +67,11 @@ namespace iosync
 			wstring name;
 
 			connectionPing ping;
+
+			// Booleans / Flags:
+
+			// This specifies if this connection is being "pinged".
+			bool pinging = false;
 		};
 
 		struct indirect_player : player
@@ -77,6 +90,9 @@ namespace iosync
 			virtual address vaddr() const override;
 
 			virtual bool hasVirtualAddress() const override;
+
+			// Operators:
+			virtual bool operator==(const QSocket& socket) const override;
 
 			// Fields:
 			address realAddress;

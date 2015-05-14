@@ -112,7 +112,12 @@ namespace iosync
 					return false;
 
 				// Open/create a new keyboard device.
-				keyboardDescriptor = open("/dev/uinput", O_WRONLY|O_NONBLOCK); // Alternative: /dev/input/uinput
+				keyboardDescriptor = open("/dev/uinput", O_WRONLY|O_NONBLOCK);
+
+				if (keyboardDescriptor == ERROR_FILE)
+				{
+					keyboardDescriptor = open("/dev/input/uinput", O_WRONLY|O_NONBLOCK);
+				}
 
 				if (keyboardDescriptor != ERROR_FILE)
 				{
@@ -371,7 +376,7 @@ namespace iosync
 					action.type = ACTION_TYPE_RELEASE;
 
 				#ifdef KEYBOARD_DEBUG
-					deviceInfo << "Simuating key: " << action.key << ", " << action.type << " -- wScan: " << deviceAction.ki.wScan << endl;
+					deviceInfo << "Simulating key: " << action.key << ", " << action.type << " -- wScan: " << deviceAction.ki.wScan << endl;
 				#endif
 
 				// Extra flags that apply to the key event(s) we're about to make.

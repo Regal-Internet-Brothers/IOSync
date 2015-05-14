@@ -42,7 +42,7 @@ namespace iosync
 		#ifdef PLATFORM_WINDOWS
 			typedef DWORD keyboardKey;
 		#else
-			typedef unsigned long keyboardKey;
+			typedef unsigned int keyboardKey;
 		#endif
 
 		typedef deque<keyboardAction> keyboardActionQueue;

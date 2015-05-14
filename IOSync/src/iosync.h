@@ -17,7 +17,7 @@
 #define IOSYNC_SAFE
 
 #ifdef IOSYNC_TESTMODE
-	//#define IOSYNC_FAST_TESTMODE
+	#define IOSYNC_FAST_TESTMODE
 	
 	#ifdef IOSYNC_FAST_TESTMODE
 		#define IOSYNC_FAST_TESTMODE_SINGLE_INPUT
@@ -185,7 +185,7 @@ namespace iosync
 
 		enum gamepadMetrics : unsigned long long
 		{
-			GAMEPAD_DEFAULT_TIMEOUT = 10000,
+			GAMEPAD_DEFAULT_TIMEOUT = 15000,
 		};
 
 		// Structures:
@@ -334,6 +334,23 @@ namespace iosync
 
 			// This command is "unsafe", please check against 'gamepadConnected' before using this.
 			bool disconnectLocalGamepad(iosync_application* program, gamepadID identifier);
+
+			inline bool disconnectLocalGamepads(iosync_application* program, player* owner)
+			{
+				bool response = false;
+
+				for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
+				{
+					if (gamepads[i] != nullptr && gamepads[i]->owner == owner)
+					{
+						if (disconnectGamepad(program, gamepads[i]->localGamepadNumber))
+							response = true;
+					}
+				}
+
+				// Return the calculated response.
+				return response;
+			}
 
 			// Unlike 'disconnectLocalGamepad', this will check if a device is connected, so it is "safer".
 			// If you need to manually disconnect a gamepad using its local identifier, please use 'disconnectLocalGamepad' instead.
@@ -629,11 +646,23 @@ namespace iosync
 
 			// This will send the active serializable data this manager produces.
 			// Please call 'sendConnectionRequests' (Or similar) before calling this.
-			inline size_t sendTo(networkEngine& engine, networkDestinationCode destination=DEFAULT_DESTINATION)
+			inline size_t sendTo(networkEngine& engine, networkDestinationCode destination)
 			{
 				serializeTo(engine);
 
 				return engine.sendMessage(engine, destination);
+			}
+
+			inline size_t sendTo(networkEngine& engine)
+			{
+				if (engine.canBroadcastLocally())
+				{
+					serializeTo(engine);
+
+					return engine.sendMessage(engine, DESTINATION_ALL);
+				}
+
+				return sendTo(engine, DEFAULT_DESTINATION);
 			}
 
 			inline bool keyboardConnected() const
@@ -728,6 +757,9 @@ namespace iosync
 			{
 				MODE_CLIENT = 0,
 				MODE_SERVER = 1,
+
+				MODE_DIRECT_CLIENT = 2,
+				MODE_DIRECT_SERVER = 3,
 			};
 
 			enum messageTypes : messageType
@@ -1018,8 +1050,8 @@ namespace iosync
 
 			// Methods:
 			int execute();
-			int execute(const addressPort port);
-			int execute(wstring username, string remoteAddress, addressPort remotePort = DEFAULT_PORT, addressPort localPort = DEFAULT_LOCAL_PORT);
+			int execute(const addressPort port, const applicationMode mode=MODE_SERVER);
+			int execute(const wstring& username, const string& remoteAddress, const addressPort remotePort = DEFAULT_PORT, const addressPort localPort = DEFAULT_LOCAL_PORT, const applicationMode mode=MODE_CLIENT);
 
 			#ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
 				void executeAsync();
@@ -1095,14 +1127,19 @@ namespace iosync
 				return !isRunning;
 			}
 
+			inline bool twoWayOperations() const
+			{
+				return (mode == MODE_DIRECT_CLIENT || mode == MODE_DIRECT_SERVER);
+			}
+
 			inline bool allowDeviceDetection() const
 			{
-				return (mode == MODE_CLIENT);
+				return (mode == MODE_CLIENT || twoWayOperations());
 			}
 
 			inline bool allowDeviceSimulation() const
 			{
-				return (mode == MODE_SERVER);
+				return (mode == MODE_SERVER || twoWayOperations());
 			}
 
 			inline bool reserveLocalGamepads() const

@@ -386,8 +386,6 @@ namespace iosync
 				#endif
 			#endif
 
-			updateActivityTimer();
-
 			// Call the super-class's implementation, then return its response.
 			return deviceManager::connect();
 		}
@@ -427,9 +425,6 @@ namespace iosync
 				__winnt__state_meta = result;
 			#endif
 
-			// Update the activity timer.
-			updateActivityTimer();
-
 			return;
 		}
 
@@ -449,18 +444,12 @@ namespace iosync
 		{
 			state.readFrom(socket);
 
-			// Update the activity timer.
-			updateActivityTimer();
-
 			return;
 		}
 
 		void gamepad::writeTo(QSocket& socket)
 		{
 			state.writeTo(socket);
-
-			// Update the activity timer.
-			updateActivityTimer();
 
 			return;
 		}
@@ -469,9 +458,6 @@ namespace iosync
 		{
 			if (!hasState())
 				return false;
-
-			// Update the activity timer.
-			updateActivityTimer();
 
 			simulateState(state, localGamepadNumber);
 

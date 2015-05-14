@@ -38,7 +38,7 @@ namespace iosync
 		high_resolution_clock::time_point reliablePacketManager::updateSnapshot()
 		{
 			// Update the connection-snapshot, then return it.
-			return connectionSnapshot = high_resolution_clock::now();
+			return (connectionSnapshot = high_resolution_clock::now());
 		}
 
 		// player:
@@ -128,6 +128,12 @@ namespace iosync
 			return;
 		}
 
+		// Operators:
+		bool player::operator==(const QSocket& socket) const
+		{
+			return (remoteAddress == socket);
+		}
+
 		// indirect_player:
 
 		// Constructor(s):
@@ -166,6 +172,12 @@ namespace iosync
 			return (realAddress.isSet()); // true;
 		}
 
+		// Operators:
+		bool indirect_player::operator==(const QSocket& socket) const
+		{
+			return (player::operator==(socket) || (realAddress == socket));
+		}
+
 		// Classes:
 
 		// networkMetrics:
@@ -192,11 +204,6 @@ namespace iosync
 		}
 
 		// Destructor(s):
-		networkEngine::~networkEngine()
-		{
-			// Nothing so far.
-		}
-
 		bool networkEngine::close()
 		{
 			// Close the internal socket.
@@ -204,9 +211,6 @@ namespace iosync
 
 			// Clear the list of packets in transit.
 			packetsInTransit.clear();
-
-			// Tell the 'program' object that we've closed.
-			parentProgram.onNetworkClosed(*this);
 
 			// Return the default response.
 			return true;
@@ -217,12 +221,15 @@ namespace iosync
 		// Update routines:
 		void networkEngine::update()
 		{
-			if (connectionTime() >= metrics.pingInterval)
+			if (connectedToOthers())
 			{
-				pingRemoteConnection(socket);
+				if (connectionTime() >= metrics.pingInterval)
+				{
+					pingRemoteConnection(socket);
 
-				// Reset/update the main connection-snapshot.
-				reliablePacketManager::updateSnapshot();
+					// Reset/update the main connection-snapshot.
+					reliablePacketManager::updateSnapshot();
+				}
 			}
 
 			updatePacketsInTransit();
@@ -362,7 +369,9 @@ namespace iosync
 					// Check if this is the master, otherwise,
 					// continue on to the "reply" implementation:
 					if (isMaster)
+					{
 						break;
+					}
 				case DESTINATION_REPLY:
 					return (size_t)socket.sendMsg(resetLength);
 				case DESTINATION_ALL:
@@ -385,6 +394,16 @@ namespace iosync
 		bool networkEngine::hasRemoteConnection() const
 		{
 			return true;
+		}
+
+		bool networkEngine::canBroadcastLocally() const
+		{
+			return false;
+		}
+
+		player* networkEngine::getPlayer(QSocket& socket)
+		{
+			return nullptr;
 		}
 
 		// Reliable message related:
@@ -533,12 +552,10 @@ namespace iosync
 				}
 
 				// Make sure we don't spend all of our time reading messages:
-				/*
 				if (elapsed(timer) > metrics.pollTimeout)
 				{
 					break;
 				}
-				*/
 			};
 
 			return messages;
@@ -664,10 +681,10 @@ namespace iosync
 		// Update routines:
 		void clientNetworkEngine::update()
 		{
-			// Check if we've timed out:
+			// Check if we've timed-out:
 			if (timedOut())
 			{
-				close();
+				throw exceptions::networkClosed(*this);
 
 				return;
 			}
@@ -735,6 +752,8 @@ namespace iosync
 			// Send a "ping" messages to the host.
 			sendPing(socket);
 
+			connection.pinging = true;
+
 			return;
 		}
 
@@ -763,6 +782,8 @@ namespace iosync
 					// Send back a "pong" message.
 					sendPong(socket);
 
+					connection.pinging = false;
+
 					break;
 				case MESSAGE_TYPE_PONG:
 					// Update the connection's ping.
@@ -771,6 +792,8 @@ namespace iosync
 					updateSnapshot();
 
 					//sendPong(socket);
+
+					connection.pinging = false;
 
 					break;
 				case MESSAGE_TYPE_LEAVE:
@@ -821,6 +844,17 @@ namespace iosync
 
 			// Return the "reason" given.
 			return reason;
+		}
+
+		// Connection management functionality:
+		player* clientNetworkEngine::getPlayer(QSocket& socket)
+		{
+			return &connection;
+		}
+
+		bool clientNetworkEngine::alone() const
+		{
+			return connected;
 		}
 
 		// serverNetworkEngine:
@@ -924,6 +958,21 @@ namespace iosync
 			return hasPlayers();
 		}
 
+		bool serverNetworkEngine::canBroadcastLocally() const
+		{
+			return true;
+		}
+
+		player* serverNetworkEngine::getPlayer(QSocket& socket)
+		{
+			return getPlayer(address(socket));
+		}
+
+		bool serverNetworkEngine::alone() const
+		{
+			return players.empty();
+		}
+
 		// Reliable message related:
 		bool serverNetworkEngine::onReliableMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
@@ -964,7 +1013,12 @@ namespace iosync
 				sendMessage(socket, p->remoteAddress, false);
 
 				// Update this player's connection-snapshot.
-				p->updateSnapshot();
+				if (!p->pinging)
+				{
+					p->updateSnapshot();
+
+					p->pinging = true;
+				}
 			}
 
 			// Flush the output-stream.
@@ -1024,6 +1078,8 @@ namespace iosync
 
 					p->updateSnapshot();
 
+					p->pinging = false;
+
 					break;
 				case MESSAGE_TYPE_PONG:
 					// Set this player's ping to the number
@@ -1032,6 +1088,8 @@ namespace iosync
 
 					// Update the time-snapshot of this player, so they don't time-out.
 					p->updateSnapshot();
+
+					p->pinging = false;
 
 					break;
 				default:
@@ -1188,6 +1246,33 @@ namespace iosync
 			}
 
 			return;
+		}
+	}
+
+	namespace exceptions
+	{
+		// networkEnded:
+
+		// Constructor(s):
+		networkEnded::networkEnded(networkEngine& target, const string& exception_name)
+			: iosync_exception(exception_name), network(target) { /* Nothing so far. */ }
+
+		// Methods:
+		const string networkEnded::message() const throw()
+		{
+			return "Network session ended unexpectedly.";
+		}
+
+		// networkClosed:
+
+		// Constructor(s):
+		networkClosed::networkClosed(networkEngine& target, const string& exception_name)
+			: networkEnded(target, exception_name) { /* Nothing so far. */ }
+
+		// Methods:
+		const string networkClosed::message() const throw()
+		{
+			return "Network session closed; disconnected, timed-out, etc.";
 		}
 	}
 }

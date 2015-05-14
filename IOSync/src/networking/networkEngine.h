@@ -9,9 +9,12 @@
 #include "packets.h"
 #include "messages.h"
 
+#include "../exceptions.h"
+
 // Standard library:
 #include <list>
 #include <string>
+#include <stdexcept>
 
 // Namespace(s):
 using namespace std;
@@ -21,6 +24,7 @@ namespace iosync
 	// Forward declarations:
 	class application;
 
+	// Namespace(s):
 	namespace networking
 	{
 		// Constant variable(s):
@@ -146,8 +150,6 @@ namespace iosync
 				virtual bool open();
 
 				// Destructor(s):
-				virtual ~networkEngine();
-
 				virtual bool close();
 
 				// Methods:
@@ -228,6 +230,18 @@ namespace iosync
 				virtual size_t sendMessage(networkDestinationCode destination=DEFAULT_DESTINATION, bool resetLength=true);
 
 				virtual bool hasRemoteConnection() const;
+
+				// This specifies if this 'networkEngine' can broadcast without first contacting a remote machine.
+				virtual bool canBroadcastLocally() const;
+
+				virtual player* getPlayer(QSocket& socket);
+
+				virtual bool alone() const = 0;
+
+				inline bool connectedToOthers() const
+				{
+					return !alone();
+				}
 
 				// Reliable message related:
 
@@ -445,7 +459,7 @@ namespace iosync
 				size_t broadcastMessage(QSocket& socket, bool resetLength=true) override;
 				size_t sendMessage(QSocket& socket, address remote, bool resetLength=true) override;
 
-				bool hasRemoteConnection() const override;
+				virtual bool hasRemoteConnection() const override;
 
 				inline bool timedOut() const
 				{
@@ -502,6 +516,11 @@ namespace iosync
 
 				// Parsing/deserialization related:
 				virtual disconnectionReason parseLeaveNotice(QSocket& socket, address remoteAddress, address forwardAddress=address()) override;
+
+				// Connection management functionality:
+				virtual player* getPlayer(QSocket& socket) override;
+
+				virtual bool alone() const;
 
 				// Operators:
 				inline operator player&()
@@ -616,9 +635,14 @@ namespace iosync
 				}
 
 				// Player/connection management functionality:
-				bool hasRemoteConnection() const override;
+				virtual bool hasRemoteConnection() const override;
+				virtual bool canBroadcastLocally() const override;
 
-				inline bool timedOut(player* p)
+				virtual player* getPlayer(QSocket& socket) override;
+
+				virtual bool alone() const;
+
+				inline bool timedOut(player* p) const
 				{
 					// Call the super-class's implementation.
 					return networkEngine::timedOut(p->connectionTime());
@@ -626,11 +650,11 @@ namespace iosync
 
 				inline bool hasPlayers() const
 				{
-					return !players.empty();
+					return connectedToOthers(); // !alone();
 				}
 
 				// This command allows you to retrieve a player-entry from the 'players' list.
-				inline player* getPlayer(address addr)
+				inline player* getPlayer(address addr) const
 				{
 					for (auto p : players)
 					{
@@ -641,7 +665,7 @@ namespace iosync
 					return nullptr;
 				}
 
-				inline player* getPlayer(address addr, address vaddr)
+				inline player* getPlayer(address addr, address vaddr) const
 				{
 					for (auto p : players)
 					{
@@ -652,7 +676,7 @@ namespace iosync
 					return nullptr;
 				}
 
-				inline bool playerJoined(address addr)
+				inline bool playerJoined(address addr) const
 				{
 					return (getPlayer(addr) != nullptr);
 				}
@@ -721,6 +745,34 @@ namespace iosync
 
 				// Fields:
 				list<player*> players;
+		};
+	}
+
+	namespace exceptions
+	{
+		using namespace networking;
+
+		class networkEnded : public iosync_exception
+		{
+			public:
+				// Constructor(s):
+				networkEnded(networkEngine& target, const string& exception_name="IOSYNC: Network session ended.");
+
+				// Methods:
+				virtual const string message() const throw();
+
+				// Fields:
+				networkEngine& network;
+		};
+
+		class networkClosed : public networkEnded
+		{
+			public:
+				// Constructor(s):
+				networkClosed(networkEngine& target, const string& exception_name="IOSYNC: Network session closed.");
+
+				// Methods:
+				virtual const string message() const throw() override;
 		};
 	}
 }

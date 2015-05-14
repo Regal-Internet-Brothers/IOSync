@@ -260,7 +260,7 @@ namespace iosync
 		{
 			#if defined(IOSYNC_DEVICE_GAMEPAD) && defined(IOSYNC_DEVICE_GAMEPAD_AUTODETECT)
 				// Check if we're detecting gamepads:
-				if (program->allowDeviceDetection())
+				if (program->allowDeviceDetection() && program->network->connectedToOthers())
 				{
 					if (gamepadsEnabled)
 					{
@@ -281,10 +281,12 @@ namespace iosync
 								#ifdef PLATFORM_WINDOWS
 									if (gp::__winnt__pluggedIn(i))
 									{
-										// Tell the remote host that a gamepad was connected.
-										sendGamepadConnectMessage(*program->network, program->network->socket, DESTINATION_HOST);
+										auto destination = (program->network->isHostNode) ? DESTINATION_ALL : DESTINATION_HOST;
 
-										//sendGamepadConnectMessage(*program->network, program->network->socket, i, DESTINATION_HOST);
+										// Tell the remote host that a gamepad was connected:
+										sendGamepadConnectMessage(*program->network, program->network->socket, destination);
+
+										//sendGamepadConnectMessage(*program->network, program->network->socket, i, destination);
 
 										// Add this identifier, so we don't bother trying to connect with it redundantly.
 										reservedGamepads.insert(i);
@@ -306,19 +308,6 @@ namespace iosync
 										reservedGamepads.erase(i);
 									}
 								}
-							}
-						}
-					}
-				}
-				else if (program->allowDeviceSimulation())
-				{
-					for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
-					{
-						if (gamepadConnected(i))
-						{
-							if (gamepads[i]->activityTime() > gamepadTimeout)
-							{
-								disconnectLocalGamepad(program, i);
 							}
 						}
 					}
@@ -553,7 +542,17 @@ namespace iosync
 				deviceInfo << "Attempting to create gamepad-instance..." << endl;
 
 				// Allocate a new 'gp' on the heap.
-				gamepads[identifier] = new gp(identifier, remoteIdentifier, program->allowDeviceDetection(), program->allowDeviceSimulation());
+				gamepads[identifier] = new gp
+				(
+					identifier, remoteIdentifier,
+					program->allowDeviceDetection()
+
+					#ifdef PLATFORM_WINDOWS
+						&& gp::__winnt__pluggedIn(identifier)
+					#endif
+					,
+					program->allowDeviceSimulation()
+				);
 
 				deviceInfo << "Gamepad-instance created." << endl;
 			}
@@ -648,7 +647,7 @@ namespace iosync
 						return false;
 					}
 
-					if (program->mode == iosync_application::MODE_SERVER)
+					if (program->allowDeviceSimulation())
 					{
 						sendConnectMessage(*program->network, socket, devType, DESTINATION_REPLY);
 					}
@@ -661,25 +660,32 @@ namespace iosync
 							auto identifier = (gamepadID)socket.read<serializedGamepadID>();
 							bool remotelyConnected = remoteGamepadConnected(identifier);
 
-							if (program->allowDeviceDetection() && remotelyConnected)
-							{
-								reservedGamepads.erase(identifier);
-							}
-
 							if (remotelyConnected)
 							{
-								sendGamepadDisconnectMessage(*program->network, socket, identifier, DESTINATION_REPLY);
+								if (program->allowDeviceDetection())
+								{
+									reservedGamepads.erase(identifier);
+								}
 
-								return false;
+								if (!program->twoWayOperations())
+								{
+									sendGamepadDisconnectMessage(*program->network, socket, identifier, DESTINATION_REPLY);
+
+									return false;
+								}
 							}
 
+							gp* pad = connectGamepad(program, identifier);
+
 							// Connect a gamepad using the identifier specified.
-							if (connectGamepad(program, identifier) == nullptr)
+							if (pad == nullptr)
 							{
 								return false;
 							}
 
-							if (program->mode == iosync_application::MODE_SERVER)
+							pad->owner = program->network->getPlayer(socket);
+
+							if (program->allowDeviceSimulation())
 							{
 								// Tell the user that their gamepad was connected.
 								sendGamepadConnectMessage(*program->network, socket, identifier, DESTINATION_REPLY);
@@ -687,14 +693,16 @@ namespace iosync
 						}
 						else
 						{
-							auto pad = connectGamepad(program);
+							gp* pad = connectGamepad(program);
 
 							if (pad == nullptr)
 							{
 								return false;
 							}
 
-							if (program->mode == iosync_application::MODE_SERVER)
+							pad->owner = program->network->getPlayer(socket);
+
+							if (program->allowDeviceSimulation())
 							{
 								// Tell the user that their gamepad was connected.
 								sendGamepadConnectMessage(*program->network, socket, pad->remoteGamepadNumber, DESTINATION_REPLY);
@@ -914,6 +922,7 @@ namespace iosync
 
 						switch (program->mode)
 						{
+							case iosync_application::MODE_DIRECT_CLIENT:
 							case iosync_application::MODE_CLIENT:
 								deviceNetInfoStream << ", as the remote host intended";
 							default:
@@ -941,6 +950,7 @@ namespace iosync
 
 						switch (program->mode)
 						{
+							case iosync_application::MODE_DIRECT_CLIENT:
 							case iosync_application::MODE_CLIENT:
 								deviceNetInfoStream << ", as the remote host intended";
 							default:
@@ -1041,8 +1051,8 @@ namespace iosync
 				// Retrieve the correct gamepad for this message.
 				gp* pad = getGamepad(identifier); // getLocalGamepad(identifier);
 
-				// Ensure we were able to retrieve a gamepad:
-				if (pad == nullptr)
+				// Ensure we were able to retrieve a gamepad, and the sender is authorized:
+				if (pad == nullptr || (*pad->owner) != socket)
 					return DEVICE_NETWORK_MESSAGE_INVALID;
 
 				// Check the sub-message type:
@@ -1627,29 +1637,32 @@ namespace iosync
 		// Increment the dynamic-link counter.
 		dynamicLinks++;
 
-		#ifdef PLATFORM_WINDOWS
-			if (application.devices.gamepadsEnabled)
-			{
-				// XInput is used by applications which simulate:
-				if (application.allowDeviceDetection() || application.allowDeviceSimulation())
+		if (dynamicLinks == 1)
+		{
+			#ifdef PLATFORM_WINDOWS
+				if (application.devices.gamepadsEnabled)
 				{
-					if (xInputModule == NULL)
+					// XInput is used by applications which simulate:
+					if (application.allowDeviceDetection() || application.allowDeviceSimulation())
 					{
-						xInputModule = REAL_XINPUT::linkTo();
-					}
-				}
-
-				#ifdef GAMEPAD_VJOY_DYNAMIC_LINK
-					if (application.allowDeviceSimulation() && application.devices.vJoyEnabled)
-					{
-						if (vJoyModule == NULL)
+						if (xInputModule == NULL)
 						{
-							vJoyModule = devices::vJoy::REAL_VJOY::linkTo();
+							xInputModule = REAL_XINPUT::linkTo();
 						}
 					}
-				#endif
-			}
-		#endif
+
+					#ifdef GAMEPAD_VJOY_DYNAMIC_LINK
+						if (application.allowDeviceSimulation() && application.devices.vJoyEnabled)
+						{
+							if (vJoyModule == NULL)
+							{
+								vJoyModule = devices::vJoy::REAL_VJOY::linkTo();
+							}
+						}
+					#endif
+				}
+			#endif
+		}
 
 		return;
 	}
@@ -1928,7 +1941,7 @@ namespace iosync
 	}
 
 	// Methods:
-	int iosync_application::execute(const addressPort port)
+	int iosync_application::execute(const addressPort port, const applicationMode mode)
 	{
 		cout << "Attempting to open server network (" << port << ")..." << endl << endl;
 
@@ -1954,7 +1967,7 @@ namespace iosync
 		cout << "Server network started." << endl << endl;
 
 		// Execute the creation call-back.
-		onCreate(MODE_SERVER);
+		onCreate(mode);
 
 		// Call the super-class's implementation.
 		auto responseCode = application::execute();
@@ -2205,7 +2218,7 @@ namespace iosync
 		return execute(DEFAULT_PORT);
 	}
 
-	int iosync_application::execute(wstring username, string remoteAddress, addressPort remotePort, addressPort localPort)
+	int iosync_application::execute(const wstring& username, const string& remoteAddress, const addressPort remotePort, const addressPort localPort, const applicationMode mode)
 	{
 		cout << "Attempting to open client network (" << remoteAddress << networking::ADDRESS_SEPARATOR << remotePort << ")..." << endl << endl;
 
@@ -2231,7 +2244,7 @@ namespace iosync
 		this->network = engine;
 
 		// Execute the creation call-back.
-		onCreate(MODE_CLIENT);
+		onCreate(mode);
 
 		// Call the super-class's implementation.
 		auto responseCode = application::execute();
@@ -2317,13 +2330,14 @@ namespace iosync
 
 		switch (configuration.mode)
 		{
+			case MODE_DIRECT_CLIENT:
 			case MODE_CLIENT:
 				do
 				{
 					// Check if a proper address was specified:
 					if (address::addressSet(configuration.remoteAddress.IP))
 					{
-						return execute((configuration.username.empty()) ? DEFAULT_PLAYER_NAME : configuration.username, configuration.remoteAddress.IP, configuration.remoteAddress.port);
+						return execute((configuration.username.empty()) ? DEFAULT_PLAYER_NAME : configuration.username, configuration.remoteAddress.IP, configuration.remoteAddress.port, configuration.mode);
 					}
 					else
 					{
@@ -2375,8 +2389,9 @@ namespace iosync
 						}
 					}
 				} while(true);
+			case MODE_DIRECT_SERVER:
 			case MODE_SERVER:
-				return execute(configuration.remoteAddress.port);
+				return execute(configuration.remoteAddress.port, configuration.mode);
 		}
 
 		cout << "Invalid application-mode specified." << endl;
@@ -2390,7 +2405,7 @@ namespace iosync
 
 		//cout << endl;
 
-		cout << "Application mode (" << MODE_CLIENT << " = Client, " << MODE_SERVER << " = Server): "; cin >> mode; //cout << endl;
+		cout << "Application mode (" << MODE_CLIENT << " = Client, " << MODE_SERVER << " = Server, " << MODE_DIRECT_CLIENT << " = Two-way Client, " << MODE_DIRECT_SERVER << " = Two-way Server): "; cin >> mode; //cout << endl;
 
 		if (logChoices)
 		{
@@ -2401,6 +2416,7 @@ namespace iosync
 
 		switch (mode)
 		{
+			case MODE_DIRECT_CLIENT:
 			case MODE_CLIENT:
 				#ifndef IOSYNC_FAST_TESTMODE
 					//configuration.remoteAddress.IP = "127.0.0.1";
@@ -2435,7 +2451,8 @@ namespace iosync
 
 				//clearConsole();
 
-				return execute(configuration.username, configuration.remoteAddress.IP, configuration.remoteAddress.port);
+				return execute(configuration.username, configuration.remoteAddress.IP, configuration.remoteAddress.port, DEFAULT_LOCAL_PORT, mode);
+			case MODE_DIRECT_SERVER:
 			case MODE_SERVER:
 				{
 					#ifndef IOSYNC_FAST_TESTMODE
@@ -2485,7 +2502,7 @@ namespace iosync
 
 				//clearConsole();
 
-				return execute(configuration.remoteAddress.port);
+				return execute(configuration.remoteAddress.port, mode);
 		}
 
 		// If all else fails, host with the default port.
@@ -2552,11 +2569,8 @@ namespace iosync
 		if (network == nullptr)
 			return;
 
-		// Manually close the network-engine.
-		network->close();
-
-		delete network;
-		network = nullptr;
+		// Execute the closure call-back.
+		onNetworkClosed(*network);
 
 		return;
 	}
@@ -2586,6 +2600,8 @@ namespace iosync
 					// Nothing so far.
 
 					break;
+				case MODE_DIRECT_SERVER:
+				case MODE_DIRECT_CLIENT:
 				case MODE_CLIENT:
 					devices.sendTo(*network);
 
@@ -2593,7 +2609,14 @@ namespace iosync
 			}
 		}
 
-		network->update();
+		try
+		{
+			network->update();
+		}
+		catch (exceptions::networkEnded&) // networkClosed
+		{
+			closeNetwork();
+		}
 
 		return;
 	}
@@ -2601,7 +2624,7 @@ namespace iosync
 	void iosync_application::updateDevices()
 	{
 		// Check for platform-specific device-messages:
-		if (mode == MODE_CLIENT && devices.hasDeviceConnected())
+		if (allowDeviceDetection() && devices.hasDeviceConnected())
 			checkDeviceMessages();
 
 		// Update all of the devices:
@@ -2764,8 +2787,9 @@ namespace iosync
 	void iosync_application::onNetworkClientTimedOut(networkEngine& engine, player& p)
 	{
 		wnetworkLog << "Player timed-out: " << p.name << endl;
-
 		networkLog << "Timed-out player's address: "; p.outputAddressInfo(networkLogStream, true);
+
+		devices.disconnectLocalGamepads(this, &p);
 
 		return;
 	}
