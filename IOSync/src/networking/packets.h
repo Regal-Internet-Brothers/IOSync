@@ -112,7 +112,7 @@ namespace iosync
 			// DO NOT use this method, unless you are sending a completely raw packet.
 			// In other words, this must only be used when the 'data' field points
 			// to a raw-packet containing the message's data, a header, and optionally, a footer.
-			packetSize_t sendTo(QSocket& socket, address destinationAddress, bool destroyDataAfter = false);
+			packetSize_t sendTo(QSocket& socket, const address& destinationAddress, bool destroyDataAfter = false);
 
 			// Operators:
 			inline bool operator==(const packet& p) const
@@ -140,7 +140,7 @@ namespace iosync
 		struct outbound_packet : packet
 		{
 			// Constructor(s):
-			explicit outbound_packet(address remoteDestination, rawPacket rawData = (rawPacket)nullptr, packetID reliableIdentifier=PACKET_ID_UNRELIABLE, size_t rawSize = 0, bool canFreeRawData = true);
+			explicit outbound_packet(const address& remoteDestination, rawPacket rawData = (rawPacket)nullptr, packetID reliableIdentifier=PACKET_ID_UNRELIABLE, size_t rawSize = 0, bool canFreeRawData = true);
 
 			explicit outbound_packet(networkDestinationCode destCode, rawPacket rawData = (rawPacket)nullptr, packetID reliableIdentifier=PACKET_ID_UNRELIABLE, size_t rawSize = 0, bool canFreeRawData = true);
 
@@ -150,7 +150,7 @@ namespace iosync
 				please use the other constructor, and 'parodySerializedOutputMessage' instead.
 				The 'simulatedRead' argument is the same as the 'readFrom' command's version.
 			*/
-			explicit outbound_packet(QSocket& socket, size_t readSize = 0, packetID reliableIdentifier=PACKET_ID_UNRELIABLE, address destinationAddress=address(), bool simulatedRead=false);
+			explicit outbound_packet(QSocket& socket, size_t readSize = 0, packetID reliableIdentifier=PACKET_ID_UNRELIABLE, const address& destinationAddress=address(), bool simulatedRead=false);
 
 			// Methods:
 
@@ -172,7 +172,7 @@ namespace iosync
 			packetSize_t sendFor(networkEngine& engine, QSocket& socket);
 
 			// This states if this packet is being sent to the address specified.
-			bool isSendingTo(const address addr) const;
+			bool isSendingTo(const address& addr) const;
 
 			// This will update the time-snapshot used to represent when this packet was first sent.
 			inline high_resolution_clock::time_point updateSnapshot()

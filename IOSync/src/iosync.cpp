@@ -875,7 +875,7 @@ namespace iosync
 		}
 
 		// Message generation related:
-		outbound_packet connectedDevices::generateConnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address realAddress, const address forwardAddress)
+		outbound_packet connectedDevices::generateConnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address& realAddress, const address& forwardAddress)
 		{
 			auto headerInformation = beginDeviceMessage(engine, socket, device, DEVICE_NETWORK_MESSAGE_CONNECT);
 
@@ -884,7 +884,7 @@ namespace iosync
 			return engine.finishReliableMessage(socket, realAddress, headerInformation, forwardAddress);
 		}
 
-		outbound_packet connectedDevices::generateDisconnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address realAddress, const address forwardAddress)
+		outbound_packet connectedDevices::generateDisconnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address& realAddress, const address& forwardAddress)
 		{
 			auto headerInformation = beginDeviceMessage(engine, socket, device, DEVICE_NETWORK_MESSAGE_DISCONNECT);
 
@@ -893,7 +893,7 @@ namespace iosync
 			return engine.finishReliableMessage(socket, realAddress, headerInformation, forwardAddress);
 		}
 
-		outbound_packet connectedDevices::generateGamepadConnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address realAddress, const address forwardAddress)
+		outbound_packet connectedDevices::generateGamepadConnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address& realAddress, const address& forwardAddress)
 		{
 			// This will automatically add the extension-flag to the message.
 			auto headerInformation = beginGamepadDeviceMessage(engine, socket, identifier, DEVICE_NETWORK_MESSAGE_CONNECT);
@@ -903,7 +903,7 @@ namespace iosync
 			return engine.finishReliableMessage(socket, realAddress, headerInformation, forwardAddress);
 		}
 
-		outbound_packet connectedDevices::generateGamepadDisconnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address realAddress, const address forwardAddress)
+		outbound_packet connectedDevices::generateGamepadDisconnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address& realAddress, const address& forwardAddress)
 		{
 			// This will automatically add the extension-flag to the message.
 			auto headerInformation = beginGamepadDeviceMessage(engine, socket, identifier, DEVICE_NETWORK_MESSAGE_DISCONNECT);

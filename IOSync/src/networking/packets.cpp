@@ -139,7 +139,7 @@ namespace iosync
 			return socket.UwriteBytes(data, size);
 		}
 
-		packetSize_t packet::sendTo(QSocket& socket, address destinationAddress, bool destroyDataAfter)
+		packetSize_t packet::sendTo(QSocket& socket, const address& destinationAddress, bool destroyDataAfter)
 		{
 			writeTo(socket, destroyDataAfter);
 
@@ -149,13 +149,13 @@ namespace iosync
 		// outbound_packet:
 		
 		// Constructor(s):
-		outbound_packet::outbound_packet(address remoteDestination, rawPacket rawData, packetID reliableIdentifier, size_t rawSize, bool canFreeRawData)
+		outbound_packet::outbound_packet(const address& remoteDestination, rawPacket rawData, packetID reliableIdentifier, size_t rawSize, bool canFreeRawData)
 			: packet(rawData, rawSize, canFreeRawData), identifier(reliableIdentifier), destination(remoteDestination), destinationCode(DESTINATION_DIRECT) { /* Nothing so far. */ }
 
 		outbound_packet::outbound_packet(networkDestinationCode destCode, rawPacket rawData, packetID reliableIdentifier, size_t rawSize, bool canFreeRawData)
 			: packet(rawData, rawSize, canFreeRawData), identifier(reliableIdentifier), destinationCode(destCode), destination() { /* Nothing so far. */ }
 
-		outbound_packet::outbound_packet(QSocket& socket, size_t readSize, packetID reliableIdentifier, address destinationAddress, bool simulatedRead)
+		outbound_packet::outbound_packet(QSocket& socket, size_t readSize, packetID reliableIdentifier, const address& destinationAddress, bool simulatedRead)
 			: packet(socket, readSize), identifier(reliableIdentifier), destination(destinationAddress), destinationCode(DESTINATION_DIRECT)
 		{
 			readFrom(socket, readSize, false);
@@ -198,7 +198,7 @@ namespace iosync
 			return (packetSize_t)engine.sendMessage(socket, destinationCode);
 		}
 
-		bool outbound_packet::isSendingTo(const address addr) const
+		bool outbound_packet::isSendingTo(const address& addr) const
 		{
 			return (addr == destination);
 		}

@@ -44,7 +44,7 @@ namespace iosync
 		// player:
 
 		// Constructor(s):
-		player::player(address remote, bool calculateSnapshot)
+		player::player(const address& remote, bool calculateSnapshot)
 			: reliablePacketManager(calculateSnapshot), remoteAddress(remote), confirmedPackets(), ping((connectionPing)PING_UNAVAILABLE) { /* Nothing so far. */ }
 
 		// Destructor(s):
@@ -137,7 +137,7 @@ namespace iosync
 		// indirect_player:
 
 		// Constructor(s):
-		indirect_player::indirect_player(address representativeAddress, address resolvedAddress, bool calculateSnapshot)
+		indirect_player::indirect_player(const address& representativeAddress, const address& resolvedAddress, bool calculateSnapshot)
 			: player(representativeAddress, calculateSnapshot), realAddress(resolvedAddress) { /* Nothing so far. */ }
 
 		// Destructor(s):
@@ -299,7 +299,7 @@ namespace iosync
 			return;
 		}
 
-		messageFooter networkEngine::finishMessage(QSocket& socket, const headerInfo header_information, const address forwardAddress, const packetID ID)
+		messageFooter networkEngine::finishMessage(QSocket& socket, const headerInfo header_information, const address& forwardAddress, const packetID ID)
 		{
 			messageFooter footer(forwardAddress, ID);
 
@@ -308,7 +308,7 @@ namespace iosync
 			return footer;
 		}
 
-		outbound_packet networkEngine::finishReliableMessage(QSocket& socket, const address realAddress, const headerInfo header_Information, const address forwardAddress, const packetID ID)
+		outbound_packet networkEngine::finishReliableMessage(QSocket& socket, const address& realAddress, const headerInfo header_Information, const address& forwardAddress, const packetID ID)
 		{
 			// Local variable(s):
 			auto identifier = (ID != PACKET_ID_AUTOMATIC) ? ID : generateReliableID();
@@ -393,7 +393,7 @@ namespace iosync
 			return packet.sendFor(*this, socket);
 		}
 
-		size_t networkEngine::sendMessage(QSocket& socket, address remote, bool resetLength)
+		size_t networkEngine::sendMessage(QSocket& socket, const address& remote, bool resetLength)
 		{
 			return (size_t)socket.sendMsg(remote.IP, remote.port, resetLength);
 		}
@@ -419,7 +419,7 @@ namespace iosync
 		}
 
 		// Reliable message related:
-		bool networkEngine::onReliableMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
+		bool networkEngine::onReliableMessage(QSocket& socket, const address& remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Tell the user that reliable messages aren't supported.
 			return false;
@@ -471,7 +471,7 @@ namespace iosync
 			return false;
 		}
 
-		bool networkEngine::removeReliablePacket(address remoteAddress, packetID ID)
+		bool networkEngine::removeReliablePacket(const address& remoteAddress, packetID ID)
 		{
 			for (auto& packetInTransit : packetsInTransit)
 			{
@@ -625,7 +625,7 @@ namespace iosync
 		}
 
 		// Parsing/deserialization related:
-		bool networkEngine::parseMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
+		bool networkEngine::parseMessage(QSocket& socket, const address& remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			switch (header.type)
 			{
@@ -645,7 +645,7 @@ namespace iosync
 			return true;
 		}
 
-		bool networkEngine::onForwardPacket(QSocket& socket, streamLocation startPosition, address remoteAddress, const messageHeader& header, const messageFooter& footer)
+		bool networkEngine::onForwardPacket(QSocket& socket, streamLocation startPosition, const address& remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Tell the user that packet-forwarding isn't supported.
 			return false;
@@ -678,12 +678,12 @@ namespace iosync
 		}
 
 		// Parsing/deserialization related:
-		disconnectionReason networkEngine::parseLeaveNotice(QSocket& socket, address remoteAddress, const address forwardAddress)
+		disconnectionReason networkEngine::parseLeaveNotice(QSocket& socket, const address& remoteAddress, const address& forwardAddress)
 		{
 			return socket.read<disconnectionReason>();
 		}
 
-		packetID networkEngine::parsePacketConfirmationMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
+		packetID networkEngine::parsePacketConfirmationMessage(QSocket& socket, const address& remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Local variable(s):
 
@@ -777,7 +777,7 @@ namespace iosync
 			return;
 		}
 
-		bool clientNetworkEngine::onForwardPacket(QSocket& socket, streamLocation startPosition, address remoteAddress, const messageHeader& header, const messageFooter& footer)
+		bool clientNetworkEngine::onForwardPacket(QSocket& socket, streamLocation startPosition, const address& remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Re-write the message.
 			rewriteMessage(socket, header, footer);
@@ -789,7 +789,7 @@ namespace iosync
 		}
 
 		// Reliable message related:
-		bool clientNetworkEngine::onReliableMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
+		bool clientNetworkEngine::onReliableMessage(QSocket& socket, const address& remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Local variable(s):
 
@@ -821,7 +821,7 @@ namespace iosync
 		}
 
 		// Parsing/deserialization related:
-		bool clientNetworkEngine::parseMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
+		bool clientNetworkEngine::parseMessage(QSocket& socket, const address& remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Call the super-class's implementation:
 			if (networkEngine::parseMessage(socket, remoteAddress, header, footer))
@@ -888,7 +888,7 @@ namespace iosync
 			return sendMessage(socket, connection.remoteAddress);
 		}
 
-		size_t clientNetworkEngine::sendMessage(QSocket& socket, address remote, bool resetLength)
+		size_t clientNetworkEngine::sendMessage(QSocket& socket, const address& remote, bool resetLength)
 		{
 			return (size_t)socket.sendMsg(remote.IP, remote.port, resetLength);
 		}
@@ -899,7 +899,7 @@ namespace iosync
 		}
 
 		// Parsing/deserialization related:
-		disconnectionReason clientNetworkEngine::parseLeaveNotice(QSocket& socket, address remoteAddress, const address forwardAddress)
+		disconnectionReason clientNetworkEngine::parseLeaveNotice(QSocket& socket, const address& remoteAddress, const address& forwardAddress)
 		{
 			// Local variable(s):
 
@@ -1042,7 +1042,7 @@ namespace iosync
 		}
 
 		// Reliable message related:
-		bool serverNetworkEngine::onReliableMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
+		bool serverNetworkEngine::onReliableMessage(QSocket& socket, const address& remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Local variable(s):
 			bool response = true;
@@ -1091,7 +1091,7 @@ namespace iosync
 			return;
 		}
 
-		bool serverNetworkEngine::onForwardPacket(QSocket& socket, streamLocation startPosition, address remoteAddress, const messageHeader& header, const messageFooter& footer)
+		bool serverNetworkEngine::onForwardPacket(QSocket& socket, streamLocation startPosition, const address& remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Tell the user that packet-forwarding isn't supported.
 			return false;
@@ -1109,7 +1109,7 @@ namespace iosync
 		}
 
 		// Parsing/deserialization related:
-		bool serverNetworkEngine::parseMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
+		bool serverNetworkEngine::parseMessage(QSocket& socket, const address& remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Local variable(s):
 
@@ -1179,7 +1179,7 @@ namespace iosync
 		}
 
 		// Parsing/deserialization related:
-		bool serverNetworkEngine::parseConnectionMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer)
+		bool serverNetworkEngine::parseConnectionMessage(QSocket& socket, const address& remoteAddress, const messageHeader& header, const messageFooter& footer)
 		{
 			// Local variable(s):
 			player* p;
@@ -1233,7 +1233,7 @@ namespace iosync
 			return response;
 		}
 
-		disconnectionReason serverNetworkEngine::parseLeaveNotice(QSocket& socket, address remoteAddress, const address forwardAddress)
+		disconnectionReason serverNetworkEngine::parseLeaveNotice(QSocket& socket, const address& remoteAddress, const address& forwardAddress)
 		{
 			// Local variable(s):
 

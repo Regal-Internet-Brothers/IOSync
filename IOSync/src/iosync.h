@@ -558,11 +558,11 @@ namespace iosync
 			void serializeIODevice(QSocket& socket, IODevice* device);
 
 			// Message generation related:
-			outbound_packet generateConnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address realAddress=address(), const address forwardAddress=address());
-			outbound_packet generateDisconnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address realAddress=address(), const address forwardAddress=address());
+			outbound_packet generateConnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address& realAddress=address(), const address& forwardAddress=address());
+			outbound_packet generateDisconnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address& realAddress=address(), const address& forwardAddress=address());
 
-			outbound_packet generateGamepadConnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address realAddress=address(), const address forwardAddress=address());
-			outbound_packet generateGamepadDisconnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address realAddress=address(), const address forwardAddress=address());
+			outbound_packet generateGamepadConnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address& realAddress=address(), const address& forwardAddress=address());
+			outbound_packet generateGamepadDisconnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address& realAddress=address(), const address& forwardAddress=address());
 
 			// Parsing/deserialization related:
 			deviceType parseDeviceMessage(iosync_application* program, QSocket& socket, const messageHeader& header, const messageFooter& footer);

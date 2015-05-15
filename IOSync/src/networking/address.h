@@ -47,7 +47,7 @@ namespace iosync
 			// Methods:
 			bool isSet() const;
 
-			inline packetSize_t sendWith(QSocket& socket)
+			inline packetSize_t sendWith(QSocket& socket) const
 			{
 				return (packetSize_t)socket.sendMsg(IP, port);
 			}
@@ -115,7 +115,7 @@ namespace iosync
 				return ((this->port == addr->port) && this->IP == addr->IP);
 			}
 
-			inline bool operator==(const address addr) const
+			inline bool operator==(const address& addr) const
 			{
 				return operator==(&addr);
 			}
@@ -130,7 +130,7 @@ namespace iosync
 				return !operator==(addr);
 			}
 
-			inline bool operator!=(const address addr) const
+			inline bool operator!=(const address& addr) const
 			{
 				return operator!=(&addr);
 			}

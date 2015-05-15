@@ -18,7 +18,7 @@ namespace iosync
 		struct player : reliablePacketManager
 		{
 			// Constructor(s):
-			player(address remote = address(), bool calculateSnapshot = true);
+			player(const address& remote = address(), bool calculateSnapshot = true);
 
 			// Destructor(s):
 			virtual ~player();
@@ -77,7 +77,7 @@ namespace iosync
 		struct indirect_player : player
 		{
 			// Constructor(s):
-			indirect_player(address representativeAddress = address(), address resolvedAddress = address(), bool calculateSnapshot = true);
+			indirect_player(const address& representativeAddress=address(), const address& resolvedAddress=address(), bool calculateSnapshot = true);
 
 			// Destructor(s):
 			virtual ~indirect_player();

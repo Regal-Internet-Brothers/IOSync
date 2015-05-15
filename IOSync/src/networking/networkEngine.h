@@ -202,7 +202,7 @@ namespace iosync
 				headerInfo beginMessage(QSocket& socket, messageType msgType);
 
 				void finishMessage(QSocket& socket, const headerInfo header_Information);
-				messageFooter finishMessage(QSocket& socket, const headerInfo header_information, const address forwardAddress, const packetID ID=PACKET_ID_UNRELIABLE);
+				messageFooter finishMessage(QSocket& socket, const headerInfo header_information, const address& forwardAddress, const packetID ID=PACKET_ID_UNRELIABLE);
 
 				inline void finishMessage(QSocket& socket, const headerInfo info, player* p)
 				{
@@ -224,7 +224,7 @@ namespace iosync
 
 					Please do not send a reliable message using an incorrect overload of 'sendMessage'.
 				*/
-				outbound_packet finishReliableMessage(QSocket& socket, const address realAddress, const headerInfo header_information, const address forwardAddress=address(), const packetID ID=PACKET_ID_AUTOMATIC);
+				outbound_packet finishReliableMessage(QSocket& socket, const address& realAddress, const headerInfo header_information, const address& forwardAddress=address(), const packetID ID=PACKET_ID_AUTOMATIC);
 
 				/*
 					The 'header' and 'footer' arguments should be the message's current arguments.
@@ -265,7 +265,7 @@ namespace iosync
 				// This method may be overridden by inheriting classes.
 				// For example, must specify extra information in order
 				// to send messages to specific addresses.
-				virtual size_t sendMessage(QSocket& socket, address remote, bool resetLength=true);
+				virtual size_t sendMessage(QSocket& socket, const address& remote, bool resetLength=true);
 				virtual size_t sendMessage(networkDestinationCode destination=DEFAULT_DESTINATION, bool resetLength=true);
 
 				inline size_t sendMessage(QSocket& socket, outbound_packet packet, networkDestinationCode destination, bool alreadyInOutput=true)
@@ -300,7 +300,7 @@ namespace iosync
 
 				// This command is called every time a reliable message is found.
 				// If this returns 'false', the message will not be parsed, and it will be discarded.
-				virtual bool onReliableMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer);
+				virtual bool onReliableMessage(QSocket& socket, const address& remoteAddress, const messageHeader& header, const messageFooter& footer);
 
 				bool addReliablePacket(outbound_packet p);
 
@@ -312,7 +312,7 @@ namespace iosync
 				// This command allows you to remove a reliable packet agnostic of its internal behavior.
 				// For example, some reliable packets may provide address or player based "reference routines".
 				// The return value of this command may specify if the packet was removed.
-				bool removeReliablePacket(address remoteAddress, packetID ID);
+				bool removeReliablePacket(const address& remoteAddress, packetID ID);
 
 				// This may be used to manually remove a 'player' object from an
 				// 'outbound_packet' object's internal reference-container.
@@ -345,7 +345,7 @@ namespace iosync
 					return;
 				}
 
-				virtual bool onForwardPacket(QSocket& socket, streamLocation startPosition, address remoteAddress, const messageHeader& header, const messageFooter& footer);
+				virtual bool onForwardPacket(QSocket& socket, streamLocation startPosition, const address& remoteAddress, const messageHeader& header, const messageFooter& footer);
 
 				// The return value of this method indicates the number of messages that were received.
 				size_t handleMessages(QSocket& socket);
@@ -354,7 +354,7 @@ namespace iosync
 
 				// When overriding this method, please "call up" to your super-class's implementation.
 				// The order you do this in is up to you, but it is recommended that you do this first.
-				virtual bool parseMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer);
+				virtual bool parseMessage(QSocket& socket, const address& remoteAddress, const messageHeader& header, const messageFooter& footer);
 
 				// Player/connection management functionality:
 				inline bool timedOut(milliseconds connectionTime) const
@@ -370,18 +370,18 @@ namespace iosync
 				// Message generation:
 
 				// This command will produce a "ping" message directed at 'realAddress'.
-				inline outbound_packet generatePingMessage(QSocket& socket, const address realAddress=address(), const address forwardAddress=address())
+				inline outbound_packet generatePingMessage(QSocket& socket, const address& realAddress=address(), const address& forwardAddress=address())
 				{
 					return finishReliableMessage(socket, realAddress, beginMessage(socket, MESSAGE_TYPE_PING), forwardAddress);
 				}
 
 				// This command will produce a "pong" message directed at 'realAddress'.
-				inline outbound_packet generatePongMessage(QSocket& socket, const address realAddress=address(), const address forwardAddress=address())
+				inline outbound_packet generatePongMessage(QSocket& socket, const address& realAddress=address(), const address& forwardAddress=address())
 				{
 					return finishReliableMessage(socket, realAddress, beginMessage(socket, MESSAGE_TYPE_PONG), forwardAddress);
 				}
 
-				inline outbound_packet generateLeaveNotice(QSocket& socket, disconnectionReason reason, const address realAddress = address(), const address forwardAddress = address())
+				inline outbound_packet generateLeaveNotice(QSocket& socket, disconnectionReason reason, const address& realAddress = address(), const address& forwardAddress = address())
 				{
 					auto info = beginMessage(socket, MESSAGE_TYPE_LEAVE);
 
@@ -390,7 +390,7 @@ namespace iosync
 					return finishReliableMessage(socket, realAddress, info, forwardAddress);
 				}
 
-				inline outbound_packet generateConnectionMessage(QSocket& socket, wstring name, const address realAddress = address(), const address forwardAddress = address())
+				inline outbound_packet generateConnectionMessage(QSocket& socket, wstring name, const address& realAddress = address(), const address& forwardAddress = address())
 				{
 					auto info = beginMessage(socket, MESSAGE_TYPE_JOIN);
 
@@ -411,9 +411,9 @@ namespace iosync
 				}
 
 				// Parsing/deserialization related:
-				virtual disconnectionReason parseLeaveNotice(QSocket& socket, const address remoteAddress, const address forwardAddress=address());
+				virtual disconnectionReason parseLeaveNotice(QSocket& socket, const address& remoteAddress, const address& forwardAddress=address());
 
-				virtual packetID parsePacketConfirmationMessage(QSocket& socket, const address remoteAddress, const messageHeader& header, const messageFooter& footer);
+				virtual packetID parsePacketConfirmationMessage(QSocket& socket, const address& remoteAddress, const messageHeader& header, const messageFooter& footer);
 
 				// Sending related:
 				inline size_t sendPing(QSocket& socket, networkDestinationCode destination=DEFAULT_DESTINATION, bool resetLength=true)
@@ -487,7 +487,7 @@ namespace iosync
 					)
 				);
 
-				bool open(string remoteAddress, addressPort remotePort=DEFAULT_PORT, addressPort localPort=DEFAULT_LOCAL_PORT); // address remoteAddress
+				bool open(string remoteAddress, addressPort remotePort=DEFAULT_PORT, addressPort localPort=DEFAULT_LOCAL_PORT); // const address& remoteAddress
 
 				// Destructor(s):
 				virtual bool close() override;
@@ -499,20 +499,20 @@ namespace iosync
 
 				virtual void updatePacketsInTransit(QSocket& socket) override;
 
-				virtual bool onForwardPacket(QSocket& socket, streamLocation startPosition, address remoteAddress, const messageHeader& header, const messageFooter& footer) override;
+				virtual bool onForwardPacket(QSocket& socket, streamLocation startPosition, const address& remoteAddress, const messageHeader& header, const messageFooter& footer) override;
 
 				// Parsing/deserialization related:
 
 				// When calling up to this implementation, it is best to ensure a connection has been properly made beforehand.
-				virtual bool parseMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer) override;
+				virtual bool parseMessage(QSocket& socket, const address& remoteAddress, const messageHeader& header, const messageFooter& footer) override;
 
-				inline outbound_packet finishReliableMessage(QSocket& socket, const address realAddress, const headerInfo header_information, const player* p, packetID ID = PACKET_ID_AUTOMATIC)
+				inline outbound_packet finishReliableMessage(QSocket& socket, const address& realAddress, const headerInfo header_information, const player* p, packetID ID = PACKET_ID_AUTOMATIC)
 				{
 					return networkEngine::finishReliableMessage(socket, realAddress, header_information, p->vaddr(), ID);
 				}
 
 				size_t broadcastMessage(QSocket& socket, bool resetLength=true) override;
-				size_t sendMessage(QSocket& socket, address remote, bool resetLength=true) override;
+				size_t sendMessage(QSocket& socket, const address& remote, bool resetLength=true) override;
 
 				virtual bool hasRemoteConnection() const override;
 
@@ -522,7 +522,7 @@ namespace iosync
 				}
 
 				// Reliable message related:
-				virtual bool onReliableMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer) override;
+				virtual bool onReliableMessage(QSocket& socket, const address& remoteAddress, const messageHeader& header, const messageFooter& footer) override;
 
 				// Simple messages:
 				virtual void pingRemoteConnection(QSocket& socket) override;
@@ -549,13 +549,13 @@ namespace iosync
 					return networkEngine::sendMessage(socket, generateConnectionMessage(socket, playerName), destination, resetLength);
 				}
 
-				inline size_t sendConnectionMessage(QSocket& socket, wstring playerName, const address forwardAddress, networkDestinationCode destination=DEFAULT_DESTINATION, bool resetLength=true)
+				inline size_t sendConnectionMessage(QSocket& socket, wstring playerName, const address& forwardAddress, networkDestinationCode destination=DEFAULT_DESTINATION, bool resetLength=true)
 				{
 					return networkEngine::sendMessage(socket, generateConnectionMessage(socket, playerName, socket, forwardAddress), destination, resetLength);
 				}
 
 				// Message generation:
-				inline outbound_packet generateLeaveNotice(QSocket& socket, disconnectionReason reason, const address forwardAddress = address())
+				inline outbound_packet generateLeaveNotice(QSocket& socket, disconnectionReason reason, const address& forwardAddress = address())
 				{
 					return networkEngine::generateLeaveNotice(socket, reason, connection.remoteAddress, forwardAddress);
 				}
@@ -564,7 +564,7 @@ namespace iosync
 				// Nothing so far.
 
 				// Parsing/deserialization related:
-				virtual disconnectionReason parseLeaveNotice(QSocket& socket, const address remoteAddress, const address forwardAddress=address()) override;
+				virtual disconnectionReason parseLeaveNotice(QSocket& socket, const address& remoteAddress, const address& forwardAddress=address()) override;
 
 				// Connection management functionality:
 				virtual player* getPlayer(QSocket& socket) override;
@@ -643,9 +643,9 @@ namespace iosync
 				}
 
 				// Reliable message related:
-				virtual bool onReliableMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer) override;
+				virtual bool onReliableMessage(QSocket& socket, const address& remoteAddress, const messageHeader& header, const messageFooter& footer) override;
 
-				virtual bool onForwardPacket(QSocket& socket, streamLocation startPosition, address remoteAddress, const messageHeader& header, const messageFooter& footer) override;
+				virtual bool onForwardPacket(QSocket& socket, streamLocation startPosition, const address& remoteAddress, const messageHeader& header, const messageFooter& footer) override;
 
 				virtual size_t sendMessage(QSocket& socket, outbound_packet packet, bool alreadyInOutput=true) override;
 
@@ -658,7 +658,7 @@ namespace iosync
 				}
 
 				// Parsing/deserialization related:
-				virtual bool parseMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer) override;
+				virtual bool parseMessage(QSocket& socket, const address& remoteAddress, const messageHeader& header, const messageFooter& footer) override;
 
 				// Serialization related:
 				// Nothing so far.
@@ -667,7 +667,7 @@ namespace iosync
 
 				// This sends a blank 'MESSAGE_TYPE_JOIN' message reliably to the address specified.
 				// This is used to notify a player that their connection request has been accepted.
-				inline outbound_packet generatePlayerConfirmationMessage(QSocket& socket, const address realAddress = address(), const address forwardAddress = address())
+				inline outbound_packet generatePlayerConfirmationMessage(QSocket& socket, const address& realAddress = address(), const address& forwardAddress = address())
 				{
 					return finishReliableMessage(socket, realAddress, beginMessage(socket, MESSAGE_TYPE_JOIN), forwardAddress);
 				}
@@ -680,9 +680,9 @@ namespace iosync
 				// Parsing/deserialization related:
 
 				// The return value of this command specifies if the 'player' object was an "indirect" player or not.
-				bool parseConnectionMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer);
+				bool parseConnectionMessage(QSocket& socket, const address& remoteAddress, const messageHeader& header, const messageFooter& footer);
 
-				virtual disconnectionReason parseLeaveNotice(QSocket& socket, const address remoteAddress, const address forwardAddress=address()) override;
+				virtual disconnectionReason parseLeaveNotice(QSocket& socket, const address& remoteAddress, const address& forwardAddress=address()) override;
 
 				// Simple messages:
 				virtual void pingRemoteConnection(QSocket& socket) override;
@@ -713,17 +713,17 @@ namespace iosync
 				}
 
 				// This command allows you to retrieve a player-entry from the 'players' list.
-				inline player* getPlayer(address addr) const
+				inline player* getPlayer(const address& addr) const
 				{
 					return networkEngine::getPlayer(players, addr);
 				}
 
-				inline player* getPlayer(address addr, address vaddr) const
+				inline player* getPlayer(const address& addr, const address& vaddr) const
 				{
 					return networkEngine::getPlayer(players, addr, vaddr);
 				}
 
-				inline bool playerJoined(address addr) const
+				inline bool playerJoined(const address& addr) const
 				{
 					return (getPlayer(addr) != nullptr); //networkEngine::playerJoined(players, addr);
 				}
