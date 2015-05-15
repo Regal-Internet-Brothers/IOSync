@@ -17,11 +17,17 @@ namespace iosync
 	namespace networking
 	{
 		// Forward declarations:
+
+		// Structures:
 		struct messageHeader;
-		//struct messageFooter;
 		struct headerInfo;
 
+		//struct messageFooter;
+
 		struct player;
+
+		// Classes:
+		class networkEngine;
 
 		//using rawPacket = uqchar*;
 		typedef uqchar* rawPacket;
@@ -45,8 +51,8 @@ namespace iosync
 			typedef shared_ptr<uqchar> sharedMemory;
 
 			// Constructor(s):
-			packet(rawPacket rawData = (rawPacket)nullptr, size_t rawSize = 0, bool canFreeRawData = true);
-			packet(QSocket& socket, size_t readSize = 0);
+			explicit packet(rawPacket rawData = (rawPacket)nullptr, size_t rawSize = 0, bool canFreeRawData = true);
+			explicit packet(QSocket& socket, size_t readSize = 0);
 
 			// Destructor(s):
 			virtual ~packet();
@@ -134,7 +140,9 @@ namespace iosync
 		struct outbound_packet : packet
 		{
 			// Constructor(s):
-			outbound_packet(address remoteDestination, rawPacket rawData = (rawPacket)nullptr, packetID reliableIdentifier=PACKET_ID_UNRELIABLE, size_t rawSize = 0, bool canFreeRawData = true, bool isActive=false);
+			explicit outbound_packet(address remoteDestination, rawPacket rawData = (rawPacket)nullptr, packetID reliableIdentifier=PACKET_ID_UNRELIABLE, size_t rawSize = 0, bool canFreeRawData = true);
+
+			explicit outbound_packet(networkDestinationCode destCode, rawPacket rawData = (rawPacket)nullptr, packetID reliableIdentifier=PACKET_ID_UNRELIABLE, size_t rawSize = 0, bool canFreeRawData = true);
 
 			/*
 				This overload will read from the socket specified.
@@ -142,7 +150,7 @@ namespace iosync
 				please use the other constructor, and 'parodySerializedOutputMessage' instead.
 				The 'simulatedRead' argument is the same as the 'readFrom' command's version.
 			*/
-			outbound_packet(QSocket& socket, size_t readSize = 0, packetID reliableIdentifier=PACKET_ID_UNRELIABLE, address destinationAddress=address(), bool simulatedRead=false, bool isActive=false);
+			explicit outbound_packet(QSocket& socket, size_t readSize = 0, packetID reliableIdentifier=PACKET_ID_UNRELIABLE, address destinationAddress=address(), bool simulatedRead=false);
 
 			// Methods:
 
@@ -150,11 +158,20 @@ namespace iosync
 			// which uses the internal 'destination' address.
 			packetSize_t sendTo(QSocket& socket, bool destroyDataAfter = false);
 
+			// This allows you to send this packet using a 'networkEngine'.
+			// This means the 'destinationCode' field may be used (If set by the user).
+			packetSize_t sendTo(networkEngine& engine, QSocket& socket, bool destroyDataAfter = false);
+
 			// This command will automatically change the 'destination'
 			// address to the socket's message address, then send with it.
 			// Ideally, you'll want to use 'sendTo', instead of this.
 			packetSize_t autoSendTo(QSocket& socket, bool destroyDataAfter = false);
 
+			// This will send a packet using the arguments specified. This will not copy the internal buffer into the 'socket' itself.
+			// This is not guaranteed to use the 'engine' argument. However, it is guaranteed to use 'socket'.
+			packetSize_t sendFor(networkEngine& engine, QSocket& socket);
+
+			// This states if this packet is being sent to the address specified.
 			bool isSendingTo(const address addr) const;
 
 			// This will update the time-snapshot used to represent when this packet was first sent.
@@ -202,6 +219,9 @@ namespace iosync
 				if (destination != p.destination)
 					return false;
 
+				if (destinationCode != p.destinationCode)
+					return false;
+
 				return (snapshot == p.snapshot);
 			}
 
@@ -209,6 +229,12 @@ namespace iosync
 
 			// The address this packet is going to.
 			address destination;
+
+			// Used when sending to a destination, without an explicit address.
+			networkDestinationCode destinationCode;
+
+			// A list of connections tied to this packet.
+			playerList waitingConnections;
 
 			// A "snapshot" of the time this packet was initially sent.
 			high_resolution_clock::time_point snapshot;

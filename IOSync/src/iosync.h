@@ -558,11 +558,11 @@ namespace iosync
 			void serializeIODevice(QSocket& socket, IODevice* device);
 
 			// Message generation related:
-			outbound_packet generateConnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address realAddress=address(), address forwardAddress=address());
-			outbound_packet generateDisconnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address realAddress=address(), address forwardAddress=address());
+			outbound_packet generateConnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address realAddress=address(), const address forwardAddress=address());
+			outbound_packet generateDisconnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address realAddress=address(), const address forwardAddress=address());
 
-			outbound_packet generateGamepadConnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address realAddress=address(), address forwardAddress=address());
-			outbound_packet generateGamepadDisconnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address realAddress=address(), address forwardAddress=address());
+			outbound_packet generateGamepadConnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address realAddress=address(), const address forwardAddress=address());
+			outbound_packet generateGamepadDisconnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address realAddress=address(), const address forwardAddress=address());
 
 			// Parsing/deserialization related:
 			deviceType parseDeviceMessage(iosync_application* program, QSocket& socket, const messageHeader& header, const messageFooter& footer);
@@ -576,40 +576,35 @@ namespace iosync
 			void parseIODevice(iosync_application* program, QSocket& socket, IODevice* device, const messageHeader& header, const messageFooter& footer);
 
 			// Sending related:
+
+			// This may be used by hosts to connect all active devices to a client.
+			// This is very useful when dealing with setups where clients and hosts both handle device I/O.
+			size_t sendActiveDevices(networkEngine& engine, QSocket& socket, const player& p);
+
 			inline size_t sendConnectMessage(networkEngine& engine, QSocket& socket, deviceType device, networkDestinationCode destination = DEFAULT_DESTINATION, bool resetLength=true)
 			{
-				generateConnectMessage(engine, socket, device);
-
-				return engine.sendMessage(socket, destination, resetLength);
+				return engine.sendMessage(socket, generateConnectMessage(engine, socket, device), destination, resetLength);
 			}
 
 			inline size_t sendDisconnectMessage(networkEngine& engine, QSocket& socket, deviceType device, networkDestinationCode destination = DEFAULT_DESTINATION, bool resetLength=true)
 			{
-				generateDisconnectMessage(engine, socket, device);
-
-				return engine.sendMessage(socket, destination, resetLength);
+				return engine.sendMessage(socket, generateDisconnectMessage(engine, socket, device), destination, resetLength);
 			}
 
 			inline size_t sendGamepadConnectMessage(networkEngine& engine, QSocket& socket, networkDestinationCode destination = DEFAULT_DESTINATION, bool resetLength = true)
 			{
-				generateConnectMessage(engine, socket, DEVICE_TYPE_GAMEPAD);
-
-				return engine.sendMessage(socket, destination, resetLength);
+				return engine.sendMessage(socket, generateConnectMessage(engine, socket, DEVICE_TYPE_GAMEPAD), destination, resetLength);
 			}
 
 			// This can be used to manually request connection of a 'gamepad' device.
 			inline size_t sendGamepadConnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, networkDestinationCode destination = DEFAULT_DESTINATION, bool resetLength=true)
 			{
-				generateGamepadConnectMessage(engine, socket, identifier);
-
-				return engine.sendMessage(socket, destination, resetLength);
+				return engine.sendMessage(socket, generateGamepadConnectMessage(engine, socket, identifier), destination, resetLength);
 			}
 
 			inline size_t sendGamepadDisconnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, networkDestinationCode destination = DEFAULT_DESTINATION, bool resetLength=true)
 			{
-				generateGamepadDisconnectMessage(engine, socket, identifier);
-
-				return engine.sendMessage(socket, destination, resetLength);
+				return engine.sendMessage(socket, generateGamepadDisconnectMessage(engine, socket, identifier), destination, resetLength);
 			}
 
 			// This acts as a macro for requesting device-connections.
@@ -672,7 +667,7 @@ namespace iosync
 
 			// This will tell you if the local gamepad at the identifier specified is connected.
 			// To check if a gamepad is connected using a remote-identifier, please use 'remoteGamepadConnected'.
-			// This routine is primarily useful for routine which iterate through the 'gamepads' array.
+			// This is primarily useful for routines which iterate through the 'gamepads' array.
 			inline bool gamepadConnected(const gamepadID identifier) const
 			{
 				return ((gamepads[identifier] != nullptr) && gamepads[identifier]->connected());
@@ -706,6 +701,7 @@ namespace iosync
 					return true;
 				}
 
+				/*
 				gamepadID lowestRemoteID = MAX_GAMEPADS;
 
 				for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
@@ -717,6 +713,9 @@ namespace iosync
 				}
 
 				return (identifier > lowestRemoteID);
+				*/
+
+				return false;
 			}
 
 			// This will tell the caller if at least one virtual gamepad is connected.

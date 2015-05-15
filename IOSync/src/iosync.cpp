@@ -281,12 +281,26 @@ namespace iosync
 								#ifdef PLATFORM_WINDOWS
 									if (gp::__winnt__pluggedIn(i))
 									{
-										auto destination = (program->network->isHostNode) ? DESTINATION_ALL : DESTINATION_HOST;
+										switch (program->mode)
+										{
+											case iosync_application::MODE_DIRECT_CLIENT:
+											case iosync_application::MODE_CLIENT:
+												// Tell the remote host that a gamepad was connected:
+												sendGamepadConnectMessage(*program->network, program->network->socket, DESTINATION_HOST);
 
-										// Tell the remote host that a gamepad was connected:
-										sendGamepadConnectMessage(*program->network, program->network->socket, destination);
+												//sendGamepadConnectMessage(*program->network, program->network->socket, i, DESTINATION_HOST);
 
-										//sendGamepadConnectMessage(*program->network, program->network->socket, i, destination);
+												break;
+											case iosync_application::MODE_DIRECT_SERVER:
+												// Attempt to connect the gamepad manually:
+												if (connectGamepad(program, i) != nullptr)
+												{
+													// Tell all of the clients about this gamepad being connected:
+													sendGamepadConnectMessage(*program->network, program->network->socket, i, DESTINATION_ALL);
+												}
+
+												break;
+										}
 
 										// Add this identifier, so we don't bother trying to connect with it redundantly.
 										reservedGamepads.insert(i);
@@ -302,7 +316,7 @@ namespace iosync
 									if (disconnectLocalGamepad(program, i))
 									{
 										// Disconnection was successful, tell the remote host.
-										sendGamepadDisconnectMessage(*program->network, program->network->socket, i, DESTINATION_HOST);
+										sendGamepadDisconnectMessage(*program->network, program->network->socket, i, (program->twoWayOperations()) ? DESTINATION_ALL : DESTINATION_HOST);
 
 										// Remove this identifier, so it may be used again.
 										reservedGamepads.erase(i);
@@ -660,6 +674,7 @@ namespace iosync
 							auto identifier = (gamepadID)socket.read<serializedGamepadID>();
 							bool remotelyConnected = remoteGamepadConnected(identifier);
 
+							// Check if the device is already connected:
 							if (remotelyConnected)
 							{
 								if (program->allowDeviceDetection())
@@ -667,12 +682,9 @@ namespace iosync
 									reservedGamepads.erase(identifier);
 								}
 
-								if (!program->twoWayOperations())
-								{
-									sendGamepadDisconnectMessage(*program->network, socket, identifier, DESTINATION_REPLY);
+								sendGamepadDisconnectMessage(*program->network, socket, identifier, DESTINATION_REPLY);
 
-									return false;
-								}
+								return false;
 							}
 
 							gp* pad = connectGamepad(program, identifier);
@@ -685,7 +697,9 @@ namespace iosync
 
 							pad->owner = program->network->getPlayer(socket);
 
-							if (program->allowDeviceSimulation())
+							//if (program->allowDeviceSimulation()) // !program->twoWayOperations()
+							//if (program->mode == iosync_application::MODE_SERVER || program->mode == iosync_application::MODE_DIRECT_SERVER)
+							if (program->network->isHostNode)
 							{
 								// Tell the user that their gamepad was connected.
 								sendGamepadConnectMessage(*program->network, socket, identifier, DESTINATION_REPLY);
@@ -702,7 +716,8 @@ namespace iosync
 
 							pad->owner = program->network->getPlayer(socket);
 
-							if (program->allowDeviceSimulation())
+							//if (program->allowDeviceSimulation())
+							if (program->network->isHostNode)
 							{
 								// Tell the user that their gamepad was connected.
 								sendGamepadConnectMessage(*program->network, socket, pad->remoteGamepadNumber, DESTINATION_REPLY);
@@ -860,7 +875,7 @@ namespace iosync
 		}
 
 		// Message generation related:
-		outbound_packet connectedDevices::generateConnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address realAddress, address forwardAddress)
+		outbound_packet connectedDevices::generateConnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address realAddress, const address forwardAddress)
 		{
 			auto headerInformation = beginDeviceMessage(engine, socket, device, DEVICE_NETWORK_MESSAGE_CONNECT);
 
@@ -869,7 +884,7 @@ namespace iosync
 			return engine.finishReliableMessage(socket, realAddress, headerInformation, forwardAddress);
 		}
 
-		outbound_packet connectedDevices::generateDisconnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address realAddress, address forwardAddress)
+		outbound_packet connectedDevices::generateDisconnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address realAddress, const address forwardAddress)
 		{
 			auto headerInformation = beginDeviceMessage(engine, socket, device, DEVICE_NETWORK_MESSAGE_DISCONNECT);
 
@@ -878,7 +893,7 @@ namespace iosync
 			return engine.finishReliableMessage(socket, realAddress, headerInformation, forwardAddress);
 		}
 
-		outbound_packet connectedDevices::generateGamepadConnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address realAddress, address forwardAddress)
+		outbound_packet connectedDevices::generateGamepadConnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address realAddress, const address forwardAddress)
 		{
 			// This will automatically add the extension-flag to the message.
 			auto headerInformation = beginGamepadDeviceMessage(engine, socket, identifier, DEVICE_NETWORK_MESSAGE_CONNECT);
@@ -888,7 +903,7 @@ namespace iosync
 			return engine.finishReliableMessage(socket, realAddress, headerInformation, forwardAddress);
 		}
 
-		outbound_packet connectedDevices::generateGamepadDisconnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address realAddress, address forwardAddress)
+		outbound_packet connectedDevices::generateGamepadDisconnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address realAddress, const address forwardAddress)
 		{
 			// This will automatically add the extension-flag to the message.
 			auto headerInformation = beginGamepadDeviceMessage(engine, socket, identifier, DEVICE_NETWORK_MESSAGE_DISCONNECT);
@@ -1052,7 +1067,7 @@ namespace iosync
 				gp* pad = getGamepad(identifier); // getLocalGamepad(identifier);
 
 				// Ensure we were able to retrieve a gamepad, and the sender is authorized:
-				if (pad == nullptr || (*pad->owner) != socket)
+				if (pad == nullptr || ((pad->owner != nullptr) && (*pad->owner) != socket))
 					return DEVICE_NETWORK_MESSAGE_INVALID;
 
 				// Check the sub-message type:
@@ -1085,6 +1100,30 @@ namespace iosync
 			device->readFrom(socket);
 
 			return;
+		}
+
+		// Sending related:
+		size_t connectedDevices::sendActiveDevices(networkEngine& engine, QSocket& socket, const player& p)
+		{
+			size_t sent = 0;
+
+			if (hasDeviceConnected())
+			{
+				for (gamepadID i = 0; i < deviceManagement::MAX_GAMEPADS; i++)
+				{
+					if (gamepadConnected(i))
+					{
+						sent += engine.sendMessage(socket, generateGamepadConnectMessage(engine, socket, gamepads[i]->remoteGamepadNumber, p, p.vaddr()));
+					}
+				}
+
+				if (keyboardConnected())
+				{
+					sent += engine.sendMessage(socket, generateConnectMessage(engine, socket, DEVICE_TYPE_KEYBOARD, p, p.vaddr()));
+				}
+			}
+
+			return sent;
 		}
 	}
 
@@ -2752,7 +2791,7 @@ namespace iosync
 	// Call-backs:
 	void iosync_application::onNetworkConnected(networkEngine& engine)
 	{
-		networkLog << "Connected to server, sending device connection-requests..." << endl;
+		networkLog << "Connected to the server." << endl;
 
 		/*
 			// Handled through safe call-back messages now:
@@ -2761,15 +2800,23 @@ namespace iosync
 			devices.connect(this);
 		*/
 
-		// Tell the host to connect the devices we have.
-		// If they accept, we will receive messages to connect our devices.
-		if (devices.sendConnectionRequests(engine, DESTINATION_HOST) > 0)
+		switch (mode)
 		{
-			networkLog << "Device messages sent, waiting for a response." << endl;
-		}
-		else
-		{
-			networkLog << "Initial device-messages unneeded." << endl;
+			case MODE_CLIENT:
+				networkLog << "Sending device connection-requests..." << endl;
+
+				// Tell the host to connect the devices we have.
+				// If they accept, we will receive messages to connect our devices.
+				if (devices.sendConnectionRequests(engine, DESTINATION_HOST) > 0)
+				{
+					networkLog << "Device messages sent, waiting for a response." << endl;
+				}
+				else
+				{
+					networkLog << "Initial device-messages unneeded." << endl;
+				}
+
+				break;
 		}
 
 		return;
@@ -2780,6 +2827,15 @@ namespace iosync
 		wnetworkLog << "Player connected: " << p.name << endl;
 
 		networkLog << "Player address: "; p.outputAddressInfo(networkLogStream, true);
+
+		switch (mode)
+		{
+			case MODE_DIRECT_SERVER:
+				// Tell the client about the actively connected devices.
+				devices.sendActiveDevices(engine, engine.socket, p);
+
+				break;
+		}
 
 		return;
 	}

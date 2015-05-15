@@ -55,7 +55,7 @@ namespace iosync
 		struct messageFooter
 		{
 			// Constructor(s):
-			messageFooter(address forward = address(), packetID identifier = PACKET_ID_UNRELIABLE);
+			messageFooter(const address& forward = address(), packetID identifier = PACKET_ID_UNRELIABLE);
 			messageFooter(QSocket& socket, streamLocation position);
 			messageFooter(QSocket& socket);
 

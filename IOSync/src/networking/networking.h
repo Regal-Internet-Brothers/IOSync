@@ -26,6 +26,7 @@
 #include <climits>
 
 #include <iostream>
+#include <list>
 #include <chrono>
 
 // Namespaces:
@@ -37,6 +38,9 @@ namespace iosync
 	namespace networking
 	{
 		using namespace quickLib::sockets;
+
+		// Forward declarations:
+		struct player;
 
 		// Typedefs:
 		typedef nativeIP addressIP;
@@ -53,31 +57,7 @@ namespace iosync
 
 		typedef milliseconds connectionPing;
 
-		/*
-		// Structures:
-		struct player;
-		struct address;
-
-		// Message types:
-		struct messageHeader;
-		struct messageFooter;
-
-		// Packet types:
-		struct packet;
-
-		struct outbound_packet;
-		struct symbolic_packet;
-
-		// Networking time-information.
-		struct networkMetrics;
-
-		// Classes:
-
-		// Internal:
-		class networkEngine;
-		class clientNetworkEngine;
-		class serverNetworkEngine;
-		*/
+		typedef list<player*> playerList;
 
 		// Enumerator(s):
 
@@ -119,10 +99,10 @@ namespace iosync
 		{
 			DESTINATION_HOST = 0,
 			DESTINATION_REPLY = 1,
-			DESTINATION_DIRECT = 2,
 			DESTINATION_ALL = 3,
 
-			DEFAULT_DESTINATION = DESTINATION_REPLY,
+			DESTINATION_DIRECT = DESTINATION_REPLY,
+			DEFAULT_DESTINATION = DESTINATION_REPLY, // DESTINATION_DIRECT
 		};
 
 		// Reserved/useful packet identifier-macros:

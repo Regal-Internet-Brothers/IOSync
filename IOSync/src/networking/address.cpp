@@ -51,6 +51,11 @@ namespace iosync
 			// Nothing so far.
 		}
 
+		address::address(const player& p) : address(&p)
+		{
+			// Nothing so far.
+		}
+
 		// Methods:
 		bool address::isSet() const
 		{

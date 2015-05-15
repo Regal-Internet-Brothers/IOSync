@@ -90,7 +90,7 @@ namespace iosync
 		// messageFooter:
 
 		// Constructor(s):
-		messageFooter::messageFooter(address forward, packetID identifier)
+		messageFooter::messageFooter(const address& forward, packetID identifier)
 			: reliableIdentifier(identifier), forwardAddress(forward), serializedSize(0) { /* Nothing so far. */ }
 
 		// The socket specified will be immediately read from.

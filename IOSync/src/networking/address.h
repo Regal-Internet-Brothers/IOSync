@@ -42,6 +42,7 @@ namespace iosync
 			address(nonNativeIP address, addressPort remotePort);
 			address(const QSocket& socket);
 			address(const player* p);
+			address(const player& p);
 
 			// Methods:
 			bool isSet() const;

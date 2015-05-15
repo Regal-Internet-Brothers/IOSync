@@ -266,7 +266,7 @@ namespace iosync
 				{
 					packetInTransit.updateOutputSnapshot();
 
-					packetInTransit.sendTo(socket, false);
+					packetInTransit.sendTo(*this, socket, false);
 				}
 
 				packetIterator++;
@@ -317,9 +317,6 @@ namespace iosync
 
 			outbound_packet output((realAddress.isSet()) ? realAddress : address(socket), nullptr, identifier);
 			output.parodySerializedOutputMessage(socket, header_Information, footer.serializedSize, false);
-
-			// Add the newly generated packet to the reliable-packet list.
-			addReliablePacket(output);
 
 			return output;
 		}
@@ -379,6 +376,21 @@ namespace iosync
 			}
 
 			return (size_t)SOCKET_ERROR;
+		}
+
+		size_t networkEngine::sendMessage(QSocket& socket, outbound_packet packet, bool alreadyInOutput)
+		{
+			// Add the specified packet to the reliable-packet container.
+			addReliablePacket(packet);
+
+			if (!alreadyInOutput)
+			{
+				socket.flushOutput();
+
+				return packet.sendTo(*this, socket);
+			}
+			
+			return packet.sendFor(*this, socket);
 		}
 
 		size_t networkEngine::sendMessage(QSocket& socket, address remote, bool resetLength)
@@ -457,6 +469,57 @@ namespace iosync
 
 			// Return the default response.
 			return false;
+		}
+
+		bool networkEngine::removeReliablePacket(address remoteAddress, packetID ID)
+		{
+			for (auto& packetInTransit : packetsInTransit)
+			{
+				if (packetInTransit.identifier == ID)
+				{
+					if (packetInTransit.waitingConnections.empty())
+					{
+						removeReliablePacket(ID);
+
+						return true;
+					}
+					else
+					{
+						// Retrieve the corrisponding player-object to the 'remoteAddress' argument.
+						auto p = getPlayer(packetInTransit.waitingConnections, remoteAddress);
+
+						if (p != nullptr)
+						{
+							return removeReliablePacket(p, packetInTransit);
+						}
+
+						break;
+					}
+				}
+			}
+
+			// Return the default response.
+			return false;
+		}
+
+		bool networkEngine::removeReliablePacket(player* p, outbound_packet& packetInTransit)
+		{
+			if (!packetInTransit.waitingConnections.empty())
+			{
+				packetInTransit.waitingConnections.remove(p);
+
+				// Check if this container still isn't empty:
+				if (!packetInTransit.waitingConnections.empty())
+				{
+					// Tell the user we aren't done yet.
+					return false;
+				}
+			}
+
+			packetsInTransit.remove(packetInTransit);
+
+			// Tell the user we found the packet, and successfully removed it.
+			return true;
 		}
 
 		size_t networkEngine::handleMessages(QSocket& socket)
@@ -615,7 +678,7 @@ namespace iosync
 		}
 
 		// Parsing/deserialization related:
-		disconnectionReason networkEngine::parseLeaveNotice(QSocket& socket, address remoteAddress, address forwardAddress)
+		disconnectionReason networkEngine::parseLeaveNotice(QSocket& socket, address remoteAddress, const address forwardAddress)
 		{
 			return socket.read<disconnectionReason>();
 		}
@@ -628,7 +691,7 @@ namespace iosync
 			auto ID = socket.read<packetID>();
 
 			// Remove the reliable-packet with this identifier.
-			removeReliablePacket(ID);
+			removeReliablePacket(remoteAddress, ID);
 
 			// Return the packet-identifier.
 			return ID;
@@ -659,7 +722,7 @@ namespace iosync
 			connection.remoteAddress = master;
 
 			// Check if we have a username to work with, if not, assign one:
-			if (connection.name.size() == 0)
+			if (connection.name.empty())
 				connection.name = L"Unknown";
 
 			sendConnectionMessage(socket, connection.name, DESTINATION_HOST);
@@ -767,12 +830,15 @@ namespace iosync
 			switch (header.type)
 			{
 				case MESSAGE_TYPE_JOIN:
-					// Set the connection-flag.
-					connected = true;
+					if (!connected)
+					{
+						// Set the connection-flag.
+						connected = true;
 
-					updateSnapshot();
+						updateSnapshot();
 
-					parentProgram.onNetworkConnected(*this);
+						parentProgram.onNetworkConnected(*this);
+					}
 
 					break;
 				case MESSAGE_TYPE_PING:
@@ -797,11 +863,14 @@ namespace iosync
 
 					break;
 				case MESSAGE_TYPE_LEAVE:
-					// Attempt to disconnect "gracefully". (Unreliable)
-					sendCourtesyLeaveConfirmation(socket);
+					if (connected)
+					{
+						// Attempt to disconnect "gracefully". (Unreliable)
+						sendCourtesyLeaveConfirmation(socket);
 
-					// Close this network.
-					close();
+						// Close this network.
+						close();
+					}
 
 					break;
 				default:
@@ -830,7 +899,7 @@ namespace iosync
 		}
 
 		// Parsing/deserialization related:
-		disconnectionReason clientNetworkEngine::parseLeaveNotice(QSocket& socket, address remoteAddress, address forwardAddress)
+		disconnectionReason clientNetworkEngine::parseLeaveNotice(QSocket& socket, address remoteAddress, const address forwardAddress)
 		{
 			// Local variable(s):
 
@@ -838,9 +907,7 @@ namespace iosync
 			auto reason = networkEngine::parseLeaveNotice(socket, remoteAddress, forwardAddress);
 			
 			// By default, clients will accept all leave-notices:
-			generateLeaveNotice(socket, DISCONNECTION_REASON_ACCEPT);
-
-			sendMessage(socket, remoteAddress);
+			networkEngine::sendMessage(socket, generateLeaveNotice(socket, DISCONNECTION_REASON_ACCEPT));
 
 			// Return the "reason" given.
 			return reason;
@@ -925,6 +992,7 @@ namespace iosync
 
 					forceDisconnectPlayer(socket, *p, DISCONNECTION_REASON_TIMEDOUT, false, false);
 
+					// Remove the invalid "reference" from the 'players' container.
 					players.erase(p++);
 
 					continue;
@@ -944,7 +1012,7 @@ namespace iosync
 
 			for (auto p : players)
 			{
-				 sent += sendMessage(socket, p->remoteAddress, false);
+				 sent += networkEngine::sendMessage(socket, p->remoteAddress, false);
 			}
 
 			if (resetLength)
@@ -996,7 +1064,7 @@ namespace iosync
 			generatePacketConfirmationMessage(socket, footer.reliableIdentifier);
 
 			//sendPacketConfirmationMessage(socket, footer.reliableIdentifier);
-			sendMessage(socket, remoteAddress);
+			networkEngine::sendMessage(socket, remoteAddress);
 
 			return response;
 		}
@@ -1004,27 +1072,21 @@ namespace iosync
 		// Simple messages:
 		void serverNetworkEngine::pingRemoteConnection(QSocket& socket)
 		{
-			// Generate a ping-message.
-			generatePingMessage(socket);
-
 			// Send "ping" messages to every player:
 			for (auto p : players)
 			{
-				sendMessage(socket, p->remoteAddress, false);
-
-				// Update this player's connection-snapshot.
 				if (!p->pinging)
 				{
+					// Send a message to this player.
+					sendMessage(socket, generatePingMessage(socket, p, p->vaddr()));
+
+					// Update this player's connection-snapshot.
 					p->updateSnapshot();
 
+					// Set this player as "pinging", so we don't send incorrectly.
 					p->pinging = true;
 				}
 			}
-
-			// Flush the output-stream.
-			socket.flushOutput();
-
-			//sendPing(socket);
 
 			return;
 		}
@@ -1033,6 +1095,17 @@ namespace iosync
 		{
 			// Tell the user that packet-forwarding isn't supported.
 			return false;
+		}
+
+		size_t serverNetworkEngine::sendMessage(QSocket& socket, outbound_packet packet, bool alreadyInOutput)
+		{
+			if (packet.destinationCode == DESTINATION_ALL)
+			{
+				// Make a copy of the current player-list.
+				packet.waitingConnections = players;
+			}
+
+			return networkEngine::sendMessage(socket, packet, alreadyInOutput);
 		}
 
 		// Parsing/deserialization related:
@@ -1160,7 +1233,7 @@ namespace iosync
 			return response;
 		}
 
-		disconnectionReason serverNetworkEngine::parseLeaveNotice(QSocket& socket, address remoteAddress, address forwardAddress)
+		disconnectionReason serverNetworkEngine::parseLeaveNotice(QSocket& socket, address remoteAddress, const address forwardAddress)
 		{
 			// Local variable(s):
 
@@ -1188,8 +1261,7 @@ namespace iosync
 			// Add the player to the internal-container.
 			addPlayer(p);
 
-			generatePlayerConfirmationMessage(socket, p, p->vaddr());
-			sendMessage(socket, p);
+			networkEngine::sendMessage(socket, generatePlayerConfirmationMessage(socket, p, p->vaddr()));
 
 			// Return the default response.
 			return true;
@@ -1197,9 +1269,8 @@ namespace iosync
 
 		bool serverNetworkEngine::disconnectPlayer(QSocket& socket, player* p, disconnectionReason reason)
 		{
-			// Request that the player disconnects:
-			generateLeaveNotice(socket, reason, p);
-			sendMessage(socket, p);
+			// Request that the player disconnects.
+			sendMessage(socket, generateLeaveNotice(socket, reason, p));
 
 			// Return the default response.
 			return true;
@@ -1214,13 +1285,44 @@ namespace iosync
 
 			finishMessage(socket, info, p);
 
-			sendMessage(socket, p);
+			networkEngine::sendMessage(socket, p);
 
 			// Force the player out of the internal-container.
 			removePlayer(p, autoRemove);
 
 			// Delete the 'player' object specified.
 			delete p;
+
+			return;
+		}
+
+		void serverNetworkEngine::onPlayerRemoved(player* p)
+		{
+			// Remove any references to this 'player':
+
+			// Check for lingering packets sent directly to 'p':
+			if (getPlayer(p->remoteAddress) == nullptr)
+			{
+				auto op = packetsInTransit.begin();
+
+				while (op != packetsInTransit.end())
+				{
+					if ((*op).isSendingTo(p))
+					{
+						packetsInTransit.erase(op++);
+
+						continue;
+					}
+
+					op++;
+				}
+			}
+
+			// Remove multi-destination ties to this 'player' object:
+			for (auto& packetInTransit : packetsInTransit)
+			{
+				removeReliablePacket(p, packetInTransit);
+			}
 
 			return;
 		}

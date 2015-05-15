@@ -12,7 +12,6 @@
 #include "../exceptions.h"
 
 // Standard library:
-#include <list>
 #include <string>
 #include <stdexcept>
 
@@ -142,7 +141,34 @@ namespace iosync
 				};
 
 				// Functions:
-				// Nothing so far.
+
+				// This command allows you to retrieve a player-entry from the 'players' list.
+				static inline player* getPlayer(const playerList& players, const address& addr)
+				{
+					for (auto p : players)
+					{
+						if (p->remoteAddress == addr)
+							return p;
+					}
+
+					return nullptr;
+				}
+
+				static inline player* getPlayer(const playerList& players, const address& addr, const address& vaddr)
+				{
+					for (auto p : players)
+					{
+						if (p->remoteAddress == addr && p->vaddr() == vaddr)
+							return p;
+					}
+
+					return nullptr;
+				}
+
+				static inline bool playerJoined(const playerList& players, const address& addr)
+				{
+					return (getPlayer(players, addr) != nullptr);
+				}
 
 				// Constructor(s):
 				networkEngine(application& parent, const networkMetrics metrics);
@@ -188,6 +214,16 @@ namespace iosync
 					return;
 				}
 
+				/*
+					This should be used when finishing a reliable message.
+					The output should be used in order to send a message.
+					
+					Not sending with the output will result in partially undefined behavior.
+					Currently this means that the message will only be unreliable,
+					and the 'outbound_packet' object will be destroyed instantly.
+
+					Please do not send a reliable message using an incorrect overload of 'sendMessage'.
+				*/
 				outbound_packet finishReliableMessage(QSocket& socket, const address realAddress, const headerInfo header_information, const address forwardAddress=address(), const packetID ID=PACKET_ID_AUTOMATIC);
 
 				/*
@@ -223,11 +259,28 @@ namespace iosync
 				// This is useful for situations where an address isn't needed.
 				virtual size_t sendMessage(QSocket& socket, networkDestinationCode destination=DEFAULT_DESTINATION, bool resetLength=true);
 
+				// This may be used to easily send an 'outbound_packet' object.
+				virtual size_t sendMessage(QSocket& socket, outbound_packet packet, bool alreadyInOutput=true);
+
 				// This method may be overridden by inheriting classes.
 				// For example, must specify extra information in order
 				// to send messages to specific addresses.
 				virtual size_t sendMessage(QSocket& socket, address remote, bool resetLength=true);
 				virtual size_t sendMessage(networkDestinationCode destination=DEFAULT_DESTINATION, bool resetLength=true);
+
+				inline size_t sendMessage(QSocket& socket, outbound_packet packet, networkDestinationCode destination, bool alreadyInOutput=true)
+				{
+					packet.destinationCode = destination;
+
+					return sendMessage(socket, packet, alreadyInOutput);
+				}
+
+				inline size_t sendMessage(QSocket& socket, outbound_packet packet, const player* p, bool alreadyInOutput=true)
+				{
+					packet.destination = p;
+
+					return sendMessage(socket, packet, alreadyInOutput);
+				}
 
 				virtual bool hasRemoteConnection() const;
 
@@ -255,6 +308,16 @@ namespace iosync
 
 				void removeReliablePacket(packetID ID) override;
 				bool hasReliablePacket(packetID ID) const override;
+
+				// This command allows you to remove a reliable packet agnostic of its internal behavior.
+				// For example, some reliable packets may provide address or player based "reference routines".
+				// The return value of this command may specify if the packet was removed.
+				bool removeReliablePacket(address remoteAddress, packetID ID);
+
+				// This may be used to manually remove a 'player' object from an
+				// 'outbound_packet' object's internal reference-container.
+				// This command is considered "unsafe", as it may rely upon undefined behavior under certain conditions.
+				bool removeReliablePacket(player* p, outbound_packet& packetInTransit);
 
 				// This method passes the message represented by the header specified.
 				// This will only pass the data-segment of the message; the footer will not be passed.
@@ -307,13 +370,13 @@ namespace iosync
 				// Message generation:
 
 				// This command will produce a "ping" message directed at 'realAddress'.
-				inline outbound_packet generatePingMessage(QSocket& socket, const address realAddress=address(), address forwardAddress=address())
+				inline outbound_packet generatePingMessage(QSocket& socket, const address realAddress=address(), const address forwardAddress=address())
 				{
 					return finishReliableMessage(socket, realAddress, beginMessage(socket, MESSAGE_TYPE_PING), forwardAddress);
 				}
 
 				// This command will produce a "pong" message directed at 'realAddress'.
-				inline outbound_packet generatePongMessage(QSocket& socket, const address realAddress=address(), address forwardAddress=address())
+				inline outbound_packet generatePongMessage(QSocket& socket, const address realAddress=address(), const address forwardAddress=address())
 				{
 					return finishReliableMessage(socket, realAddress, beginMessage(socket, MESSAGE_TYPE_PONG), forwardAddress);
 				}
@@ -348,27 +411,19 @@ namespace iosync
 				}
 
 				// Parsing/deserialization related:
-				virtual disconnectionReason parseLeaveNotice(QSocket& socket, address remoteAddress, address forwardAddress=address());
+				virtual disconnectionReason parseLeaveNotice(QSocket& socket, const address remoteAddress, const address forwardAddress=address());
 
-				virtual packetID parsePacketConfirmationMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer);
+				virtual packetID parsePacketConfirmationMessage(QSocket& socket, const address remoteAddress, const messageHeader& header, const messageFooter& footer);
 
 				// Sending related:
 				inline size_t sendPing(QSocket& socket, networkDestinationCode destination=DEFAULT_DESTINATION, bool resetLength=true)
 				{
-					// Generate a message header for the output.
-					generatePingMessage(socket);
-
-					// Send the newly generated message.
-					return networkEngine::sendMessage(socket, destination, resetLength);
+					return networkEngine::sendMessage(socket, generatePingMessage(socket), destination, resetLength);
 				}
 
 				inline size_t sendPong(QSocket& socket, networkDestinationCode destination=DEFAULT_DESTINATION, bool resetLength=true)
 				{
-					// Generate a message header for the output.
-					generatePongMessage(socket);
-
-					// Send the newly generated message.
-					return networkEngine::sendMessage(socket, destination, resetLength);
+					return networkEngine::sendMessage(socket, generatePongMessage(socket), destination, resetLength);
 				}
 
 				virtual void pingRemoteConnection(QSocket& socket) = 0;
@@ -474,9 +529,7 @@ namespace iosync
 
 				inline size_t sendLeaveNotice(QSocket& socket, disconnectionReason reason=DISCONNECTION_REASON_UNKNOWN, networkDestinationCode destination=DEFAULT_DESTINATION, bool resetLength=true)
 				{
-					generateLeaveNotice(socket, reason);
-
-					return networkEngine::sendMessage(socket, destination, resetLength);
+					return networkEngine::sendMessage(socket, generateLeaveNotice(socket, reason), destination, resetLength);
 				}
 
 				inline size_t sendCourtesyLeaveConfirmation(QSocket& socket, networkDestinationCode destination=DEFAULT_DESTINATION)
@@ -493,16 +546,12 @@ namespace iosync
 
 				inline size_t sendConnectionMessage(QSocket& socket, wstring playerName=L"Player", networkDestinationCode destination=DEFAULT_DESTINATION, bool resetLength=true)
 				{
-					generateConnectionMessage(socket, playerName);
-
-					return networkEngine::sendMessage(socket, destination, resetLength);
+					return networkEngine::sendMessage(socket, generateConnectionMessage(socket, playerName), destination, resetLength);
 				}
 
-				inline size_t sendConnectionMessage(QSocket& socket, wstring playerName, address forwardAddress, networkDestinationCode destination=DEFAULT_DESTINATION, bool resetLength=true)
+				inline size_t sendConnectionMessage(QSocket& socket, wstring playerName, const address forwardAddress, networkDestinationCode destination=DEFAULT_DESTINATION, bool resetLength=true)
 				{
-					generateConnectionMessage(socket, playerName, socket, forwardAddress);
-
-					return networkEngine::sendMessage(socket, destination, resetLength);
+					return networkEngine::sendMessage(socket, generateConnectionMessage(socket, playerName, socket, forwardAddress), destination, resetLength);
 				}
 
 				// Message generation:
@@ -515,7 +564,7 @@ namespace iosync
 				// Nothing so far.
 
 				// Parsing/deserialization related:
-				virtual disconnectionReason parseLeaveNotice(QSocket& socket, address remoteAddress, address forwardAddress=address()) override;
+				virtual disconnectionReason parseLeaveNotice(QSocket& socket, const address remoteAddress, const address forwardAddress=address()) override;
 
 				// Connection management functionality:
 				virtual player* getPlayer(QSocket& socket) override;
@@ -548,7 +597,7 @@ namespace iosync
 				address master;
 
 				// Booleans / Flags:
-				bool connected;
+				bool connected = false;
 		};
 
 		class serverNetworkEngine : public networkEngine
@@ -590,13 +639,23 @@ namespace iosync
 
 				inline size_t sendMessageTo(QSocket& socket, player* p)
 				{
-					return sendMessage(socket, p->remoteAddress);
+					return networkEngine::sendMessage(socket, p->remoteAddress);
 				}
 
 				// Reliable message related:
 				virtual bool onReliableMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer) override;
 
 				virtual bool onForwardPacket(QSocket& socket, streamLocation startPosition, address remoteAddress, const messageHeader& header, const messageFooter& footer) override;
+
+				virtual size_t sendMessage(QSocket& socket, outbound_packet packet, bool alreadyInOutput=true) override;
+
+				// This is used to manually set the output-destination to a player's address, then send to that address.
+				inline size_t sendMessage(QSocket& socket, outbound_packet packet, player* p, bool alreadyInOutput=true)
+				{
+					packet.destination = p;
+
+					return sendMessage(socket, packet, alreadyInOutput);
+				}
 
 				// Parsing/deserialization related:
 				virtual bool parseMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer) override;
@@ -615,7 +674,7 @@ namespace iosync
 
 				inline outbound_packet generateLeaveNotice(QSocket& socket, disconnectionReason reason, player* p)
 				{
-					return networkEngine::generateLeaveNotice(socket, reason, p->remoteAddress, p->vaddr());
+					return networkEngine::generateLeaveNotice(socket, reason, p, p->vaddr());
 				}
 
 				// Parsing/deserialization related:
@@ -623,7 +682,7 @@ namespace iosync
 				// The return value of this command specifies if the 'player' object was an "indirect" player or not.
 				bool parseConnectionMessage(QSocket& socket, address remoteAddress, const messageHeader& header, const messageFooter& footer);
 
-				virtual disconnectionReason parseLeaveNotice(QSocket& socket, address remoteAddress, address forwardAddress=address()) override;
+				virtual disconnectionReason parseLeaveNotice(QSocket& socket, const address remoteAddress, const address forwardAddress=address()) override;
 
 				// Simple messages:
 				virtual void pingRemoteConnection(QSocket& socket) override;
@@ -656,35 +715,27 @@ namespace iosync
 				// This command allows you to retrieve a player-entry from the 'players' list.
 				inline player* getPlayer(address addr) const
 				{
-					for (auto p : players)
-					{
-						if (p->remoteAddress == addr)
-							return p;
-					}
-
-					return nullptr;
+					return networkEngine::getPlayer(players, addr);
 				}
 
 				inline player* getPlayer(address addr, address vaddr) const
 				{
-					for (auto p : players)
-					{
-						if (p->remoteAddress == addr && p->vaddr() == vaddr)
-							return p;
-					}
-
-					return nullptr;
+					return networkEngine::getPlayer(players, addr, vaddr);
 				}
 
 				inline bool playerJoined(address addr) const
 				{
-					return (getPlayer(addr) != nullptr);
+					return (getPlayer(addr) != nullptr); //networkEngine::playerJoined(players, addr);
 				}
 
 				// The return values of these commands indicate if they were successful:
 				bool connectPlayer(QSocket& socket, player* p);
 				bool disconnectPlayer(QSocket& socket, player* p, disconnectionReason reason=DISCONNECTION_REASON_ACCEPT);
 				void forceDisconnectPlayer(QSocket& socket, player* p, disconnectionReason reason=DISCONNECTION_REASON_FORCE, bool reliable=false, bool autoRemove=true);
+
+				// This is called every time 'removePlayer' is called (Internally, or externally).
+				// This routine does not delete, or otherwise mutate the input.
+				void onPlayerRemoved(player* p);
 
 				// This will force-disconnect all connected players.
 				void forceDisconnectPlayers(QSocket& socket, disconnectionReason reason=DISCONNECTION_REASON_FORCE, bool reliable=false);
@@ -711,6 +762,8 @@ namespace iosync
 				}
 				*/
 
+				// Objects passed into this command should be assumed as managed internally by this class.
+				// The only exception being, when an explicit removal is done with intent to externally manage the object.
 				inline void addPlayer(player* p)
 				{
 					players.push_back(p);
@@ -718,33 +771,19 @@ namespace iosync
 					return;
 				}
 
+				// This will not delete the 'player' object in question.
 				inline void removePlayer(player* p, bool autoRemove=true)
 				{
 					if (autoRemove)
 						players.remove(p);
 
-					if (getPlayer(p->remoteAddress) == nullptr)
-					{
-						auto op = packetsInTransit.begin();
-
-						while (op != packetsInTransit.end())
-						{
-							if ((*op).isSendingTo(p))
-							{
-								packetsInTransit.erase(op++);
-
-								continue;
-							}
-
-							op++;
-						}
-					}
+					onPlayerRemoved(p);
 
 					return;
 				}
 
 				// Fields:
-				list<player*> players;
+				playerList players;
 		};
 	}
 

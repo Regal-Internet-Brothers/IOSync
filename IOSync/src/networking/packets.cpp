@@ -1,8 +1,9 @@
 // Includes:
 #include "packets.h"
-
 #include "messages.h"
 #include "player.h"
+
+#include "networkEngine.h"
 
 // Namespace(s):
 namespace iosync
@@ -148,11 +149,14 @@ namespace iosync
 		// outbound_packet:
 		
 		// Constructor(s):
-		outbound_packet::outbound_packet(address remoteDestination, rawPacket rawData, packetID reliableIdentifier, size_t rawSize, bool canFreeRawData, bool isActive)
-			: packet(rawData, rawSize, canFreeRawData), identifier(reliableIdentifier), destination(remoteDestination) { /* Nothing so far. */ }
+		outbound_packet::outbound_packet(address remoteDestination, rawPacket rawData, packetID reliableIdentifier, size_t rawSize, bool canFreeRawData)
+			: packet(rawData, rawSize, canFreeRawData), identifier(reliableIdentifier), destination(remoteDestination), destinationCode(DESTINATION_DIRECT) { /* Nothing so far. */ }
 
-		outbound_packet::outbound_packet(QSocket& socket, size_t readSize, packetID reliableIdentifier, address destinationAddress, bool simulatedRead, bool isActive)
-			: packet(socket, readSize), identifier(reliableIdentifier), destination(destinationAddress)
+		outbound_packet::outbound_packet(networkDestinationCode destCode, rawPacket rawData, packetID reliableIdentifier, size_t rawSize, bool canFreeRawData)
+			: packet(rawData, rawSize, canFreeRawData), identifier(reliableIdentifier), destinationCode(destCode), destination() { /* Nothing so far. */ }
+
+		outbound_packet::outbound_packet(QSocket& socket, size_t readSize, packetID reliableIdentifier, address destinationAddress, bool simulatedRead)
+			: packet(socket, readSize), identifier(reliableIdentifier), destination(destinationAddress), destinationCode(DESTINATION_DIRECT)
 		{
 			readFrom(socket, readSize, false);
 		}
@@ -163,12 +167,35 @@ namespace iosync
 			return packet::sendTo(socket, destination, destroyDataAfter);
 		}
 
+		packetSize_t outbound_packet::sendTo(networkEngine& engine, QSocket& socket, bool destroyDataAfter)
+		{
+			packet::writeTo(socket, destroyDataAfter);
+
+			return sendFor(engine, socket);
+		}
+
 		packetSize_t outbound_packet::autoSendTo(QSocket& socket, bool destroyDataAfter)
 		{
 			destination.IP = socket.msgIP();
 			destination.port = socket.msgPort();
 
 			return packet::sendTo(socket, destination, destroyDataAfter);
+		}
+
+		packetSize_t outbound_packet::sendFor(networkEngine& engine, QSocket& socket)
+		{
+			if (destinationCode == DESTINATION_DIRECT)
+			{
+				if (destination.isSet()) // (destination == socket)
+				{
+					return sendTo(socket);
+				}
+				
+				return 0; // (packetSize_t)-1;
+			}
+
+			// Send using the internal destination-code.
+			return (packetSize_t)engine.sendMessage(socket, destinationCode);
 		}
 
 		bool outbound_packet::isSendingTo(const address addr) const
