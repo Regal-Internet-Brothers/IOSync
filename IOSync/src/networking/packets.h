@@ -156,19 +156,25 @@ namespace iosync
 
 			// This overload provides an automated version of 'sendTo',
 			// which uses the internal 'destination' address.
+			// This method is considered "unsafe", since it doesn't directly
+			// comply with the standards applied to 'destinationCode'.
 			packetSize_t sendTo(QSocket& socket, bool destroyDataAfter = false);
 
 			// This allows you to send this packet using a 'networkEngine'.
 			// This means the 'destinationCode' field may be used (If set by the user).
+			// This method complies with the standards applied to 'destinationCode'.
 			packetSize_t sendTo(networkEngine& engine, QSocket& socket, bool destroyDataAfter = false);
 
 			// This command will automatically change the 'destination'
 			// address to the socket's message address, then send with it.
 			// Ideally, you'll want to use 'sendTo', instead of this.
+			// This method is considered "unsafe", since it doesn't directly
+			// comply with the standards applied to 'destinationCode'.
 			packetSize_t autoSendTo(QSocket& socket, bool destroyDataAfter = false);
 
-			// This will send a packet using the arguments specified. This will not copy the internal buffer into the 'socket' itself.
-			// This is not guaranteed to use the 'engine' argument. However, it is guaranteed to use 'socket'.
+			// This will send a packet using the arguments specified. This will
+			// not copy the internal buffer into the 'socket' itself.
+			// This method complies with the standards applied to 'destinationCode'.
 			packetSize_t sendFor(networkEngine& engine, QSocket& socket);
 
 			// This states if this packet is being sent to the address specified.

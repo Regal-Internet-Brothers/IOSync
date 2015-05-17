@@ -176,8 +176,12 @@ namespace iosync
 
 		packetSize_t outbound_packet::autoSendTo(QSocket& socket, bool destroyDataAfter)
 		{
+			/*
 			destination.IP = socket.msgIP();
 			destination.port = socket.msgPort();
+			*/
+
+			destination = socket;
 
 			return packet::sendTo(socket, destination, destroyDataAfter);
 		}
@@ -186,12 +190,17 @@ namespace iosync
 		{
 			if (destinationCode == DESTINATION_DIRECT)
 			{
-				if (destination.isSet()) // (destination == socket)
+				if (!destination.isSet())
 				{
-					return sendTo(socket);
+					/*
+					destination.IP = socket.msgIP();
+					destination.port = socket.msgPort();
+					*/
+
+					destination = socket;
 				}
-				
-				return 0; // (packetSize_t)-1;
+
+				return (packetSize_t)engine.sendMessage(socket, destination);
 			}
 
 			// Send using the internal destination-code.

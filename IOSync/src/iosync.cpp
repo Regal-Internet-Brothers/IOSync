@@ -1172,6 +1172,23 @@ namespace iosync
 
 			return sent;
 		}
+
+		size_t connectedDevices::sendTo(networkEngine& engine, networkDestinationCode destination)
+		{
+			serializeTo(engine);
+
+			return engine.sendMessage(engine, destination);
+		}
+
+		size_t connectedDevices::sendTo(iosync_application* program, networkEngine& engine)
+		{
+			if (program->twoWayOperations()) // engine.canBroadcastLocally()
+			{
+				return sendTo(engine, DESTINATION_ALL);
+			}
+
+			return sendTo(engine, DEFAULT_DESTINATION);
+		}
 	}
 
 	// Classes:
@@ -2689,7 +2706,7 @@ namespace iosync
 				case MODE_DIRECT_SERVER:
 				case MODE_DIRECT_CLIENT:
 				case MODE_CLIENT:
-					devices.sendTo(*network);
+					devices.sendTo(this, *network);
 
 					break;
 			}

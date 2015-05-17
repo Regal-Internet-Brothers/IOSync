@@ -45,9 +45,9 @@ namespace iosync
 			virtual bool hasReliablePackets() const override;
 
 			// Operators:
-			virtual bool operator==(const QSocket& socket) const;
+			virtual bool operator==(const address& addr) const;
 
-			inline bool operator!=(const QSocket& addr) const
+			inline bool operator!=(const address& addr) const
 			{
 				return !operator==(addr);
 			}
@@ -92,7 +92,7 @@ namespace iosync
 			virtual bool hasVirtualAddress() const override;
 
 			// Operators:
-			virtual bool operator==(const QSocket& socket) const override;
+			virtual bool operator==(const address& addr) const override;
 
 			// Fields:
 			address realAddress;

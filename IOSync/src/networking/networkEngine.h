@@ -83,6 +83,11 @@ namespace iosync
 				// Enumerator(s):
 				enum messageTypes : messageType
 				{
+					// This is used to handle final operations for a packet.
+					// Basically, a header with this type specifies a
+					// manual packet end, as well as any relevant meta-data.
+					MESSAGE_TYPE_META = 0,
+
 					// This is used by clients when joining a server.
 					MESSAGE_TYPE_JOIN,
 
@@ -178,7 +183,7 @@ namespace iosync
 				// Destructor(s):
 				virtual bool close();
 
-				// Methods:
+				// Methods (Public):
 				virtual void update();
 
 				bool updateSocket(QSocket& socket);
@@ -265,7 +270,7 @@ namespace iosync
 				// This method may be overridden by inheriting classes.
 				// For example, must specify extra information in order
 				// to send messages to specific addresses.
-				virtual size_t sendMessage(QSocket& socket, const address& remote, bool resetLength=true);
+				virtual size_t sendMessage(QSocket& socket, const address& remote, bool resetLength=true, networkDestinationCode destinationCode=DEFAULT_DESTINATION);
 				virtual size_t sendMessage(networkDestinationCode destination=DEFAULT_DESTINATION, bool resetLength=true);
 
 				inline size_t sendMessage(QSocket& socket, outbound_packet packet, networkDestinationCode destination, bool alreadyInOutput=true)
@@ -447,6 +452,16 @@ namespace iosync
 				// This also changes for the real host of the session.
 				bool isHostNode;
 			protected:
+				// Methods (Protected):
+
+				// Message generation:
+
+				// This is used to finalize a packet, before sending it off.
+				void finalizeOutput(QSocket& s, networkDestinationCode destinationCode=DEFAULT_DESTINATION);
+
+				// Parsing/deserialization related:
+				virtual networkDestinationCode parseMeta(QSocket& socket, const address& remoteAddress, const messageHeader& header);
+
 				// Fields (Protected):
 
 				// A reference to the 'application' controlling this object.
@@ -512,7 +527,8 @@ namespace iosync
 				}
 
 				size_t broadcastMessage(QSocket& socket, bool resetLength=true) override;
-				size_t sendMessage(QSocket& socket, const address& remote, bool resetLength=true) override;
+
+				size_t sendMessage(QSocket& socket, const address& remote, bool resetLength=true, networkDestinationCode destinationCode=DEFAULT_DESTINATION) override;
 
 				virtual bool hasRemoteConnection() const override;
 
@@ -623,7 +639,7 @@ namespace iosync
 
 				bool open(addressPort port=DEFAULT_PORT);
 
-				// Methods:
+				// Methods (Public):
 				virtual void update() override;
 
 				virtual void updatePacketsInTransit(QSocket& socket) override;
@@ -635,6 +651,7 @@ namespace iosync
 					return checkClientTimeouts(this->socket);
 				}
 
+				size_t broadcastMessage(QSocket& socket, playerList players, bool resetLength=true);
 				size_t broadcastMessage(QSocket& socket, bool resetLength=true) override;
 
 				inline size_t sendMessageTo(QSocket& socket, player* p)
@@ -784,6 +801,11 @@ namespace iosync
 
 				// Fields:
 				playerList players;
+			protected:
+				// Methods (Protected):
+
+				// Parsing/deserialization related:
+				virtual networkDestinationCode parseMeta(QSocket& socket, const address& remoteAddress, const messageHeader& header) override;
 		};
 	}
 

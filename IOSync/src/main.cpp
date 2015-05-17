@@ -14,9 +14,9 @@
 		/ Adjust network "metrics".
 
 		* Proper support for user-commands.
-		* Options for button-hold timeouts. (In case of disconnection/other)
 		* Options for vibration timeouts.
 
+		/ Options for button-hold timeouts. (In case of disconnection/other)
 		/ Fix "const correctness" for some commands.
 
 		? Mouse integration.

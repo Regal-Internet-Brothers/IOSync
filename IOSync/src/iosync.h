@@ -344,7 +344,11 @@ namespace iosync
 					if (gamepads[i] != nullptr && gamepads[i]->owner == owner)
 					{
 						if (disconnectGamepad(program, gamepads[i]->localGamepadNumber))
+						{
 							response = true;
+
+							gamepads[i] = nullptr;
+						}
 					}
 				}
 
@@ -656,24 +660,9 @@ namespace iosync
 
 			// This will send the active serializable data this manager produces.
 			// Please call 'sendConnectionRequests' (Or similar) before calling this.
-			inline size_t sendTo(networkEngine& engine, networkDestinationCode destination)
-			{
-				serializeTo(engine);
+			size_t sendTo(networkEngine& engine, networkDestinationCode destination);
 
-				return engine.sendMessage(engine, destination);
-			}
-
-			inline size_t sendTo(networkEngine& engine)
-			{
-				if (engine.canBroadcastLocally())
-				{
-					serializeTo(engine);
-
-					return engine.sendMessage(engine, DESTINATION_ALL);
-				}
-
-				return sendTo(engine, DEFAULT_DESTINATION);
-			}
+			size_t sendTo(iosync_application* program, networkEngine& engine);
 
 			inline bool keyboardConnected() const
 			{

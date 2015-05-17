@@ -6,7 +6,10 @@
 
 #include "../application/application.h"
 
+// Standard library:
 //#include <iostream>
+
+//#include <queue>
 
 // Namespace(s):
 using namespace std;
@@ -129,9 +132,9 @@ namespace iosync
 		}
 
 		// Operators:
-		bool player::operator==(const QSocket& socket) const
+		bool player::operator==(const address& addr) const
 		{
-			return (remoteAddress == socket);
+			return (remoteAddress == addr);
 		}
 
 		// indirect_player:
@@ -173,9 +176,9 @@ namespace iosync
 		}
 
 		// Operators:
-		bool indirect_player::operator==(const QSocket& socket) const
+		bool indirect_player::operator==(const address& addr) const
 		{
-			return (player::operator==(socket) || (realAddress == socket));
+			return (player::operator==(addr) || (realAddress == addr));
 		}
 
 		// Classes:
@@ -216,7 +219,7 @@ namespace iosync
 			return true;
 		}
 
-		// Methods:
+		// Methods (Public):
 
 		// Update routines:
 		void networkEngine::update()
@@ -367,12 +370,17 @@ namespace iosync
 					// continue on to the "reply" implementation:
 					if (isMaster)
 					{
+						if (resetLength)
+						{
+							socket.flushOutput();
+						}
+
 						break;
 					}
 				case DESTINATION_REPLY:
-					{
-						return socket.sendMsg(resetLength);
-					}
+					finalizeOutput(socket, destination);
+
+					return socket.sendMsg(resetLength);
 				case DESTINATION_ALL:
 					return broadcastMessage(socket, resetLength);
 			}
@@ -395,8 +403,10 @@ namespace iosync
 			return packet.sendFor(*this, socket);
 		}
 
-		size_t networkEngine::sendMessage(QSocket& socket, const address& remote, bool resetLength)
+		size_t networkEngine::sendMessage(QSocket& socket, const address& remote, bool resetLength, networkDestinationCode destinationCode)
 		{
+			finalizeOutput(socket, destinationCode);
+
 			return (size_t)socket.sendMsg(remote.IP, remote.port, resetLength);
 		}
 
@@ -407,11 +417,13 @@ namespace iosync
 
 		bool networkEngine::hasRemoteConnection() const
 		{
+			// Return the default response.
 			return true;
 		}
 
 		bool networkEngine::canBroadcastLocally() const
 		{
+			// Return the default response.
 			return false;
 		}
 
@@ -596,7 +608,7 @@ namespace iosync
 							continue;
 						}
 
-						// Pass this message's footer.
+						// Pass this message's footer; already read it.
 						passFooter(footer);
 					}
 					else
@@ -633,6 +645,10 @@ namespace iosync
 		{
 			switch (header.type)
 			{
+				case MESSAGE_TYPE_META:
+					parseMeta(socket, remoteAddress, header);
+
+					break;
 				case MESSAGE_TYPE_CONFIRM_PACKET:
 					parsePacketConfirmationMessage(socket, remoteAddress, header, footer);
 
@@ -699,6 +715,35 @@ namespace iosync
 
 			// Return the packet-identifier.
 			return ID;
+		}
+
+		// Methods (Protected):
+
+		// Message generation:
+		void networkEngine::finalizeOutput(QSocket& s, networkDestinationCode destinationCode)
+		{
+			// Check if we're a client:
+			if (!isHostNode)
+			{
+				// Create a final message:
+
+				// Start a new message.
+				auto headerInformation = beginMessage(s, MESSAGE_TYPE_META);
+
+				// Serialize the destination-code.
+				s << destinationCode;
+
+				// Finish the message.
+				finishMessage(s, headerInformation);
+			}
+
+			return;
+		}
+
+		// Parsing/deserialization related:
+		networkDestinationCode networkEngine::parseMeta(QSocket& socket, const address& remoteAddress, const messageHeader& header)
+		{
+			return socket.read<networkDestinationCode>();
 		}
 
 		// clientNetworkEngine:
@@ -889,12 +934,12 @@ namespace iosync
 		// Sending related:
 		size_t clientNetworkEngine::broadcastMessage(QSocket& socket, bool resetLength)
 		{
-			return sendMessage(socket, connection.remoteAddress);
+			return sendMessage(socket, connection.remoteAddress, resetLength, DESTINATION_ALL);
 		}
 
-		size_t clientNetworkEngine::sendMessage(QSocket& socket, const address& remote, bool resetLength)
+		size_t clientNetworkEngine::sendMessage(QSocket& socket, const address& remote, bool resetLength, networkDestinationCode destinationCode)
 		{
-			return (size_t)socket.sendMsg(remote.IP, remote.port, resetLength);
+			return networkEngine::sendMessage(socket, remote, resetLength, destinationCode);
 		}
 
 		bool clientNetworkEngine::hasRemoteConnection() const
@@ -955,7 +1000,7 @@ namespace iosync
 			return networkEngine::close();
 		}
 
-		// Methods:
+		// Methods (Public):
 
 		// Update routines:
 		void serverNetworkEngine::update()
@@ -1008,9 +1053,12 @@ namespace iosync
 			return;
 		}
 
-		size_t serverNetworkEngine::broadcastMessage(QSocket& socket, bool resetLength)
+		size_t serverNetworkEngine::broadcastMessage(QSocket& socket, playerList players, bool resetLength)
 		{
 			//return socket.broadcastMsg();
+
+			// Finalize this packet.
+			finalizeOutput(socket);
 			
 			size_t sent = 0;
 
@@ -1023,6 +1071,11 @@ namespace iosync
 				socket.flushOutput();
 
 			return sent;
+		}
+
+		size_t serverNetworkEngine::broadcastMessage(QSocket& socket, bool resetLength)
+		{
+			return broadcastMessage(socket, this->players, resetLength);
 		}
 
 		bool serverNetworkEngine::hasRemoteConnection() const
@@ -1322,10 +1375,13 @@ namespace iosync
 				}
 			}
 
-			// Remove multi-destination ties to this 'player' object:
-			for (auto& packetInTransit : packetsInTransit)
+			if (!packetsInTransit.empty())
 			{
-				removeReliablePacket(p, packetInTransit);
+				// Remove multi-destination ties to this 'player' object:
+				for (auto& packetInTransit : packetsInTransit)
+				{
+					removeReliablePacket(p, packetInTransit);
+				}
 			}
 
 			return;
@@ -1352,6 +1408,98 @@ namespace iosync
 			}
 
 			return;
+		}
+
+		// Methods (Protected):
+		networkDestinationCode serverNetworkEngine::parseMeta(QSocket& socket, const address& remoteAddress, const messageHeader& header)
+		{
+			// Call the super-class's implementation.
+			auto destinationCode = networkEngine::parseMeta(socket, remoteAddress, header);
+
+			switch (destinationCode)
+			{
+				case DESTINATION_ALL:
+					{
+						// Local variable(s):
+						
+						// Copy the contents of the 'players' container:
+						playerList playerMask = players;
+
+						// Remove the caller from this new container.
+						playerMask.remove(networkEngine::getPlayer(playerMask, socket));
+
+						auto returnPoint = socket.readOffset;
+
+						// Seek back to the beginning.
+						socket.resetRead();
+
+						while (socket.canRead())
+						{
+							// Local variable(s):
+							streamLocation startPosition = socket.readOffset;
+
+							messageHeader header;
+							messageFooter footer;
+
+							header.readFrom(socket, footer);
+
+							if (header.directedHere)
+							{
+								// Store the current read-position.
+								auto parsePosition = socket.readOffset;
+
+								// Start a new message:
+								auto headerInformation = beginMessage(socket, header.type);
+
+								// Write the bytes of this message into the output.
+								socket.UwriteBytes(socket.simulatedUReadBytes(header.packetSize), header.packetSize);
+
+								// Finish the message:
+								if (!footer.isReliable())
+								{
+									finishMessage(socket, headerInformation);
+								}
+								else
+								{
+									auto p = finishReliableMessage(socket, socket, headerInformation);
+
+									// Copy the generated container.
+									p.waitingConnections = playerMask;
+
+									// Add the new packet to the internal container.
+									addReliablePacket(p);
+								}
+
+								// Pass this message's footer; already read it.
+								passFooter(footer);
+							}
+							else
+							{
+								// Packet forwarding should not be done here.
+								passMessage(header, footer);
+
+								// Continue to the next message.
+								continue;
+							}
+						}
+
+						// Send out the message.
+						//networkEngine::sendMessage(destinationCode, true); // DESTINATION_ALL
+
+						broadcastMessage(socket, playerMask, true);
+
+						socket.inSeek(returnPoint);
+					}
+
+					break;
+				case DESTINATION_REPLY:
+					// Nothing so far.
+
+					break;
+			}
+
+			// Return the default response.
+			return destinationCode;
 		}
 	}
 
