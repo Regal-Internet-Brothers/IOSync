@@ -36,7 +36,7 @@
 // Namespace(s):
 namespace iosync
 {
-	class application;
+	class iosync_application;
 
 	// Namespace(s):
 	namespace devices
@@ -144,7 +144,7 @@ namespace iosync
 				virtual bool autoConnect();
 
 				// This method is used to interface with the device.
-				virtual void update(application* program) = 0;
+				virtual void update(iosync_application& program) = 0;
 
 				virtual bool connected() const;
 				virtual bool disconnected() const;
@@ -204,13 +204,13 @@ namespace iosync
 					You should only "call up" to this implementation if your super-class says to do so.
 				*/
 
-				virtual void detect(application* program) = 0;
+				virtual void detect(iosync_application& program) = 0;
 
 				// Networking related:
 				virtual void readFrom(QSocket& socket) = 0;
 
 				// When overriding this implementation, please "call up" to this one.
-				virtual void update(application* program) override;
+				virtual void update(iosync_application& program) override;
 		};
 
 		class outputDevice : virtual public deviceManager
@@ -239,13 +239,13 @@ namespace iosync
 					You should only "call up" to this implementation if your super-class says to do so.
 				*/
 
-				virtual void simulate(application* program) = 0;
+				virtual void simulate(iosync_application& program) = 0;
 
 				// Networking related:
 				virtual void writeTo(QSocket& socket) = 0;
 
 				// When overriding this implementation, please "call up" to this one.
-				virtual void update(application* program) override;
+				virtual void update(iosync_application& program) override;
 		};
 
 		class IODevice : virtual public inputDevice, virtual public outputDevice
@@ -262,15 +262,15 @@ namespace iosync
 				// Methods:
 
 				// When overriding this implementation, please "call up" to this one.
-				virtual void update(application* program) override;
+				virtual void update(iosync_application& program) override;
 
 				// Overriding these is only recommended if you are not handling I/O asynchronously.
 				// By default, this isn't the case, so you'll want to override these.
 				// Asynchronous I/O is handled in two parts, so this is really just device-dependent.
 				// You do not need to "call up" to these implementations.
 
-				virtual void simulate(application* program) override;
-				virtual void detect(application* program) override;
+				virtual void simulate(iosync_application& program) override;
+				virtual void detect(iosync_application& program) override;
 
 				// Fields:
 				// Nothing so far.

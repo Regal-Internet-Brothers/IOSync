@@ -497,15 +497,15 @@ namespace iosync
 				virtual bool connect() override;
 				virtual bool disconnect() override;
 
-				virtual void detect(application* program) override;
-				virtual void simulate(application* program) override;
+				virtual void detect(iosync_application& program) override;
+				virtual void simulate(iosync_application& program) override;
 
 				// These commands may be used to serialize and deserialize this device's 'state':
 				virtual void readFrom(QSocket& socket) override;
 				virtual void writeTo(QSocket& socket) override;
 
 				// This command simulates the current state if 'hasState' specifies to do so.
-				bool simulateState();
+				bool simulateState(iosync_application& program);
 
 				#ifdef GAMEPAD_VJOY_ENABLED
 					// This will set the internal vJoy status of this device.
@@ -544,7 +544,7 @@ namespace iosync
 					DWORD __winnt__state_meta;
 
 					#ifdef GAMEPAD_VJOY_ENABLED
-						VjdStat vJoy_status;
+						VjdStat vJoy_status = VJD_STAT_BUSY;
 						UINT local_vJoyID;
 					#endif
 				#endif

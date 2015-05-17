@@ -251,7 +251,7 @@ namespace iosync
 		void connectedDevices::updateKeyboard(iosync_application* program)
 		{
 			if (keyboardConnected())
-				keyboard->update(program);
+				keyboard->update(*program);
 
 			return;
 		}
@@ -259,8 +259,11 @@ namespace iosync
 		void connectedDevices::updateGamepads(iosync_application* program)
 		{
 			#if defined(IOSYNC_DEVICE_GAMEPAD) && defined(IOSYNC_DEVICE_GAMEPAD_AUTODETECT)
+				// Local variable(s):
+				bool connectedToNetwork = program->network->connectedToOthers();
+				
 				// Check if we're detecting gamepads:
-				if (program->allowDeviceDetection() && program->network->connectedToOthers())
+				if (program->allowDeviceDetection() && (program->twoWayOperations() || connectedToNetwork))
 				{
 					if (gamepadsEnabled)
 					{
@@ -293,10 +296,13 @@ namespace iosync
 												break;
 											case iosync_application::MODE_DIRECT_SERVER:
 												// Attempt to connect the gamepad manually:
-												if (connectGamepad(program, i) != nullptr)
+												if (connectGamepad(program, i, i) != nullptr) // false // getNextGamepadID(true)
 												{
-													// Tell all of the clients about this gamepad being connected:
-													sendGamepadConnectMessage(*program->network, program->network->socket, i, DESTINATION_ALL);
+													if (connectedToNetwork)
+													{
+														// Tell all of the clients about this gamepad being connected:
+														sendGamepadConnectMessage(*program->network, program->network->socket, i, DESTINATION_ALL);
+													}
 												}
 
 												break;
@@ -331,7 +337,7 @@ namespace iosync
 			for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
 			{
 				if (gamepadConnected(i))
-					gamepads[i]->update(program);
+					gamepads[i]->update(*program);
 			}
 
 			return;
@@ -371,7 +377,7 @@ namespace iosync
 		void connectedDevices::onGamepadConnected(iosync_application* program, gp* pad)
 		{
 			#ifdef PLATFORM_WINDOWS
-				if (program->allowDeviceSimulation())
+				if (pad->canSimulate() && this->vJoyEnabled)
 				{
 					#ifdef GAMEPAD_VJOY_ENABLED
 						// Namespace(s):
@@ -424,7 +430,7 @@ namespace iosync
 		void connectedDevices::onGamepadDisconnected(iosync_application* program, gp* pad)
 		{
 			#ifdef PLATFORM_WINDOWS
-				if (program->allowDeviceSimulation())
+				if (pad->canSimulate() && this->vJoyEnabled)
 				{
 					gp::__winnt__deactivateGamepad(pad->localGamepadNumber);
 
@@ -438,6 +444,9 @@ namespace iosync
 						// Check for vJoy functionality:
 						if (gp::vJoyInfo.state == vJoyDriver::VJOY_ENABLED)	
 						{
+							// Reset the bound
+							REAL_VJOY::ResetVJD(pad->local_vJoyID);
+
 							// Relinquish control over the device.
 							REAL_VJOY::RelinquishVJD(pad->local_vJoyID);
 
@@ -555,6 +564,10 @@ namespace iosync
 			{
 				deviceInfo << "Attempting to create gamepad-instance..." << endl;
 
+				#ifdef PLATFORM_WINDOWS
+					auto realPluggedIn = gp::__winnt__pluggedIn(identifier);
+				#endif
+
 				// Allocate a new 'gp' on the heap.
 				gamepads[identifier] = new gp
 				(
@@ -562,10 +575,17 @@ namespace iosync
 					program->allowDeviceDetection()
 
 					#ifdef PLATFORM_WINDOWS
-						&& gp::__winnt__pluggedIn(identifier)
+						// Only allow detection if we have a real gamepad.
+						&& realPluggedIn
 					#endif
 					,
+
 					program->allowDeviceSimulation()
+
+					#ifdef PLATFORM_WINDOWS
+						// If the real gamepad is connected, don't allow simulation.
+						&& !realPluggedIn
+					#endif
 				);
 
 				deviceInfo << "Gamepad-instance created." << endl;
@@ -601,12 +621,12 @@ namespace iosync
 			return gamepads[identifier];
 		}
 
-		gamepad* connectedDevices::connectGamepad(iosync_application* program, gamepadID remoteIdentifier)
+		gamepad* connectedDevices::connectGamepad(iosync_application* program, gamepadID remoteIdentifier, bool checkRealDevices)
 		{
 			// Local variable(s):
 
 			// Get the next gamepad identifier.
-			auto identifier = getNextGamepadID(program->reserveLocalGamepads());
+			auto identifier = getNextGamepadID(checkRealDevices);
 
 			// Check for errors:
 			if (interruptGamepad(program, identifier, remoteIdentifier))
@@ -625,12 +645,12 @@ namespace iosync
 		}
 
 		// This implementation is commonly used by servers.
-		gamepad* connectedDevices::connectGamepad(iosync_application* program)
+		gamepad* connectedDevices::connectGamepad(iosync_application* program, bool checkRealDevices)
 		{
 			// Local variable(s):
 
 			// Get the next gamepad identifier.
-			auto identifier = getNextGamepadID(program->reserveLocalGamepads());
+			auto identifier = getNextGamepadID(checkRealDevices);
 
 			// Check for errors:
 			if (interruptGamepad(program, identifier, identifier))
@@ -646,6 +666,16 @@ namespace iosync
 			}
 
 			return connectGamepad(program, identifier, identifier);
+		}
+
+		gamepad* connectedDevices::connectGamepad(iosync_application* program, gamepadID remoteIdentifier)
+		{
+			return connectGamepad(program, remoteIdentifier, program->reserveLocalGamepads()); // !program->twoWayOperations()
+		}
+
+		gamepad* connectedDevices::connectGamepad(iosync_application* program)
+		{
+			return connectGamepad(program, program->reserveLocalGamepads());
 		}
 
 		// Networking related:
@@ -671,7 +701,10 @@ namespace iosync
 					{
 						if (extended)
 						{
+							// Read from the input:
 							auto identifier = (gamepadID)socket.read<serializedGamepadID>();
+							bool existenceCheck = socket.readBool();
+
 							bool remotelyConnected = remoteGamepadConnected(identifier);
 
 							// Check if the device is already connected:
@@ -687,7 +720,7 @@ namespace iosync
 								return false;
 							}
 
-							gp* pad = connectGamepad(program, identifier);
+							gp* pad = connectGamepad(program, identifier, ((existenceCheck) && program->reserveLocalGamepads()));
 
 							// Connect a gamepad using the identifier specified.
 							if (pad == nullptr)
@@ -852,9 +885,9 @@ namespace iosync
 			return;
 		}
 
-		void connectedDevices::serializeGamepadConnectMessage(QSocket& socket, gamepadID identifier)
+		void connectedDevices::serializeGamepadConnectMessage(QSocket& socket, gamepadID identifier, bool existenceCheck)
 		{
-			// Nothing so far.
+			socket.writeBool(existenceCheck);
 
 			return;
 		}
@@ -909,6 +942,17 @@ namespace iosync
 			auto headerInformation = beginGamepadDeviceMessage(engine, socket, identifier, DEVICE_NETWORK_MESSAGE_DISCONNECT);
 
 			serializeGamepadDisconnectMessage(socket, identifier);
+
+			return engine.finishReliableMessage(socket, realAddress, headerInformation, forwardAddress);
+		}
+
+		outbound_packet connectedDevices::generateGamepadExistsMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address& realAddress, const address& forwardAddress)
+		{
+			// This will automatically add the extension-flag to the message.
+			auto headerInformation = beginGamepadDeviceMessage(engine, socket, identifier, DEVICE_NETWORK_MESSAGE_CONNECT);
+
+			// Serialize a connection-message with the proper arguments.
+			serializeGamepadConnectMessage(socket, identifier, true);
 
 			return engine.finishReliableMessage(socket, realAddress, headerInformation, forwardAddress);
 		}
@@ -1109,15 +1153,18 @@ namespace iosync
 
 			if (hasDeviceConnected())
 			{
-				for (gamepadID i = 0; i < deviceManagement::MAX_GAMEPADS; i++)
+				if (gamepadsEnabled)
 				{
-					if (gamepadConnected(i))
+					for (gamepadID i = 0; i < deviceManagement::MAX_GAMEPADS; i++)
 					{
-						sent += engine.sendMessage(socket, generateGamepadConnectMessage(engine, socket, gamepads[i]->remoteGamepadNumber, p, p.vaddr()));
+						if (gamepadConnected(i))
+						{
+							sent += engine.sendMessage(socket, generateGamepadExistsMessage(engine, socket, gamepads[i]->remoteGamepadNumber, p, p.vaddr()));
+						}
 					}
 				}
 
-				if (keyboardConnected())
+				if (keyboardEnabled && keyboardConnected())
 				{
 					sent += engine.sendMessage(socket, generateConnectMessage(engine, socket, DEVICE_TYPE_KEYBOARD, p, p.vaddr()));
 				}

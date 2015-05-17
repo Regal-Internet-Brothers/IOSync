@@ -17,7 +17,7 @@
 #define IOSYNC_SAFE
 
 #ifdef IOSYNC_TESTMODE
-	#define IOSYNC_FAST_TESTMODE
+	//#define IOSYNC_FAST_TESTMODE
 	
 	#ifdef IOSYNC_FAST_TESTMODE
 		#define IOSYNC_FAST_TESTMODE_SINGLE_INPUT
@@ -379,9 +379,13 @@ namespace iosync
 			// This command allows you to manually connect a 'gamepad' object.
 			gamepad* connectGamepad(iosync_application* program, gamepadID identifier, gamepadID remoteIdentifier);
 
-			gamepad* connectGamepad(iosync_application* program, gamepadID remoteIdentifier);
+			gamepad* connectGamepad(iosync_application* program, gamepadID remoteIdentifier, bool checkRealDevices);
 
 			// This implementation is commonly used by servers.
+			gamepad* connectGamepad(iosync_application* program, bool checkRealDevices);
+
+			gamepad* connectGamepad(iosync_application* program, gamepadID remoteIdentifier);
+
 			gamepad* connectGamepad(iosync_application* program);
 
 			// This command will manually connect every 'gamepad' possible.
@@ -552,17 +556,28 @@ namespace iosync
 			void serializeConnectMessage(QSocket& socket, deviceType device);
 			void serializeDisconnectMessage(QSocket& socket, deviceType device);
 
-			void serializeGamepadConnectMessage(QSocket& socket, gamepadID identifier);
+			// The 'existenceCheck' argument specifies if this connection
+			// message is meant to notify a client of a gamepad's existence.
+			// If unsure, don't explicitly set/supply this argument.
+			void serializeGamepadConnectMessage(QSocket& socket, gamepadID identifier, bool existenceCheck=false);
 			void serializeGamepadDisconnectMessage(QSocket& socket, gamepadID identifier);
 
 			void serializeIODevice(QSocket& socket, IODevice* device);
 
 			// Message generation related:
+
+			// These act as the default connection/disconnection message-generators for devices:
 			outbound_packet generateConnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address& realAddress=address(), const address& forwardAddress=address());
 			outbound_packet generateDisconnectMessage(networkEngine& engine, QSocket& socket, deviceType device, const address& realAddress=address(), const address& forwardAddress=address());
 
+			// These may be used to explicitly specify gamepad identifiers when connecting and disconnecting gamepads:
 			outbound_packet generateGamepadConnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address& realAddress=address(), const address& forwardAddress=address());
 			outbound_packet generateGamepadDisconnectMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address& realAddress=address(), const address& forwardAddress=address());
+
+			// This can be used to notify people of a gamepad already being connected.
+			// This is useful when a client doesn't know about connected gamepads.
+			// "Exists" messages are an alternate form of connection-message. Disconnection is still required.
+			outbound_packet generateGamepadExistsMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address& realAddress=address(), const address& forwardAddress=address());
 
 			// Parsing/deserialization related:
 			deviceType parseDeviceMessage(iosync_application* program, QSocket& socket, const messageHeader& header, const messageFooter& footer);
@@ -701,7 +716,6 @@ namespace iosync
 					return true;
 				}
 
-				/*
 				gamepadID lowestRemoteID = MAX_GAMEPADS;
 
 				for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
@@ -713,9 +727,6 @@ namespace iosync
 				}
 
 				return (identifier > lowestRemoteID);
-				*/
-
-				return false;
 			}
 
 			// This will tell the caller if at least one virtual gamepad is connected.

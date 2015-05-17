@@ -91,7 +91,7 @@ namespace iosync
 		// representativeAddress:
 
 		// Constructor(s):
-		representativeAddress::representativeAddress(string hostname, addressPort remotePort) : IP(hostname), port(remotePort)
+		representativeAddress::representativeAddress(const string& hostname, const addressPort remotePort) : IP(hostname), port(remotePort)
 		{
 			// Nothing so far.
 		}

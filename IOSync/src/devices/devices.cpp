@@ -1,7 +1,7 @@
 // Includes:
 #include "devices.h"
 
-#include "../application/application.h"
+#include "../iosync.h"
 
 // Namespace(s):
 namespace iosync
@@ -95,7 +95,7 @@ namespace iosync
 		}
 
 		// Methods:
-		void inputDevice::update(application* program)
+		void inputDevice::update(iosync_application& program)
 		{
 			// Check if we can detect input:
 			if (canDetect() && !asyncDetect())
@@ -136,7 +136,7 @@ namespace iosync
 		}
 
 		// Methods:
-		void outputDevice::update(application* program)
+		void outputDevice::update(iosync_application& program)
 		{
 			// Check if we can simulate input:
 			if (canSimulate() && !asyncSimulate())
@@ -171,7 +171,7 @@ namespace iosync
 		}
 
 		// Methods:
-		void IODevice::update(application* program)
+		void IODevice::update(iosync_application& program)
 		{
 			// Call the primary implementations:
 			inputDevice::update(program);
@@ -182,14 +182,14 @@ namespace iosync
 			return;
 		}
 
-		void IODevice::simulate(application* program)
+		void IODevice::simulate(iosync_application& program)
 		{
 			// Nothing so far.
 
 			return;
 		}
 
-		void IODevice::detect(application* program)
+		void IODevice::detect(iosync_application& program)
 		{
 			// Nothing so far.
 

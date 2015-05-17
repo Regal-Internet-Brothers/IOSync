@@ -25,6 +25,7 @@
 					typedef decltype(&::DriverMatch) _DriverMatch_t;
 					typedef decltype(&::AcquireVJD) _AcquireVJD_t;
 					typedef decltype(&::RelinquishVJD) _RelinquishVJD_t;
+					typedef decltype(&::ResetVJD) _ResetVJD_t;
 					typedef decltype(&::UpdateVJD) _UpdateVJD_t;
 					typedef decltype(&::GetVJDStatus) _GetVJDStatus_t;
 					typedef decltype(&::GetVJDAxisExist) _GetVJDAxisExist_t;
@@ -39,6 +40,7 @@
 					_DriverMatch_t _DriverMatch;
 					_AcquireVJD_t _AcquireVJD;
 					_RelinquishVJD_t _RelinquishVJD;
+					_ResetVJD_t _ResetVJD;
 					_UpdateVJD_t _UpdateVJD;
 					_GetVJDStatus_t _GetVJDStatus;
 					_GetVJDAxisExist_t _GetVJDAxisExist;
@@ -54,6 +56,7 @@
 						_DriverMatch = nullptr;
 						_AcquireVJD = nullptr;
 						_RelinquishVJD = nullptr;
+						_ResetVJD = nullptr;
 						_UpdateVJD = nullptr;
 						_GetVJDStatus = nullptr;
 						_GetVJDAxisExist = nullptr;
@@ -75,6 +78,8 @@
 						else if ((_AcquireVJD = (_AcquireVJD_t)GetProcAddress(hDLL, "AcquireVJD")) == nullptr)
 							return !restoreFunctions();
 						else if ((_RelinquishVJD = (_RelinquishVJD_t)GetProcAddress(hDLL, "RelinquishVJD")) == nullptr)
+							return !restoreFunctions();
+						else if ((_ResetVJD = (_ResetVJD_t)GetProcAddress(hDLL, "ResetVJD")) == nullptr)
 							return !restoreFunctions();
 						else if ((_UpdateVJD = (_UpdateVJD_t)GetProcAddress(hDLL, "UpdateVJD")) == nullptr)
 							return !restoreFunctions();
@@ -232,6 +237,20 @@
 							::RelinquishVJD(rID);
 						
 							return;
+						#endif
+					}
+
+					BOOL __cdecl ResetVJD(UINT rID)
+					{
+						#ifdef GAMEPAD_VJOY_DYNAMIC_LINK
+							if (_ResetVJD != nullptr)
+							{
+								return _ResetVJD(rID);
+							}
+
+							return FALSE;
+						#else
+							return ::ResetVJD(rID);
 						#endif
 					}
 

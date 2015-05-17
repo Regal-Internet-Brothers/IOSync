@@ -213,8 +213,8 @@ namespace iosync
 				bool connect() override;
 				virtual bool disconnect() override;
 
-				virtual void detect(application* program) override;
-				virtual void simulate(application* program) override;
+				virtual void detect(iosync_application& program) override;
+				virtual void simulate(iosync_application& program) override;
 
 				// These commands may be used to serialize and deserialize this device's "action-queue":
 				virtual void readFrom(QSocket& socket) override;

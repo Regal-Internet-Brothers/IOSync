@@ -72,6 +72,7 @@
 					BOOL __cdecl DriverMatch(WORD* DLLVer, WORD* DrvVer);
 					BOOL __cdecl AcquireVJD(UINT rID);
 					VOID __cdecl RelinquishVJD(UINT rID);
+					BOOL __cdecl ResetVJD(UINT rID);
 					BOOL __cdecl UpdateVJD(UINT rID, PVOID pData);
 					enum VjdStat __cdecl GetVJDStatus(UINT rID);
 					BOOL __cdecl GetVJDAxisExist(UINT rID, UINT axis);

@@ -150,7 +150,7 @@ namespace iosync
 		struct representativeAddress
 		{
 			// Constructor(s):
-			representativeAddress(string hostname="", addressPort remotePort=0);
+			representativeAddress(const string& hostname=string(), const addressPort remotePort=0);
 
 			// Methods:
 			bool isSet() const;

@@ -370,7 +370,9 @@ namespace iosync
 						break;
 					}
 				case DESTINATION_REPLY:
-					return (size_t)socket.sendMsg(resetLength);
+					{
+						return socket.sendMsg(resetLength);
+					}
 				case DESTINATION_ALL:
 					return broadcastMessage(socket, resetLength);
 			}
@@ -615,10 +617,12 @@ namespace iosync
 				}
 
 				// Make sure we don't spend all of our time reading messages:
+				/*
 				if (elapsed(timer) > metrics.pollTimeout)
 				{
 					break;
 				}
+				*/
 			};
 
 			return messages;

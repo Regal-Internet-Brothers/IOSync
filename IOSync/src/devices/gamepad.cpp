@@ -3,7 +3,7 @@
 
 #include "../platform.h"
 #include "../networking/networking.h"
-#include "../application/application.h"
+#include "../iosync.h"
 #include "../names.h"
 
 #include <algorithm>
@@ -228,6 +228,7 @@ namespace iosync
 								LONG m = vJoyInfo.getDevice(vJoyID).axisMax(axis);
 
 								m = ((m+1)/2);
+								//m /= 2;
 								//m = m+1;
 
 								auto value = m;
@@ -400,7 +401,7 @@ namespace iosync
 			return deviceManager::disconnect();
 		}
 
-		void gamepad::detect(application* program)
+		void gamepad::detect(iosync_application& program)
 		{
 			#ifdef PLATFORM_WINDOWS
 				__winnt__lastPacketNumber = state.native.dwPacketNumber;
@@ -428,14 +429,14 @@ namespace iosync
 			return;
 		}
 
-		void gamepad::simulate(application* program)
+		void gamepad::simulate(iosync_application& program)
 		{
 			#ifdef PLATFORM_WINDOWS
 				if (!__winnt__sharedMemoryOpen())
 					return;
 			#endif
 
-			simulateState();
+			simulateState(program);
 
 			return;
 		}
@@ -454,7 +455,7 @@ namespace iosync
 			return;
 		}
 
-		bool gamepad::simulateState()
+		bool gamepad::simulateState(iosync_application& program)
 		{
 			if (!hasState())
 				return false;

@@ -513,14 +513,14 @@ namespace iosync
 			return deviceManager::disconnect();
 		}
 
-		void keyboard::detect(application* program)
+		void keyboard::detect(iosync_application& program)
 		{
 			// Nothing so far.
 
 			return;
 		}
 
-		void keyboard::simulate(application* program)
+		void keyboard::simulate(iosync_application& program)
 		{
 			/*
 				keyboardKey key = VK_UP;
