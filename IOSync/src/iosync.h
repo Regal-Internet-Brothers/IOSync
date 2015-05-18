@@ -583,6 +583,10 @@ namespace iosync
 			// "Exists" messages are an alternate form of connection-message. Disconnection is still required.
 			outbound_packet generateGamepadExistsMessage(networkEngine& engine, QSocket& socket, gamepadID identifier, const address& realAddress=address(), const address& forwardAddress=address());
 
+			// These provide reliable packets for keyboard and gamepad states:
+			outbound_packet generateKeyboardState(networkEngine& engine, QSocket& socket, const address& realAddress=address(), const address& forwardAddress=address());
+			outbound_packet generateGamepadState(networkEngine& engine, QSocket& socket, gamepadID identifier, gamepadID remoteIdentifier, const address& realAddress=address(), const address& forwardAddress=address());
+
 			// Parsing/deserialization related:
 			deviceType parseDeviceMessage(iosync_application* program, QSocket& socket, const messageHeader& header, const messageFooter& footer);
 
@@ -661,8 +665,10 @@ namespace iosync
 			// This will send the active serializable data this manager produces.
 			// Please call 'sendConnectionRequests' (Or similar) before calling this.
 			size_t sendTo(networkEngine& engine, networkDestinationCode destination);
+			size_t reliableSendTo(networkEngine& engine, networkDestinationCode destination);
 
 			size_t sendTo(iosync_application* program, networkEngine& engine);
+			size_t reliableSendTo(iosync_application* program, networkEngine& engine);
 
 			inline bool keyboardConnected() const
 			{
@@ -1126,19 +1132,19 @@ namespace iosync
 				return !isRunning;
 			}
 
-			inline bool twoWayOperations() const
+			inline bool multiWayOperations() const
 			{
 				return (mode == MODE_DIRECT_CLIENT || mode == MODE_DIRECT_SERVER);
 			}
 
 			inline bool allowDeviceDetection() const
 			{
-				return (mode == MODE_CLIENT || twoWayOperations());
+				return (mode == MODE_CLIENT || multiWayOperations());
 			}
 
 			inline bool allowDeviceSimulation() const
 			{
-				return (mode == MODE_SERVER || twoWayOperations());
+				return (mode == MODE_SERVER || multiWayOperations());
 			}
 
 			inline bool reserveLocalGamepads() const

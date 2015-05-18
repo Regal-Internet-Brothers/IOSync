@@ -547,6 +547,10 @@ namespace iosync
 			// Check for incoming messages:
 			while (updateSocket(socket))
 			{
+				#ifdef QSOCK_TESTMODE
+					streamLocation initialPosition = socket.readOffset;
+				#endif
+
 				while (socket.canRead())
 				{
 					// Local variable(s):
@@ -578,15 +582,20 @@ namespace iosync
 						// Attempt to parse the message:
 						if (!parseMessage(socket, address(socket), header, footer))
 						{
+							// Move back to the beginning of the message.
+							socket.inSeek(parsePosition);
+
+							// Report to the standard log.
 							clog << UNABLE_TO_PARSE_MESSAGE << header.type << endl;
 
-							// We were unable to parse this message, skip it.
+							// We were unable to parse this message, skip it:
 							passMessage(header, footer);
 
 							// Continue to the next message.
 							continue;
 						}
 
+						// Add to the message-counter.
 						messages += 1;
 
 						// Calculate the number of bytes read while parsing.
@@ -1377,10 +1386,12 @@ namespace iosync
 
 			if (!packetsInTransit.empty())
 			{
+				auto packetInTransit = packetsInTransit.begin();
+
 				// Remove multi-destination ties to this 'player' object:
-				for (auto& packetInTransit : packetsInTransit)
+				while (packetInTransit != packetsInTransit.end())
 				{
-					removeReliablePacket(p, packetInTransit);
+					removeReliablePacket(p, *packetInTransit++);
 				}
 			}
 
@@ -1419,76 +1430,95 @@ namespace iosync
 			switch (destinationCode)
 			{
 				case DESTINATION_ALL:
+					if (!players.empty())
 					{
 						// Local variable(s):
 						
 						// Copy the contents of the 'players' container:
 						playerList playerMask = players;
 
+						auto p = networkEngine::getPlayer(playerMask, socket);
+
 						// Remove the caller from this new container.
-						playerMask.remove(networkEngine::getPlayer(playerMask, socket));
+						playerMask.remove(p);
 
-						auto returnPoint = socket.readOffset;
-
-						// Seek back to the beginning.
-						socket.resetRead();
-
-						while (socket.canRead())
+						if (!playerMask.empty())
 						{
-							// Local variable(s):
-							streamLocation startPosition = socket.readOffset;
+							auto returnPoint = socket.readOffset;
 
-							messageHeader header;
-							messageFooter footer;
+							// Seek back to the beginning.
+							socket.resetRead();
 
-							header.readFrom(socket, footer);
-
-							if (header.directedHere)
+							while (socket.canRead())
 							{
-								// Store the current read-position.
-								auto parsePosition = socket.readOffset;
+								// Local variable(s):
+								streamLocation startPosition = socket.readOffset;
 
-								// Start a new message:
-								auto headerInformation = beginMessage(socket, header.type);
+								messageHeader header;
+								messageFooter footer;
 
-								// Write the bytes of this message into the output.
-								socket.UwriteBytes(socket.simulatedUReadBytes(header.packetSize), header.packetSize);
+								header.readFrom(socket, footer);
 
-								// Finish the message:
-								if (!footer.isReliable())
+								if (header.directedHere)
 								{
-									finishMessage(socket, headerInformation);
+									switch (header.type)
+									{
+										case MESSAGE_TYPE_META:
+											// Skip this message; meta-data, same as this.
+											socket.inSeekForward(header.packetSize);
+
+											break;
+										default:
+											// Store the current read-position.
+											auto parsePosition = socket.readOffset;
+
+											// Start a new message:
+											auto headerInformation = beginMessage(socket, header.type);
+
+											// Write the bytes of this message into the output.
+											socket.UwriteBytes(socket.simulatedUReadBytes(header.packetSize), header.packetSize);
+
+											// Finish the message:
+											if (!footer.isReliable())
+											{
+												finishMessage(socket, headerInformation);
+											}
+											else
+											{
+												auto p = finishReliableMessage(socket, address(), headerInformation);
+									
+												p.destinationCode = destinationCode;
+									
+												// Copy the generated container.
+												p.waitingConnections = playerMask;
+
+												// Add the new packet to the internal container.
+												addReliablePacket(p);
+											}
+
+											break;
+									}
+
+									// Pass this message's footer; already read it.
+									passFooter(footer);
 								}
 								else
 								{
-									auto p = finishReliableMessage(socket, socket, headerInformation);
+									// Packet forwarding should not be done here.
+									passMessage(header, footer);
 
-									// Copy the generated container.
-									p.waitingConnections = playerMask;
-
-									// Add the new packet to the internal container.
-									addReliablePacket(p);
+									// Continue to the next message.
+									continue;
 								}
-
-								// Pass this message's footer; already read it.
-								passFooter(footer);
 							}
-							else
-							{
-								// Packet forwarding should not be done here.
-								passMessage(header, footer);
 
-								// Continue to the next message.
-								continue;
-							}
+							// Send out the message.
+							//networkEngine::sendMessage(destinationCode, true); // DESTINATION_ALL
+
+							broadcastMessage(socket, playerMask, true);
+
+							socket.inSeek(returnPoint);
 						}
-
-						// Send out the message.
-						//networkEngine::sendMessage(destinationCode, true); // DESTINATION_ALL
-
-						broadcastMessage(socket, playerMask, true);
-
-						socket.inSeek(returnPoint);
 					}
 
 					break;

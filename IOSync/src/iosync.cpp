@@ -263,7 +263,7 @@ namespace iosync
 				bool connectedToNetwork = program->network->connectedToOthers();
 				
 				// Check if we're detecting gamepads:
-				if (program->allowDeviceDetection() && (program->twoWayOperations() || connectedToNetwork))
+				if (program->allowDeviceDetection() && (program->multiWayOperations() || connectedToNetwork))
 				{
 					if (gamepadsEnabled)
 					{
@@ -322,7 +322,7 @@ namespace iosync
 									if (disconnectLocalGamepad(program, i))
 									{
 										// Disconnection was successful, tell the remote host.
-										sendGamepadDisconnectMessage(*program->network, program->network->socket, i, (program->twoWayOperations()) ? DESTINATION_ALL : DESTINATION_HOST);
+										sendGamepadDisconnectMessage(*program->network, program->network->socket, i, (program->multiWayOperations()) ? DESTINATION_ALL : DESTINATION_HOST);
 
 										// Remove this identifier, so it may be used again.
 										reservedGamepads.erase(i);
@@ -670,7 +670,7 @@ namespace iosync
 
 		gamepad* connectedDevices::connectGamepad(iosync_application* program, gamepadID remoteIdentifier)
 		{
-			return connectGamepad(program, remoteIdentifier, program->reserveLocalGamepads()); // !program->twoWayOperations()
+			return connectGamepad(program, remoteIdentifier, program->reserveLocalGamepads()); // !program->multiWayOperations()
 		}
 
 		gamepad* connectedDevices::connectGamepad(iosync_application* program)
@@ -730,12 +730,12 @@ namespace iosync
 
 							pad->owner = program->network->getPlayer(socket);
 
-							//if (program->allowDeviceSimulation()) // !program->twoWayOperations()
+							//if (program->allowDeviceSimulation()) // !program->multiWayOperations()
 							//if (program->mode == iosync_application::MODE_SERVER || program->mode == iosync_application::MODE_DIRECT_SERVER)
 							if (program->network->isHostNode)
 							{
 								// Tell the user that their gamepad was connected.
-								sendGamepadConnectMessage(*program->network, socket, identifier, DESTINATION_REPLY);
+								sendGamepadConnectMessage(*program->network, socket, identifier, DESTINATION_REPLY); // (program->multiWayOperations()) ? DESTINATION_ALL : DESTINATION_REPLY
 							}
 						}
 						else
@@ -753,7 +753,7 @@ namespace iosync
 							if (program->network->isHostNode)
 							{
 								// Tell the user that their gamepad was connected.
-								sendGamepadConnectMessage(*program->network, socket, pad->remoteGamepadNumber, DESTINATION_REPLY);
+								sendGamepadConnectMessage(*program->network, socket, pad->remoteGamepadNumber, (program->multiWayOperations()) ? DESTINATION_ALL : DESTINATION_REPLY);
 							}
 						}
 					}
@@ -953,6 +953,24 @@ namespace iosync
 
 			// Serialize a connection-message with the proper arguments.
 			serializeGamepadConnectMessage(socket, identifier, true);
+
+			return engine.finishReliableMessage(socket, realAddress, headerInformation, forwardAddress);
+		}
+
+		outbound_packet connectedDevices::generateKeyboardState(networkEngine& engine, QSocket& socket, const address& realAddress, const address& forwardAddress)
+		{
+			auto headerInformation = beginDeviceMessage(engine, socket, DEVICE_TYPE_KEYBOARD, DEVICE_NETWORK_MESSAGE_ENTRIES);
+
+			serializeIODevice(socket, keyboard);
+
+			return engine.finishReliableMessage(socket, realAddress, headerInformation, forwardAddress);
+		}
+
+		outbound_packet connectedDevices::generateGamepadState(networkEngine& engine, QSocket& socket, gamepadID identifier, gamepadID remoteIdentifier, const address& realAddress, const address& forwardAddress)
+		{
+			auto headerInformation = beginGamepadDeviceMessage(engine, socket, remoteIdentifier, DEVICE_NETWORK_MESSAGE_ENTRIES);
+
+			serializeIODevice(socket, gamepads[identifier]);
 
 			return engine.finishReliableMessage(socket, realAddress, headerInformation, forwardAddress);
 		}
@@ -1180,14 +1198,44 @@ namespace iosync
 			return engine.sendMessage(engine, destination);
 		}
 
+		size_t connectedDevices::reliableSendTo(networkEngine& engine, networkDestinationCode destination)
+		{
+			size_t sent = 0;
+
+			if (keyboardConnected())
+			{
+				sent += engine.sendMessage(engine, generateKeyboardState(engine, engine), destination);
+			}
+
+			for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
+			{
+				if (gamepadConnected(i) && gamepads[i]->canDetect())
+				{
+					sent += engine.sendMessage(engine, generateGamepadState(engine, engine, i, gamepads[i]->remoteGamepadNumber), destination);
+				}
+			}
+
+			return sent;
+		}
+
 		size_t connectedDevices::sendTo(iosync_application* program, networkEngine& engine)
 		{
-			if (program->twoWayOperations()) // engine.canBroadcastLocally()
+			if (program->multiWayOperations()) // engine.canBroadcastLocally()
 			{
 				return sendTo(engine, DESTINATION_ALL);
 			}
 
 			return sendTo(engine, DEFAULT_DESTINATION);
+		}
+
+		size_t connectedDevices::reliableSendTo(iosync_application* program, networkEngine& engine)
+		{
+			if (program->multiWayOperations()) // engine.canBroadcastLocally()
+			{
+				return reliableSendTo(engine, DESTINATION_ALL);
+			}
+
+			return reliableSendTo(engine, DEFAULT_DESTINATION);
 		}
 	}
 
@@ -2508,7 +2556,7 @@ namespace iosync
 
 		//cout << endl;
 
-		cout << "Application mode (" << MODE_CLIENT << " = Client, " << MODE_SERVER << " = Server, " << MODE_DIRECT_CLIENT << " = Two-way Client, " << MODE_DIRECT_SERVER << " = Two-way Server): "; cin >> mode; //cout << endl;
+		cout << "Application mode (" << MODE_CLIENT << " = Client, " << MODE_SERVER << " = Server, " << MODE_DIRECT_CLIENT << " = Multi-way Client, " << MODE_DIRECT_SERVER << " = Multi-way Server): "; cin >> mode; //cout << endl;
 
 		if (logChoices)
 		{
@@ -2706,7 +2754,8 @@ namespace iosync
 				case MODE_DIRECT_SERVER:
 				case MODE_DIRECT_CLIENT:
 				case MODE_CLIENT:
-					devices.sendTo(this, *network);
+					//devices.sendTo(this, *network);
+					devices.reliableSendTo(this, *network);
 
 					break;
 			}
