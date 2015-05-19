@@ -982,6 +982,11 @@ namespace iosync
 			return connected;
 		}
 
+		size_t clientNetworkEngine::connections() const
+		{
+			return 1;
+		}
+
 		// serverNetworkEngine:
 
 		// Constructor(s):
@@ -1105,6 +1110,11 @@ namespace iosync
 		bool serverNetworkEngine::alone() const
 		{
 			return players.empty();
+		}
+
+		size_t serverNetworkEngine::connections() const
+		{
+			return players.size();
 		}
 
 		// Reliable message related:

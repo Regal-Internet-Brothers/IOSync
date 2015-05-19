@@ -1291,6 +1291,7 @@ namespace iosync
 	const wstring iosync_application::applicationConfiguration::APPLICATION_MODE = L"mode";
 	const wstring iosync_application::applicationConfiguration::APPLICATION_USECMD = L"force_cmd";
 	const wstring iosync_application::applicationConfiguration::APPLICATION_CONFIG = L"config";
+	const wstring iosync_application::applicationConfiguration::APPLICATION_SYNCHRONIZED_APPLICATIONS = L"targets";
 
 	// Devices:
 	const wstring iosync_application::applicationConfiguration::DEVICES_KEYBOARD = L"keyboard";
@@ -1462,6 +1463,30 @@ namespace iosync
 			{
 				mode = (applicationMode)stoi(modeIterator->second);
 			}
+
+			#if defined(IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION) && defined(PLATFORM_WINDOWS)
+				auto targetsIterator = application.find(APPLICATION_SYNCHRONIZED_APPLICATIONS);
+
+				if (targetsIterator != application.end())
+				{
+					// Parse the array provided:
+					parseArray
+					(
+						targetsIterator->second,
+						
+						[this] (const wstring& entry)
+						{
+							auto PID = process::resolvePIDW(entry);
+
+							if (PID != 0)
+							{
+								// Add a new process entry into the container.
+								synchronizedApplications.push_back(PID);
+							}
+						}
+					);
+				}
+			#endif
 		}
 
 		// Devices:
@@ -1608,60 +1633,22 @@ namespace iosync
 
 				if (processes_entry != XInput.end())
 				{
-					const auto& entries = processes_entry->second;
-
-					for
+					// Parse the array provided:
+					parseArray
 					(
-						// Calculate the start of the first number:
-						wstring::size_type numberLocation = ((numberLocation = entries.find('[')) != wstring::npos) ? (numberLocation+1) : 0;
-							
-						// Ensure the next number-location isn't at the end of the string:
-						numberLocation != wstring::npos && numberLocation < entries.length();
-					)
-					{
-						// Calculate the edge of the current number:
-						auto edge = entries.find('|', numberLocation);
-
-						if (edge == wstring::npos)
+						processes_entry->second,
+						
+						[this] (const wstring& entry)
 						{
-							// We were unable to find a separator, look for the scope-end symbol:
-							edge = entries.find(']', numberLocation);
+							auto PID = process::resolvePIDW(entry);
 
-							if (edge == wstring::npos)
+							if (PID != 0)
 							{
-								// When all else fails, the edge will be the end of the string.
-								edge = entries.length();
+								// Push the current number onto the PID-container.
+								PIDs.push(PID);
 							}
 						}
-
-						DWORD PID = 0;
-
-						// This will act as the current entry in the "array" of processes.
-						auto entry = entries.substr(numberLocation, edge-numberLocation);
-							
-						try
-						{
-							PID = (DWORD)stoi(entry);
-						}
-						catch (std::invalid_argument&)
-						{
-							GetWindowThreadProcessId(FindWindowW(NULL, (LPCWSTR)entry.c_str()), (LPDWORD)&PID);
-
-							if (PID == 0)
-							{
-								PID = process::PIDFromProcessNameW(entry);
-							}
-						}
-
-						if (PID != 0)
-						{
-							// Push the current number onto the PID-container.
-							PIDs.push(PID);
-						}
-
-						// Move to the starting point of the next entry.
-						numberLocation = edge+1;
-					}
+					);
 				}
 			}
 		#endif
@@ -2040,23 +2027,7 @@ namespace iosync
 
 		DWORD iosync_application::__winnt__getPIDW(const wstring& entry)
 		{
-			DWORD PID = 0;
-
-			try
-			{
-				PID = (DWORD)stoi(entry);
-			}
-			catch (std::invalid_argument&)
-			{
-				GetWindowThreadProcessId(FindWindowW(NULL, (LPCWSTR)entry.c_str()), (LPDWORD)&PID);
-
-				if (PID == 0)
-				{
-					PID = process::PIDFromProcessNameW(entry);
-				}
-			}
-
-			return PID;
+			return process::resolvePIDW(entry);
 		}
 
 		bool iosync_application::__winnt__createAppDataFolder()
@@ -2434,6 +2405,12 @@ namespace iosync
 			return applyCommandlineConfiguration(configuration, false);
 		}
 
+		#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
+			synchronizedApplications = configuration.synchronizedApplications;
+
+			//configuration.synchronizedApplications.clear();
+		#endif
+
 		#ifdef PLATFORM_WINDOWS
 			// Attempt to inject into the PIDs in the configuration-object:
 			while (!configuration.PIDs.empty())
@@ -2553,8 +2530,6 @@ namespace iosync
 	int iosync_application::applyCommandlineConfiguration(applicationConfiguration& configuration, const bool logChoices, const wstring& output_file)
 	{
 		configuration.remoteAddress.port = DEFAULT_PORT;
-
-		//cout << endl;
 
 		cout << "Application mode (" << MODE_CLIENT << " = Client, " << MODE_SERVER << " = Server, " << MODE_DIRECT_CLIENT << " = Multi-way Client, " << MODE_DIRECT_SERVER << " = Multi-way Server): "; cin >> mode; //cout << endl;
 
@@ -2681,6 +2656,10 @@ namespace iosync
 		// Link with any dynamic modules we may need.
 		dynamicLink(*this);
 
+		#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
+			synchronizedApplications_haltTimer = high_resolution_clock::now();
+		#endif
+
 		#ifdef IOSYNC_LIVE_COMMANDS
 			openCommandThread(this);
 		#endif
@@ -2736,7 +2715,19 @@ namespace iosync
 		updateDevices();
 
 		if (network != nullptr)
+		{
 			updateNetwork();
+
+			if (network != nullptr)
+			{
+				#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
+					if (synchronizeApplications() && network->connectedToOthers())
+					{
+						updateSynchronizedApplications();
+					}
+				#endif
+			}
+		}
 
 		return;
 	}
@@ -2784,6 +2775,78 @@ namespace iosync
 
 		return;
 	}
+
+	#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
+		void iosync_application::updateSynchronizedApplications()
+		{
+			return;
+
+			if (!synchronizedApplications_suspended)
+			{
+				//switch (mode)
+				{
+					//case MODE_DIRECT_SERVER:
+						if (elapsed(synchronizedApplications_haltTimer) >= synchronizedApplications_resumeTime)
+						{
+							suspendSynchronizedApplications();
+						}
+				}
+			}
+
+			return;
+		}
+
+		void iosync_application::suspendSynchronizedApplications()
+		{
+			if (synchronizedApplications_suspended)
+				return;
+
+			synchronizedApplications_haltTimer = high_resolution_clock::now();
+
+			if (network->isHostNode)
+			{
+				synchronizedApplications_waitCounter = network->connections();
+			}
+
+			for (auto& application : synchronizedApplications)
+			{
+				application.suspend();
+			}
+
+			if (network->isHostNode)
+			{
+				network->sendMessage(*network, generateApplicationSyncMessage(*network, *network, APPLICATION_SYNCRHONIZATION_QUERY), DESTINATION_ALL);
+			}
+			/*
+			else
+			{
+				network->sendMessage(*network, generateApplicationSyncMessage(*network, *network, APPLICATION_SYNCRHONIZATION_RESPONSE), DESTINATION_HOST);
+			}
+			*/
+
+			synchronizedApplications_suspended = true;
+
+			return;
+		}
+
+		void iosync_application::resumeSynchronizedApplications()
+		{
+			if (!synchronizedApplications_suspended)
+				return;
+
+			synchronizedApplications_resumeTime = elapsed(synchronizedApplications_haltTimer);
+			synchronizedApplications_haltTimer = high_resolution_clock::now();
+
+			for (auto& application : synchronizedApplications)
+			{
+				application.resume();
+			}
+
+			synchronizedApplications_suspended = false;
+
+			return;
+		}
+	#endif
 
 	void iosync_application::checkDeviceMessages()
 	{
@@ -2878,6 +2941,24 @@ namespace iosync
 
 	// Networking related:
 
+	// Serialization related:
+	void iosync_application::serializeApplicationSyncMessage(QSocket& socket, synchronizationMessageTypes type)
+	{
+		socket.write<synchronizationMessageTypes>(type);
+
+		return;
+	}
+
+	// Message generation related:
+	outbound_packet iosync_application::generateApplicationSyncMessage(networkEngine& engine, QSocket& socket, synchronizationMessageTypes type, const address& realAddress, const address& forwardAddress)
+	{
+		auto headerInformation = engine.beginMessage(socket, MESSAGE_TYPE_SYNC);
+
+		serializeApplicationSyncMessage(socket, type);
+
+		return engine.finishReliableMessage(socket, realAddress, headerInformation, forwardAddress);
+	}
+
 	// Parsing/deserialization related:
 	bool iosync_application::parseNetworkMessage(QSocket& socket, const messageHeader& header, const messageFooter& footer)
 	{
@@ -2893,12 +2974,51 @@ namespace iosync
 				}
 
 				break;
+			case MESSAGE_TYPE_SYNC:
+				parseApplicationSyncMessage(socket, header, footer);
+
+				break;
 			default:
 				return false;
 		}
 
 		// Return the default response.
 		return true;
+	}
+
+	void iosync_application::parseApplicationSyncMessage(QSocket& socket, const messageHeader& header, const messageFooter& footer)
+	{
+		auto type = socket.read<synchronizationMessageTypes>();
+
+		switch (type)
+		{
+			case APPLICATION_SYNCRHONIZATION_QUERY:
+				if (!network->isHostNode)
+				{
+					suspendSynchronizedApplications();
+
+					network->sendMessage(socket, generateApplicationSyncMessage(*network, socket, APPLICATION_SYNCRHONIZATION_RESPONSE), DESTINATION_HOST);
+				}
+
+				break;
+			case APPLICATION_SYNCRHONIZATION_RESPONSE:
+				synchronizedApplications_waitCounter--;
+
+				if (synchronizedApplications_waitCounter == 0) // <= 0
+				{
+					network->sendMessage(socket, generateApplicationSyncMessage(*network, socket, APPLICATION_SYNCRHONIZATION_RESUME), DESTINATION_ALL);
+
+					resumeSynchronizedApplications();
+				}
+
+				break;
+			case APPLICATION_SYNCRHONIZATION_RESUME:
+				resumeSynchronizedApplications();
+
+				break;
+		}
+
+		return;
 	}
 
 	// Call-backs:

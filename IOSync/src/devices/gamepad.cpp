@@ -147,13 +147,13 @@ namespace iosync
 							#if defined(PLATFORM_X86)
 								return application::__winnt__injectLibrary(INJECTION_DLL_NAME_X86, processID);
 							#else
-								return application::__winnt__startProcess(TEXT(EXECUTABLE_NAME_X86), injectionStr());
+								return process::startProcess(TEXT(EXECUTABLE_NAME_X86), injectionStr());
 							#endif
 						case x64:
 							#if defined(PLATFORM_X64)
 								return application::__winnt__injectLibrary(INJECTION_DLL_NAME_X64, processID);
 							#else
-								return application::__winnt__startProcess(TEXT(EXECUTABLE_NAME_X64), injectionStr());
+								return process::startProcess(TEXT(EXECUTABLE_NAME_X64), injectionStr());
 							#endif
 					#elif defined(PLATFORM_ARM) || defined(PLATFORM_ARM64)
 						case ARM:
@@ -173,9 +173,9 @@ namespace iosync
 					return false;
 
 				#if !defined(PLATFORM_ARM)
-					return __winnt__injectLibrary(processID, (application::__winnt__process32bit(processID)) ? x86 : x64);
+					return __winnt__injectLibrary(processID, (process::process32bit(processID)) ? x86 : x64);
 				#else
-					return __winnt__injectLibrary(processID, (application::__winnt__process32bit(processID)) ? ARM : ARM64)
+					return __winnt__injectLibrary(processID, (process::process32bit(processID)) ? ARM : ARM64)
 				#endif
 			}
 

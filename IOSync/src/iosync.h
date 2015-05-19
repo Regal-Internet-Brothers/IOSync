@@ -66,32 +66,26 @@
 #include "devices/keyboard.h"
 #include "devices/gamepad.h"
 
-#ifdef PLATFORM_WINDOWS
-	#include "native/winnt/processManagement.h"
-#endif
-
 // QuickLib:
 #include <QuickLib/QuickINI/QuickINI.h>
 
 // Standard library:
 #include <string>
 #include <iostream>
+#include <vector>
 #include <stack>
 #include <queue>
+#include <list>
+#include <map>
 
-#ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
+#include <chrono>
+
+#if defined(IOSYNC_ALLOW_ASYNC_EXECUTE) || defined(IOSYNC_LIVE_COMMANDS)
 	#include <mutex>
 	#include <thread>
 #endif
 
-#ifdef IOSYNC_LIVE_COMMANDS
-	#include <queue>
-	#include <vector>
-	
-	#include <thread>
-	#include <mutex>
-#endif
-
+// Windows-specific:
 #ifdef PLATFORM_WINDOWS
 	// This specifies if 'sharedWindow' is implemented.
 	#define IOSYNC_SHAREDWINDOW_IMPLEMENTED
@@ -99,6 +93,16 @@
 	// If disabled, fallbacks may be used to compensate for the lack of wide I/O streams.
 	// Behavior with this disabled is partially undefined.
 	#define IOSYNC_WIDE_IO
+#endif
+
+#ifdef PROCESS_MANAGER_IMPLEMENTED
+	// This specifies if this application supports management of external processes.
+	#define IOSYNC_PROCESSES_AVAILABLE
+	
+	#ifdef PROCESS_MANAGER_SYNCHRONIZED_PROCESS_IMPLEMENTED
+		// This specifies that process synchronization is allowed.
+		#define IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
+	#endif
 #endif
 
 // Libraries:
@@ -109,6 +113,7 @@
 
 // Namespace(s):
 using namespace std;
+using namespace chrono;
 using namespace quickLib;
 using namespace iosync::networking;
 using namespace iosync::exceptions::applicationExceptions;
@@ -119,6 +124,21 @@ namespace iosync
 {
 	// Typedefs:
 	typedef unsigned short applicationMode; // unsigned char
+	
+	// The 'processID' typedef allows for platform independent process management:
+	#ifdef IOSYNC_PROCESSES_AVAILABLE
+		#ifdef PROCESS_MANAGER_IMPLEMENTED
+			typedef process::nativeID processID;
+		#else
+			#error Unable to resolve native process-identifier.
+		#endif
+
+		typedef vector<processID> processes;
+
+		#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
+			typedef vector<process::synchronized_process> synchronized_processes;
+		#endif
+	#endif
 
 	// Forward declarations:
 	class iosync_application;
@@ -770,6 +790,15 @@ namespace iosync
 			enum messageTypes : messageType
 			{
 				MESSAGE_TYPE_DEVICE = networkEngine::messageTypes::MESSAGE_TYPE_CUSTOM_LOCATION,
+				MESSAGE_TYPE_SYNC,
+			};
+
+			enum synchronizationMessageTypes : messageType
+			{
+				// Used to poll clients for 
+				APPLICATION_SYNCRHONIZATION_QUERY,
+				APPLICATION_SYNCRHONIZATION_RESPONSE,
+				APPLICATION_SYNCRHONIZATION_RESUME,
 			};
 
 			// Structures:
@@ -820,6 +849,9 @@ namespace iosync
 
 				// This is used to redirect to another configuration-file.
 				static const wstring APPLICATION_CONFIG;
+
+				// This is used to describe applications which are synchronized between systems.
+				static const wstring APPLICATION_SYNCHRONIZED_APPLICATIONS;
 
 				// Devices:
 				static const wstring DEVICES_KEYBOARD;
@@ -889,6 +921,10 @@ namespace iosync
 
 				#ifdef PLATFORM_WINDOWS
 					queue<DWORD> PIDs;
+				#endif
+
+				#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
+					synchronized_processes synchronizedApplications;
 				#endif
 
 				// Booleans / Flags:
@@ -1078,10 +1114,20 @@ namespace iosync
 			void closeNetwork();
 
 			void update(rate frameNumber=0) override;
-
+			
 			void updateNetwork();
 			void updateDevices();
+			
+			#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
+				void updateSynchronizedApplications();
 
+				// Every call to this command should have a matching call to 'resumeSynchronizedApplications'
+				void suspendSynchronizedApplications();
+
+				// This should only be called after using 'suspendSynchronizedApplications'.
+				void resumeSynchronizedApplications();
+			#endif
+			
 			void checkDeviceMessages();
 
 			#ifdef IOSYNC_LIVE_COMMANDS
@@ -1101,13 +1147,15 @@ namespace iosync
 			}
 
 			// Serialization related:
-			// Nothing so far.
+			void serializeApplicationSyncMessage(QSocket& socket, synchronizationMessageTypes type);
 
 			// Message generation related:
-			// Nothing so far.
+			outbound_packet generateApplicationSyncMessage(networkEngine& engine, QSocket& socket, synchronizationMessageTypes type, const address& realAddress=address(), const address& forwardAddress=address());
 
 			// Parsing/deserialization related:
 			bool parseNetworkMessage(QSocket& socket, const messageHeader& header, const messageFooter& footer) override;
+
+			void parseApplicationSyncMessage(QSocket& socket, const messageHeader& header, const messageFooter& footer);
 
 			// Sending related:
 			// Nothing so far.
@@ -1152,6 +1200,11 @@ namespace iosync
 				return allowDeviceSimulation();
 			}
 
+			inline bool synchronizeApplications() const
+			{
+				return multiWayOperations();
+			}
+
 			// Fields:
 
 			// Network I/O.
@@ -1166,6 +1219,21 @@ namespace iosync
 			#ifdef IOSYNC_SHAREDWINDOW_IMPLEMENTED
 				// The window this application is tied to.
 				nativeWindow window;
+			#endif
+
+			#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
+				// A timer used to halt execution of synchronized applications.
+				high_resolution_clock::time_point synchronizedApplications_haltTimer;
+
+				// The amount of time synchronized applications may resume for.
+				milliseconds synchronizedApplications_resumeTime;
+
+				size_t synchronizedApplications_waitCounter = 0;
+
+				// Process identifiers representing synchronized applications.
+				synchronized_processes synchronizedApplications;
+
+				bool synchronizedApplications_suspended = false;
 			#endif
 
 			#ifdef IOSYNC_ALLOW_ASYNC_EXECUTE

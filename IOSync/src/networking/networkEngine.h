@@ -295,6 +295,7 @@ namespace iosync
 				virtual player* getPlayer(QSocket& socket);
 
 				virtual bool alone() const = 0;
+				virtual size_t connections() const = 0;
 
 				inline bool connectedToOthers() const
 				{
@@ -586,6 +587,7 @@ namespace iosync
 				virtual player* getPlayer(QSocket& socket) override;
 
 				virtual bool alone() const;
+				virtual size_t connections() const;
 
 				// Operators:
 				inline operator player&()
@@ -717,6 +719,7 @@ namespace iosync
 				virtual player* getPlayer(QSocket& socket) override;
 
 				virtual bool alone() const;
+				virtual size_t connections() const;
 
 				inline bool timedOut(player* p) const
 				{

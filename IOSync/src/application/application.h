@@ -10,6 +10,12 @@
 #include "../util.h"
 #include "../networking/networking.h"
 
+// Platform-specific:
+#ifdef PLATFORM_WINDOWS
+	#include "native/winnt/processManagement.h"
+#endif
+
+// Standard library:
 #include <cstdio>
 
 #include <vector>
@@ -129,52 +135,6 @@ namespace iosync
 			}
 
 			#ifdef PLATFORM_WINDOWS
-				static inline bool __winnt__startProcess(LPCTSTR applicationName, const string& commandLine=string(), DWORD flags=CREATE_NO_WINDOW)
-				{
-					// Local variable(s):
-					STARTUPINFO si;     
-					PROCESS_INFORMATION pi;
-
-					// Set the size of the structures:
-					ZeroMemory(&si, sizeof(si));
-					ZeroMemory(&pi, sizeof(pi));
-
-					si.cb = sizeof(si);
-
-					CHAR cmd[MAX_PATH];
-
-					memcpy(cmd, commandLine.c_str(), std::min((size_t)commandLine.size(), (size_t)MAX_PATH));
-					cmd[commandLine.length()] = '\0';
-
-					// Start the specified program:
-					if
-					(
-						CreateProcess
-						(
-							applicationName,
-							(LPSTR)cmd,
-							NULL,
-							NULL,
-							FALSE,
-							flags,
-							NULL,
-							NULL,
-							&si,
-							&pi
-						) == FALSE
-					)
-					{
-						return false;
-					}
-
-					// Close the process and thread handles:
-					CloseHandle(pi.hProcess);
-					CloseHandle(pi.hThread);
-
-					// Return the default response.
-					return true;
-				}
-				
 				// This command will inject the library specified into the process with the PID specified by 'processID'.
 				// The return-value of this command indicates if injection was successful.
 				static inline bool __winnt__injectLibrary(string library, DWORD processID)
@@ -239,44 +199,6 @@ namespace iosync
 					delete[] buffer;
 
 					// Return the default response.
-					return true;
-				}
-
-				static inline bool __winnt__process32bit(DWORD processID)
-				{
-					// Typedefs:
-					typedef decltype(&IsWow64Process) IsWow64Process_t;
-
-					// Local variable(s):
-					auto k32Handle = GetModuleHandle(TEXT("kernel32"));
-
-					// Attempt to retrieve a remote kernel function.
-					IsWow64Process_t fnIsWow64Process = NULL;
-
-					if (k32Handle != NULL)
-					{
-						fnIsWow64Process = (IsWow64Process_t)GetProcAddress(k32Handle, "IsWow64Process");
-					}
-
-					if (fnIsWow64Process != NULL)
-					{
-						HANDLE p = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, processID); // PROCESS_VM_READ
-
-						if (p == NULL)
-							return true;
-
-						BOOL is32bit;
-
-						if (fnIsWow64Process(p, &is32bit) == FALSE)
-						{
-							return true;
-						}
-
-						CloseHandle(p);
-
-						return (is32bit == TRUE);
-					}
-
 					return true;
 				}
 			#endif

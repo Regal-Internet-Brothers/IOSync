@@ -66,7 +66,7 @@ namespace REAL_XINPUT
 		if (remoteFunction == NULL)
 		{
 			#ifdef PROCESS_MANAGER_DEBUG
-				cout << "Mapping failed; unable to find remote function."
+				cout << "Mapping failed; unable to find remote function." << endl;
 			#endif
 
 			// For now, do nothing.
