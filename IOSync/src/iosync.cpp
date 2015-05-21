@@ -2779,8 +2779,6 @@ namespace iosync
 	#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
 		void iosync_application::updateSynchronizedApplications()
 		{
-			return;
-
 			if (!synchronizedApplications_suspended)
 			{
 				//switch (mode)

@@ -26,6 +26,8 @@
 #define PROCESS_MANAGER_IMPLEMENTED
 #define PROCESS_MANAGER_SYNCHRONIZED_PROCESS_IMPLEMENTED
 
+//#define PROCESS_MANAGER_DEBUG_SUSPEND
+
 // Includes:
 #include "../../../platform.h"
 
@@ -59,6 +61,7 @@ namespace process
 
 	// This platform's native process-identifier.
 	typedef DWORD nativeID;
+	typedef DWORD nativeThreadID;
 	
 	// Classes:
 
@@ -68,13 +71,13 @@ namespace process
 	{
 		public:
 			// Typedefs:
-			#ifdef PROCESS_MANAGER_WOW
+			#if !defined(PROCESS_MANAGER_DEBUG_SUSPEND) && defined(PROCESS_MANAGER_WOW)
 				typedef decltype(&Wow64SuspendThread) Wow64SuspendThread_t;
 				//typedef decltype(&Wow64ResumeThread) Wow64ResumeThread_t;
 			#endif
 
 			// Constructor(s):
-			#ifdef PROCESS_MANAGER_WOW
+			#if !defined(PROCESS_MANAGER_DEBUG_SUSPEND) && defined(PROCESS_MANAGER_WOW)
 				synchronized_process(nativeID ID, bool retrieveSnapshot, bool is32b);
 			#endif
 
@@ -106,13 +109,14 @@ namespace process
 
 			// Windows-specific:
 			HANDLE processHandle = NULL;
-			HANDLE threadSnapshot = NULL;
 
-			// All of the currently open threads of this process.
-			vector<HANDLE> threads;
+			#ifndef PROCESS_MANAGER_DEBUG_SUSPEND
+				// All of the currently open threads of this process.
+				vector<nativeThreadID> threads;
+			#endif
 
 			// Booleans / Flags:
-			#ifdef PROCESS_MANAGER_WOW
+			#if !defined(PROCESS_MANAGER_DEBUG_SUSPEND) && defined(PROCESS_MANAGER_WOW)
 				bool is32bit;
 
 				Wow64SuspendThread_t fnWow64SuspendThread = NULL;
