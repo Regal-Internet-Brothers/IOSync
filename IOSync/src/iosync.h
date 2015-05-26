@@ -557,13 +557,13 @@ namespace iosync
 			// Serialization related:
 			void serializeTo(networkEngine& engine, QSocket& socket);
 			void serializeKeyboard(networkEngine& engine, QSocket& socket);
-			void serializeGamepad(networkEngine& engine, QSocket& socket, gamepadID identifier, gamepadID remoteIdentifier);
+			void serializeGamepad(networkEngine& engine, QSocket& socket, gamepadID gamepadLocation, gamepadID remoteIdentifier);
 
 			inline void serializeGamepads(networkEngine& engine, QSocket& socket)
 			{
 				for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
 				{
-					if (gamepadConnected(i))
+					if (gamepadConnected(i) && gamepads[i]->canDetect() && gamepads[i]->hasRealState())
 						serializeGamepad(engine, socket, i, gamepads[i]->remoteGamepadNumber);
 				}
 
@@ -762,6 +762,23 @@ namespace iosync
 			{
 				return keyboardConnected() || gamepadConnected();
 			}
+
+			inline bool playerHasDevice(player* p) const
+			{
+				for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
+				{
+					if (gamepadConnected(i))
+					{
+						if (gamepads[i]->owner == p)
+						{
+							return true;
+						}
+					}
+				}
+
+				// Return the default response.
+				return false;
+			}
 		};
 	}
 
@@ -790,15 +807,6 @@ namespace iosync
 			enum messageTypes : messageType
 			{
 				MESSAGE_TYPE_DEVICE = networkEngine::messageTypes::MESSAGE_TYPE_CUSTOM_LOCATION,
-				MESSAGE_TYPE_SYNC,
-			};
-
-			enum synchronizationMessageTypes : messageType
-			{
-				// Used to poll clients for 
-				APPLICATION_SYNCRHONIZATION_QUERY,
-				APPLICATION_SYNCRHONIZATION_RESPONSE,
-				APPLICATION_SYNCRHONIZATION_RESUME,
 			};
 
 			// Structures:
@@ -1146,16 +1154,8 @@ namespace iosync
 				return (network != nullptr);
 			}
 
-			// Serialization related:
-			void serializeApplicationSyncMessage(QSocket& socket, synchronizationMessageTypes type);
-
-			// Message generation related:
-			outbound_packet generateApplicationSyncMessage(networkEngine& engine, QSocket& socket, synchronizationMessageTypes type, const address& realAddress=address(), const address& forwardAddress=address());
-
 			// Parsing/deserialization related:
 			bool parseNetworkMessage(QSocket& socket, const messageHeader& header, const messageFooter& footer) override;
-
-			void parseApplicationSyncMessage(QSocket& socket, const messageHeader& header, const messageFooter& footer);
 
 			// Sending related:
 			// Nothing so far.
@@ -1174,6 +1174,23 @@ namespace iosync
 			#ifdef PLATFORM_WINDOWS
 				void __winnt__readFromDevice(RAWINPUT* rawDevice);
 			#endif
+
+			inline bool applicationsSuspended() const
+			{
+				#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
+					return synchronizedApplications_suspended;
+
+					/*
+					if (synchronizedApplications.empty())
+						return false;
+
+					// For now, we'll just check the first application-entry.
+					return synchronizedApplications[0].suspended;
+					*/
+				#else
+					return false;
+				#endif
+			}
 
 			inline bool closed() const
 			{
@@ -1202,7 +1219,11 @@ namespace iosync
 
 			inline bool synchronizeApplications() const
 			{
-				return multiWayOperations();
+				#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
+					return multiWayOperations();
+				#else
+					return false;
+				#endif
 			}
 
 			// Fields:
@@ -1221,23 +1242,21 @@ namespace iosync
 				nativeWindow window;
 			#endif
 
+			#ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
+				mutex asyncExecutionMutex;
+			#endif
+		protected:
+			// Fields (Protected):
 			#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
-				// A timer used to halt execution of synchronized applications.
-				high_resolution_clock::time_point synchronizedApplications_haltTimer;
-
-				// The amount of time synchronized applications may resume for.
-				milliseconds synchronizedApplications_resumeTime;
-
-				size_t synchronizedApplications_waitCounter = 0;
-
 				// Process identifiers representing synchronized applications.
 				synchronized_processes synchronizedApplications;
 
 				bool synchronizedApplications_suspended = false;
-			#endif
 
-			#ifdef IOSYNC_ALLOW_ASYNC_EXECUTE
-				mutex asyncExecutionMutex;
+				// To be refactored.
+				const milliseconds synchronizedApplicationRefreshTime = (milliseconds)500;
+
+				high_resolution_clock::time_point synchronizedApplicationRefreshTimer; // synchronizedApplicationThreadEnumerationTimer
 			#endif
 	};
 }

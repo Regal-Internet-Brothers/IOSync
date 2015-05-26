@@ -26,6 +26,7 @@
 // Standard library:
 #include <thread>
 #include <chrono>
+#include <deque>
 
 #include <climits>
 #include <cmath>
@@ -183,6 +184,34 @@ namespace iosync
 			// Methods:
 			void readFrom(QSocket& socket);
 			void writeTo(QSocket& socket);
+
+			// Operators (Only works per-gamepad; uses native packet IDs):
+			inline bool operator==(const gamepadState& state) const
+			{
+				#ifdef PLATFORM_WINDOWS
+					return (native.dwPacketNumber == state.native.dwPacketNumber);
+				#else
+					return false;
+				#endif
+			}
+
+			inline bool operator!=(const gamepadState& state) const
+			{
+				return !operator==(state);
+			}
+
+			// Platform-specific:
+			#ifdef PLATFORM_WINDOWS
+				inline bool operator<(const gamepadState& state) const
+				{
+					return (native.dwPacketNumber < state.native.dwPacketNumber);
+				}
+
+				inline bool operator>(const gamepadState& state) const
+				{
+					return (native.dwPacketNumber > state.native.dwPacketNumber);
+				}
+			#endif
 
 			// Fields:
 			nativeGamepad native;
@@ -487,6 +516,27 @@ namespace iosync
 				// This command simulates the specified state.
 				static void simulateState(const gamepadState& state, const gamepadID localIdentifier);
 
+				// Fields:
+				gamepadID localGamepadNumber;
+				gamepadID remoteGamepadNumber;
+
+				gamepadState state;
+
+				deque<gamepadState> stateLog;
+
+				// Used externally; a pointer to a player/connection which owns this object.
+				networking::player* owner = nullptr;
+
+				#ifdef PLATFORM_WINDOWS
+					DWORD __winnt__lastPacketNumber;
+					DWORD __winnt__state_meta;
+
+					#ifdef GAMEPAD_VJOY_ENABLED
+						VjdStat vJoy_status = VJD_STAT_BUSY;
+						UINT local_vJoyID;
+					#endif
+				#endif
+
 				// Constructor(s):
 				gamepad(gamepadID localIdentifier, gamepadID remoteIdentifier, bool canDetect=true, bool canSimulate=true, deviceFlags flagsToAdd=deviceFlags());
 
@@ -512,10 +562,15 @@ namespace iosync
 					VjdStat __winnt__vJoy__calculateStatus();
 				#endif
 
+				inline bool hasRealState() const
+				{
+					return (canDetect() && canSimulate()) || (state.native.dwPacketNumber != __winnt__lastPacketNumber);
+				}
+
 				inline bool hasState() const
 				{
 					#ifdef PLATFORM_WINDOWS
-						return (state.native.dwPacketNumber != __winnt__lastPacketNumber);
+						return hasRealState() || (!stateLog.empty());
 					#else
 						return false;
 					#endif
@@ -530,24 +585,10 @@ namespace iosync
 					#endif
 				}
 
-				// Fields:
-				gamepadID localGamepadNumber;
-				gamepadID remoteGamepadNumber;
-
-				gamepadState state;
-
-				// Used externally; a pointer to a player/connection which owns this object.
-				networking::player* owner = nullptr;
-
-				#ifdef PLATFORM_WINDOWS
-					DWORD __winnt__lastPacketNumber;
-					DWORD __winnt__state_meta;
-
-					#ifdef GAMEPAD_VJOY_ENABLED
-						VjdStat vJoy_status = VJD_STAT_BUSY;
-						UINT local_vJoyID;
-					#endif
-				#endif
+				inline bool hasStates() const
+				{
+					return !stateLog.empty();
+				}
 		};
 	}
 }

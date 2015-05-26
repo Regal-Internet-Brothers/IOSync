@@ -382,7 +382,8 @@ namespace iosync
 
 					return socket.sendMsg(resetLength);
 				case DESTINATION_ALL:
-					return broadcastMessage(socket, resetLength);
+				case DESTINATION_EVERYONE:
+					return broadcastMessage(socket, destination, resetLength);
 			}
 
 			return (size_t)SOCKET_ERROR;
@@ -732,7 +733,7 @@ namespace iosync
 		void networkEngine::finalizeOutput(QSocket& s, networkDestinationCode destinationCode)
 		{
 			// Check if we're a client:
-			if (!isHostNode)
+			//if (!isHostNode)
 			{
 				// Create a final message:
 
@@ -797,7 +798,7 @@ namespace iosync
 			return networkEngine::close();
 		}
 
-		// Methods:
+		// Methods (Public):
 		
 		// Update routines:
 		void clientNetworkEngine::update()
@@ -941,9 +942,9 @@ namespace iosync
 		}
 
 		// Sending related:
-		size_t clientNetworkEngine::broadcastMessage(QSocket& socket, bool resetLength)
+		size_t clientNetworkEngine::broadcastMessage(QSocket& socket, networkDestinationCode destinationCode, bool resetLength)
 		{
-			return sendMessage(socket, connection.remoteAddress, resetLength, DESTINATION_ALL);
+			return sendMessage(socket, connection.remoteAddress, resetLength, destinationCode);
 		}
 
 		size_t clientNetworkEngine::sendMessage(QSocket& socket, const address& remote, bool resetLength, networkDestinationCode destinationCode)
@@ -979,13 +980,28 @@ namespace iosync
 
 		bool clientNetworkEngine::alone() const
 		{
-			return connected;
+			return !connected;
 		}
 
 		size_t clientNetworkEngine::connections() const
 		{
 			return 1;
 		}
+
+		// Methods (Protected):
+		/*
+		networkDestinationCode clientNetworkEngine::parseMeta(QSocket& socket, const address& remoteAddress, const messageHeader& header)
+		{
+			// Call the super-class's implementation.
+			auto destinationCode = networkEngine::parseMeta(socket, remoteAddress, header);
+
+			switch (destinationCode)
+			{
+				case DESTINATION_EVERYONE:
+					
+			}
+		}
+		*/
 
 		// serverNetworkEngine:
 
@@ -1067,7 +1083,7 @@ namespace iosync
 			return;
 		}
 
-		size_t serverNetworkEngine::broadcastMessage(QSocket& socket, playerList players, bool resetLength)
+		size_t serverNetworkEngine::broadcastMessage(QSocket& socket, playerList players, networkDestinationCode destinationCode, bool resetLength)
 		{
 			//return socket.broadcastMsg();
 
@@ -1081,15 +1097,26 @@ namespace iosync
 				 sent += networkEngine::sendMessage(socket, p->remoteAddress, false);
 			}
 
+			/*
+			switch (destinationCode)
+			{
+				case DESTINATION_EVERYONE:
+					// Send to ourself.
+					sent += networkEngine::sendMessage(socket, address("127.0.0.1", 5029), false);
+
+					break;
+			}
+			*/
+
 			if (resetLength)
 				socket.flushOutput();
 
 			return sent;
 		}
 
-		size_t serverNetworkEngine::broadcastMessage(QSocket& socket, bool resetLength)
+		size_t serverNetworkEngine::broadcastMessage(QSocket& socket, networkDestinationCode destinationCode, bool resetLength)
 		{
-			return broadcastMessage(socket, this->players, resetLength);
+			return broadcastMessage(socket, this->players, destinationCode, resetLength);
 		}
 
 		bool serverNetworkEngine::hasRemoteConnection() const
@@ -1175,7 +1202,7 @@ namespace iosync
 
 		size_t serverNetworkEngine::sendMessage(QSocket& socket, outbound_packet packet, bool alreadyInOutput)
 		{
-			if (packet.destinationCode == DESTINATION_ALL)
+			if (packet.destinationCode == DESTINATION_ALL || packet.destinationCode == DESTINATION_EVERYONE)
 			{
 				// Make a copy of the current player-list.
 				packet.waitingConnections = players;
@@ -1440,19 +1467,25 @@ namespace iosync
 			switch (destinationCode)
 			{
 				case DESTINATION_ALL:
+				case DESTINATION_EVERYONE:
 					if (!players.empty())
 					{
 						// Local variable(s):
 						
 						// Copy the contents of the 'players' container:
-						playerList playerMask = players;
+						playerList playerMask;
 
-						auto p = networkEngine::getPlayer(playerMask, socket);
+						if (destinationCode != DESTINATION_EVERYONE)
+						{
+							playerMask = players;
 
-						// Remove the caller from this new container.
-						playerMask.remove(p);
+							auto p = networkEngine::getPlayer(playerMask, socket);
 
-						if (!playerMask.empty())
+							// Remove the caller from this new container.
+							playerMask.remove(p);
+						}
+
+						if (!playerMask.empty() || destinationCode == DESTINATION_EVERYONE)
 						{
 							auto returnPoint = socket.readOffset;
 
@@ -1498,9 +1531,19 @@ namespace iosync
 												auto p = finishReliableMessage(socket, address(), headerInformation);
 									
 												p.destinationCode = destinationCode;
-									
-												// Copy the generated container.
-												p.waitingConnections = playerMask;
+												
+												switch (destinationCode)
+												{
+													case DESTINATION_EVERYONE:
+														p.waitingConnections = players;
+
+														break;
+													default:
+														// Copy the generated container.
+														p.waitingConnections = playerMask;
+
+														break;
+												}
 
 												// Add the new packet to the internal container.
 												addReliablePacket(p);
@@ -1522,10 +1565,16 @@ namespace iosync
 								}
 							}
 
-							// Send out the message.
-							//networkEngine::sendMessage(destinationCode, true); // DESTINATION_ALL
+							// Send out the message:
+							switch (destinationCode)
+							{
+								case DESTINATION_EVERYONE:
+									networkEngine::sendMessage(destinationCode, true); // DESTINATION_ALL
 
-							broadcastMessage(socket, playerMask, true);
+									break;
+								default:
+									broadcastMessage(socket, playerMask, destinationCode, true);
+							}
 
 							socket.inSeek(returnPoint);
 						}

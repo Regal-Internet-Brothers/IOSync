@@ -2,6 +2,7 @@
 #include "iosync.h"
 
 // Standard library:
+#include <algorithm>
 #include <sstream>
 #include <exception>
 #include <stdexcept>
@@ -337,7 +338,19 @@ namespace iosync
 			for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
 			{
 				if (gamepadConnected(i))
-					gamepads[i]->update(*program);
+				{
+					if (!program->multiWayOperations())
+					{
+						gamepads[i]->update(*program);
+					}
+					else
+					{
+						if (gamepads[i]->canDetect())
+						{
+							gamepads[i]->detect(*program);
+						}
+					}
+				}
 			}
 
 			return;
@@ -584,7 +597,7 @@ namespace iosync
 
 					#ifdef PLATFORM_WINDOWS
 						// If the real gamepad is connected, don't allow simulation.
-						&& !realPluggedIn
+						&& (!realPluggedIn || program->multiWayOperations())
 					#endif
 				);
 
@@ -858,11 +871,11 @@ namespace iosync
 			return;
 		}
 
-		void connectedDevices::serializeGamepad(networkEngine& engine, QSocket& socket, gamepadID identifier, gamepadID remoteIdentifier)
+		void connectedDevices::serializeGamepad(networkEngine& engine, QSocket& socket, gamepadID gamepadLocation, gamepadID remoteIdentifier)
 		{
 			auto headerInformation = beginGamepadDeviceMessage(engine, socket, remoteIdentifier, DEVICE_NETWORK_MESSAGE_ENTRIES);
 
-			serializeIODevice(socket, gamepads[identifier]);
+			serializeIODevice(socket, gamepads[gamepadLocation]);
 
 			engine.finishMessage(socket, headerInformation);
 
@@ -1209,7 +1222,7 @@ namespace iosync
 
 			for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
 			{
-				if (gamepadConnected(i) && gamepads[i]->canDetect())
+				if (gamepadConnected(i) && gamepads[i]->canDetect() && gamepads[i]->hasRealState())
 				{
 					sent += engine.sendMessage(engine, generateGamepadState(engine, engine, i, gamepads[i]->remoteGamepadNumber), destination);
 				}
@@ -1222,7 +1235,14 @@ namespace iosync
 		{
 			if (program->multiWayOperations()) // engine.canBroadcastLocally()
 			{
-				return sendTo(engine, DESTINATION_ALL);
+				if (program->network->isHostNode)
+				{
+					return sendTo(engine, DESTINATION_ALL);
+				}
+				else
+				{
+					return sendTo(engine, DESTINATION_EVERYONE); // DESTINATION_ALL
+				}
 			}
 
 			return sendTo(engine, DEFAULT_DESTINATION);
@@ -1232,7 +1252,14 @@ namespace iosync
 		{
 			if (program->multiWayOperations()) // engine.canBroadcastLocally()
 			{
-				return reliableSendTo(engine, DESTINATION_ALL);
+				if (program->network->isHostNode)
+				{
+					return reliableSendTo(engine, DESTINATION_ALL);
+				}
+				else
+				{
+					return reliableSendTo(engine, DESTINATION_EVERYONE); // DESTINATION_ALL
+				}
 			}
 
 			return reliableSendTo(engine, DEFAULT_DESTINATION);
@@ -1497,11 +1524,19 @@ namespace iosync
 		{
 			auto devices = devicesIterator->second;
 
-			auto kbdEnabledIterator = devices.find(DEVICES_KEYBOARD);
-
-			if (kbdEnabledIterator != devices.end())
+			if (mode == MODE_DIRECT_CLIENT || mode == MODE_DIRECT_SERVER)
 			{
-				keyboardEnabled = wstrEnabled(kbdEnabledIterator->second);
+				// Manually disable keyboard-support. (Unsafe; could cause an endless loop)
+				keyboardEnabled = false;
+			}
+			else
+			{
+				auto kbdEnabledIterator = devices.find(DEVICES_KEYBOARD);
+
+				if (kbdEnabledIterator != devices.end())
+				{
+					keyboardEnabled = wstrEnabled(kbdEnabledIterator->second);
+				}
 			}
 
 			auto gpEnabledIterator = devices.find(DEVICES_GAMEPADS);
@@ -2465,7 +2500,7 @@ namespace iosync
 					// Check if a proper address was specified:
 					if (address::addressSet(configuration.remoteAddress.IP))
 					{
-						return execute((configuration.username.empty()) ? DEFAULT_PLAYER_NAME : configuration.username, configuration.remoteAddress.IP, configuration.remoteAddress.port, configuration.mode);
+						return execute((configuration.username.empty()) ? DEFAULT_PLAYER_NAME : configuration.username, configuration.remoteAddress.IP, configuration.remoteAddress.port, 0, configuration.mode);
 					}
 					else
 					{
@@ -2657,7 +2692,7 @@ namespace iosync
 		dynamicLink(*this);
 
 		#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
-			synchronizedApplications_haltTimer = high_resolution_clock::now();
+			synchronizedApplicationRefreshTimer = high_resolution_clock::now();
 		#endif
 
 		#ifdef IOSYNC_LIVE_COMMANDS
@@ -2718,15 +2753,12 @@ namespace iosync
 		{
 			updateNetwork();
 
-			if (network != nullptr)
-			{
-				#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
-					if (synchronizeApplications() && network->connectedToOthers())
-					{
-						updateSynchronizedApplications();
-					}
-				#endif
-			}
+			#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
+				if (synchronizeApplications() && network->connectedToOthers())
+				{
+					updateSynchronizedApplications();
+				}
+			#endif
 		}
 
 		return;
@@ -2734,7 +2766,7 @@ namespace iosync
 
 	void iosync_application::updateNetwork()
 	{
-		if (devices.hasDeviceConnected())
+		if (devices.hasDeviceConnected() && network->connectedToOthers())
 		{
 			switch (mode)
 			{
@@ -2779,16 +2811,54 @@ namespace iosync
 	#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
 		void iosync_application::updateSynchronizedApplications()
 		{
+			// Namespace(s):
+			using namespace devices;
+
 			if (!synchronizedApplications_suspended)
 			{
-				//switch (mode)
+				if (elapsed(synchronizedApplicationRefreshTimer) >= synchronizedApplicationRefreshTime)
 				{
-					//case MODE_DIRECT_SERVER:
-						if (elapsed(synchronizedApplications_haltTimer) >= synchronizedApplications_resumeTime)
-						{
-							suspendSynchronizedApplications();
-						}
+					for (auto& a : synchronizedApplications)
+					{
+						a.updateThreadSnapshot();
+					}
 				}
+			}
+
+			bool resumeApplications = true;
+
+			for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
+			{
+				if (devices.gamepadConnected(i))
+				{
+					if (!devices.gamepads[i]->hasStates() && (!network->isHostNode || !gamepad::realDeviceConnected(devices.gamepads[i]->localGamepadNumber))) // devices.gamepads[i]->connected_real()
+					{
+						//cout << "Gamepad[" << i << "] (" << devices.gamepads[i]->localGamepadNumber << ", " << devices.gamepads[i]->remoteGamepadNumber << "): No states found, suspending." << endl;
+
+						resumeApplications = false;
+
+						// Automatically suspend all synchronized applications.
+						suspendSynchronizedApplications();
+
+						break;
+					}
+				}
+			}
+
+			if (resumeApplications)
+			{
+				for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
+				{
+					if (devices.gamepadConnected(i))
+					{
+						if (devices.gamepads[i]->canSimulate())
+						{
+							devices.gamepads[i]->simulate(*this);
+						}
+					}
+				}
+
+				resumeSynchronizedApplications();
 			}
 
 			return;
@@ -2799,28 +2869,10 @@ namespace iosync
 			if (synchronizedApplications_suspended)
 				return;
 
-			synchronizedApplications_haltTimer = high_resolution_clock::now();
-
-			if (network->isHostNode)
-			{
-				synchronizedApplications_waitCounter = network->connections();
-			}
-
 			for (auto& application : synchronizedApplications)
 			{
 				application.suspend();
 			}
-
-			if (network->isHostNode)
-			{
-				network->sendMessage(*network, generateApplicationSyncMessage(*network, *network, APPLICATION_SYNCRHONIZATION_QUERY), DESTINATION_ALL);
-			}
-			/*
-			else
-			{
-				network->sendMessage(*network, generateApplicationSyncMessage(*network, *network, APPLICATION_SYNCRHONIZATION_RESPONSE), DESTINATION_HOST);
-			}
-			*/
 
 			synchronizedApplications_suspended = true;
 
@@ -2831,9 +2883,6 @@ namespace iosync
 		{
 			if (!synchronizedApplications_suspended)
 				return;
-
-			synchronizedApplications_resumeTime = elapsed(synchronizedApplications_haltTimer);
-			synchronizedApplications_haltTimer = high_resolution_clock::now();
 
 			for (auto& application : synchronizedApplications)
 			{
@@ -2940,22 +2989,10 @@ namespace iosync
 	// Networking related:
 
 	// Serialization related:
-	void iosync_application::serializeApplicationSyncMessage(QSocket& socket, synchronizationMessageTypes type)
-	{
-		socket.write<synchronizationMessageTypes>(type);
-
-		return;
-	}
+	// Nothing so far.
 
 	// Message generation related:
-	outbound_packet iosync_application::generateApplicationSyncMessage(networkEngine& engine, QSocket& socket, synchronizationMessageTypes type, const address& realAddress, const address& forwardAddress)
-	{
-		auto headerInformation = engine.beginMessage(socket, MESSAGE_TYPE_SYNC);
-
-		serializeApplicationSyncMessage(socket, type);
-
-		return engine.finishReliableMessage(socket, realAddress, headerInformation, forwardAddress);
-	}
+	// Nothing so far.
 
 	// Parsing/deserialization related:
 	bool iosync_application::parseNetworkMessage(QSocket& socket, const messageHeader& header, const messageFooter& footer)
@@ -2965,15 +3002,17 @@ namespace iosync
 			case MESSAGE_TYPE_DEVICE:
 				// Route device packets to the 'devices' manager.
 				// In the event a device wasn't found, tell our caller:
-				if (devices.parseDeviceMessage(this, socket, header, footer) == deviceManagement::DEVICE_TYPE_NOT_FOUND)
+				if (devices.parseDeviceMessage(this, socket, header, footer) != deviceManagement::DEVICE_TYPE_NOT_FOUND)
+				{
+					#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
+						// Nothing so far.
+					#endif
+				}
+				else
 				{
 					// We couldn't find the device.
 					return false;
 				}
-
-				break;
-			case MESSAGE_TYPE_SYNC:
-				parseApplicationSyncMessage(socket, header, footer);
 
 				break;
 			default:
@@ -2982,41 +3021,6 @@ namespace iosync
 
 		// Return the default response.
 		return true;
-	}
-
-	void iosync_application::parseApplicationSyncMessage(QSocket& socket, const messageHeader& header, const messageFooter& footer)
-	{
-		auto type = socket.read<synchronizationMessageTypes>();
-
-		switch (type)
-		{
-			case APPLICATION_SYNCRHONIZATION_QUERY:
-				if (!network->isHostNode)
-				{
-					suspendSynchronizedApplications();
-
-					network->sendMessage(socket, generateApplicationSyncMessage(*network, socket, APPLICATION_SYNCRHONIZATION_RESPONSE), DESTINATION_HOST);
-				}
-
-				break;
-			case APPLICATION_SYNCRHONIZATION_RESPONSE:
-				synchronizedApplications_waitCounter--;
-
-				if (synchronizedApplications_waitCounter == 0) // <= 0
-				{
-					network->sendMessage(socket, generateApplicationSyncMessage(*network, socket, APPLICATION_SYNCRHONIZATION_RESUME), DESTINATION_ALL);
-
-					resumeSynchronizedApplications();
-				}
-
-				break;
-			case APPLICATION_SYNCRHONIZATION_RESUME:
-				resumeSynchronizedApplications();
-
-				break;
-		}
-
-		return;
 	}
 
 	// Call-backs:

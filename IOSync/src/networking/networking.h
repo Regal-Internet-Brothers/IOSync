@@ -88,7 +88,8 @@ namespace iosync
 
 			DEFAULT_CLIENT_CONNECTION_TIMEOUT = 15000, // 15 seconds.
 			DEFAULT_CLIENT_PING_INTERVAL = 4000, // 4 seconds.
-			DEFAULT_CLIENT_RELIABLE_RESEND = 100, // 0.1 seconds.
+
+			DEFAULT_CLIENT_RELIABLE_RESEND = 16, // 100, // 0.1 seconds.
 
 			DEFAULT_CONNECTION_POLL_TIMEOUT = 100, // 0.1 seconds.
 			DEFAULT_RELIABLE_PACKET_WAIT_TIME = 2000, // 2 seconds.
@@ -97,9 +98,17 @@ namespace iosync
 		// These are "destination codes" used to send context-sensitive messages:
 		enum networkDestinationCode : uqchar
 		{
+			// This allows clients to directly contact the server.
 			DESTINATION_HOST = 0,
+
+			// This may be used to automatically reply to the address a packet came from.
 			DESTINATION_REPLY = 1,
+
+			// This allows you to specify every other connection as a recipient. (You don't receive the message you sent)
 			DESTINATION_ALL = 3,
+
+			// This allows you to specify every connection as a recipient. (You get your own message back, as well)
+			DESTINATION_EVERYONE = 4,
 
 			DESTINATION_DIRECT = DESTINATION_REPLY,
 			DEFAULT_DESTINATION = DESTINATION_REPLY, // DESTINATION_DIRECT

@@ -203,9 +203,9 @@ namespace iosync
 						//return axis_mid + value;
 						//return axis_mid + max(axis_min, min(value, axis_max));
 						
-						auto scalar = max(axis_mid / ((LONG)maximum_value), 1L);
+						float scalar = max(((float)axis_mid / (float)maximum_value), 1.0f);
 
-						return max(axisInfo.min, min((axis_mid + (value * scalar)), axisInfo.max));
+						return max(axisInfo.min, min((axis_mid + ((LONG)((float)value * scalar))), axisInfo.max));
 					#else
 						return value;
 					#endif
@@ -352,7 +352,7 @@ namespace iosync
 					nativeGamepad* statePtr = (((nativeGamepad*)__winnt__sharedMemory_getStatesOffset(buffer)) + localIdentifier); // FILE_MAP_ALL_ACCESS
 
 					*statePtr = state.native;
-				
+					
 					__winnt__unmapSharedMemory(buffer);
 				}
 			#endif
@@ -443,7 +443,16 @@ namespace iosync
 
 		void gamepad::readFrom(QSocket& socket)
 		{
+			gamepadState state = gamepadState();
+
 			state.readFrom(socket);
+
+			if (!contains(stateLog, state))
+			{
+				this->state = state;
+
+				stateLog.push_back(state);
+			}
 
 			return;
 		}
@@ -457,8 +466,21 @@ namespace iosync
 
 		bool gamepad::simulateState(iosync_application& program)
 		{
+			/*
 			if (!hasState())
 				return false;
+			*/
+
+			if (!stateLog.empty())
+			{
+				state = stateLog.front();
+
+				stateLog.pop_front();
+			}
+			else
+			{
+				return false;
+			}
 
 			simulateState(state, localGamepadNumber);
 
@@ -484,7 +506,7 @@ namespace iosync
 						}
 					}
 				#endif
-				
+					
 				__winnt__lastPacketNumber = state.native.dwPacketNumber;
 			#endif
 

@@ -76,6 +76,14 @@ namespace process
 				//typedef decltype(&Wow64ResumeThread) Wow64ResumeThread_t;
 			#endif
 
+			// Functions:
+			#if !defined(PROCESS_MANAGER_DEBUG_SUSPEND) && defined(PROCESS_MANAGER_WOW)
+				static Wow64SuspendThread_t fnWow64SuspendThread;
+				//static Wow64ResumeThread_t fnWow64ResumeThread;
+			#endif
+
+			static void initializeSharedFunctions();
+
 			// Constructor(s):
 			#if !defined(PROCESS_MANAGER_DEBUG_SUSPEND) && defined(PROCESS_MANAGER_WOW)
 				synchronized_process(nativeID ID, bool retrieveSnapshot, bool is32b);
@@ -117,10 +125,9 @@ namespace process
 
 			// Booleans / Flags:
 			#if !defined(PROCESS_MANAGER_DEBUG_SUSPEND) && defined(PROCESS_MANAGER_WOW)
-				bool is32bit;
+				bool is32bit; // = true;
 
-				Wow64SuspendThread_t fnWow64SuspendThread = NULL;
-				//Wow64ResumeThread_t fnWow64ResumeThread = NULL;
+				bool suspended = false;
 			#endif
 	};
 	//#endif

@@ -258,7 +258,7 @@ namespace iosync
 					return rewriteMessage(socket, header, footer, header_out, footer_out);
 				}
 
-				virtual size_t broadcastMessage(QSocket& socket, bool resetLength=true) = 0;
+				virtual size_t broadcastMessage(QSocket& socket, networkDestinationCode destinationCode=DESTINATION_ALL, bool resetLength=true) = 0;
 
 				// This is a general-purpose automatic send routine for sockets.
 				// This is useful for situations where an address isn't needed.
@@ -508,7 +508,7 @@ namespace iosync
 				// Destructor(s):
 				virtual bool close() override;
 
-				// Methods:
+				// Methods (Public):
 				virtual void update() override;
 
 				high_resolution_clock::time_point updateSnapshot() override;
@@ -527,7 +527,7 @@ namespace iosync
 					return networkEngine::finishReliableMessage(socket, realAddress, header_information, p->vaddr(), ID);
 				}
 
-				size_t broadcastMessage(QSocket& socket, bool resetLength=true) override;
+				size_t broadcastMessage(QSocket& socket, networkDestinationCode destinationCode=DESTINATION_ALL, bool resetLength=true) override;
 
 				size_t sendMessage(QSocket& socket, const address& remote, bool resetLength=true, networkDestinationCode destinationCode=DEFAULT_DESTINATION) override;
 
@@ -616,6 +616,11 @@ namespace iosync
 
 				// Booleans / Flags:
 				bool connected = false;
+			protected:
+				// Methods (Protected):
+
+				// Parsing/deserialization related:
+				//virtual networkDestinationCode parseMeta(QSocket& socket, const address& remoteAddress, const messageHeader& header) override;
 		};
 
 		class serverNetworkEngine : public networkEngine
@@ -653,8 +658,8 @@ namespace iosync
 					return checkClientTimeouts(this->socket);
 				}
 
-				size_t broadcastMessage(QSocket& socket, playerList players, bool resetLength=true);
-				size_t broadcastMessage(QSocket& socket, bool resetLength=true) override;
+				size_t broadcastMessage(QSocket& socket, playerList players, networkDestinationCode destinationCode=DESTINATION_ALL, bool resetLength=true);
+				size_t broadcastMessage(QSocket& socket, networkDestinationCode destinationCode=DESTINATION_ALL, bool resetLength=true) override;
 
 				inline size_t sendMessageTo(QSocket& socket, player* p)
 				{

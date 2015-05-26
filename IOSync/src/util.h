@@ -20,9 +20,14 @@ namespace iosync
 	using namespace chrono;
 
 	// Functions:
+	template <typename container, typename element>
+	inline bool contains(container c, element e)
+	{
+		return (std::find(c.begin(), c.end(), e) != c.end());
+	}
 
 	// This command returns the number of milliseconds that have passed since 't' was updated last.
-	static inline milliseconds elapsed(high_resolution_clock::time_point t)
+	inline milliseconds elapsed(high_resolution_clock::time_point t)
 	{
 		return duration_cast<milliseconds>(high_resolution_clock::now() - t);
 	}
