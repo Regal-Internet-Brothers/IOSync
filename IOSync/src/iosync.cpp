@@ -28,10 +28,10 @@ namespace iosync
 			// Functions:
 			nativeWindow open(OSINFO OSInfo)
 			{
-				#ifdef PLATFORM_WINDOWS_EXTENSIONS
-					if (isOpen())
-						return windowInstance;
+				if (isOpen())
+					return windowInstance;
 
+				#ifdef PLATFORM_WINDOWS_EXTENSIONS
 					if (!__winnt__classRegisted)
 						__winnt__registerClass(OSInfo);
 
@@ -281,38 +281,35 @@ namespace iosync
 							// Check if a gamepad with the 'i' identifier is connected:
 							if (!connected)
 							{
-								// This is currently Windows-only:
-								#ifdef PLATFORM_WINDOWS
-									if (gp::__winnt__pluggedIn(i))
+								if (gp::realDeviceConnected(i))
+								{
+									switch (program->mode)
 									{
-										switch (program->mode)
-										{
-											case iosync_application::MODE_DIRECT_CLIENT:
-											case iosync_application::MODE_CLIENT:
-												// Tell the remote host that a gamepad was connected:
-												sendGamepadConnectMessage(*program->network, program->network->socket, DESTINATION_HOST);
+										case iosync_application::MODE_DIRECT_CLIENT:
+										case iosync_application::MODE_CLIENT:
+											// Tell the remote host that a gamepad was connected:
+											sendGamepadConnectMessage(*program->network, program->network->socket, DESTINATION_HOST);
 
-												//sendGamepadConnectMessage(*program->network, program->network->socket, i, DESTINATION_HOST);
+											//sendGamepadConnectMessage(*program->network, program->network->socket, i, DESTINATION_HOST);
 
-												break;
-											case iosync_application::MODE_DIRECT_SERVER:
-												// Attempt to connect the gamepad manually:
-												if (connectGamepad(program, i, i) != nullptr) // false // getNextGamepadID(true)
+											break;
+										case iosync_application::MODE_DIRECT_SERVER:
+											// Attempt to connect the gamepad manually:
+											if (connectGamepad(program, i, i) != nullptr) // false // getNextGamepadID(true)
+											{
+												if (connectedToNetwork)
 												{
-													if (connectedToNetwork)
-													{
-														// Tell all of the clients about this gamepad being connected:
-														sendGamepadConnectMessage(*program->network, program->network->socket, i, DESTINATION_ALL);
-													}
+													// Tell all of the clients about this gamepad being connected:
+													sendGamepadConnectMessage(*program->network, program->network->socket, i, DESTINATION_ALL);
 												}
+											}
 
-												break;
-										}
-
-										// Add this identifier, so we don't bother trying to connect with it redundantly.
-										reservedGamepads.insert(i);
+											break;
 									}
-								#endif
+
+									// Add this identifier, so we don't bother trying to connect with it redundantly.
+									reservedGamepads.insert(i);
+								}
 							}
 							else
 							{
@@ -577,9 +574,7 @@ namespace iosync
 			{
 				deviceInfo << "Attempting to create gamepad-instance..." << endl;
 
-				#ifdef PLATFORM_WINDOWS
-					auto realPluggedIn = gp::__winnt__pluggedIn(identifier);
-				#endif
+				auto realPluggedIn = gp::realDeviceConnected(identifier);
 
 				// Allocate a new 'gp' on the heap.
 				gamepads[identifier] = new gp
@@ -2148,7 +2143,9 @@ namespace iosync
 		// Check if we have arguments to use:
 		if (argCount > 1)
 		{
+			// Windows specific:
 			#ifdef PLATFORM_WINDOWS
+				// XInput related:
 				if (devices::XINPUT_INJECTION_ARGUMENTW == args[0])
 				{
 					if (!devices::gamepad::__winnt__injectLibrary(stoi(args[1])))
@@ -2156,27 +2153,25 @@ namespace iosync
 
 					return 0;
 				}
+			#endif
+
+			#if defined(KEYBOARD_IMPLEMENTED)
+				devices::keyboardAction action;
+
+				if (toLower(args[0]) == L"keydown")
+				{
+					action.type = devices::keyboardActionType::ACTION_TYPE_DOWN;
+				}
 				else
 				{
-					#ifdef IOSYNC_TESTMODE
-						devices::keyboardAction action;
-
-						if (toLower(args[0]) == L"keydown")
-						{
-							action.type = devices::keyboardActionType::ACTION_TYPE_DOWN;
-						}
-						else
-						{
-							action.type = devices::keyboardActionType::ACTION_TYPE_RELEASE;
-						}
-
-						action.key = stoi(args[1]);
-
-						devices::keyboard::simulateAction(action);
-
-						return 0;
-					#endif
+					action.type = devices::keyboardActionType::ACTION_TYPE_RELEASE;
 				}
+
+				action.key = stoi(args[1]);
+
+				devices::keyboard::simulateAction(action);
+
+				return 0;
 			#endif
 
 			return execute((argCount > 2) ? args[2] : DEFAULT_PLAYER_NAME, wideStringToDefault(args[0]), (addressPort)stoi(args[1]));
@@ -2199,7 +2194,9 @@ namespace iosync
 					file.open(wideStringToDefault(applicationConfiguration::DEFAULT_PATH));
 				#endif
 				
+				// Windows-specific:
 				#ifdef PLATFORM_WINDOWS
+					// Application-data fallback:
 					if (file.fail())
 					{
 						file.close();
@@ -2216,6 +2213,7 @@ namespace iosync
 					}
 				#endif
 
+				// Check if loading failed:
 				if (!file.fail())
 				{
 					cout << "Would you like to load your configuration-file? (Y/N): ";
@@ -2339,7 +2337,9 @@ namespace iosync
 								continue;
 							}
 
+							// Windows specific:
 							#ifdef PLATFORM_WINDOWS
+								// Application-data configuration:
 								bool useAppData;
 								
 								cout << "Would you like to log to your application-data, instead? (Y/N): "; useAppData = userBoolean();
@@ -2620,7 +2620,9 @@ namespace iosync
 						configuration.remoteAddress.port = requestPort(cin); // cout << endl;
 					#endif
 
+					// Windows-specific:
 					#ifdef PLATFORM_WINDOWS
+						// XInput configuration:
 						#ifndef IOSYNC_FAST_TESTMODE_SINGLE_INPUT
 							wstring entry;
 
@@ -2972,7 +2974,7 @@ namespace iosync
 				auto& connectedPrograms = commandQueue.front().connectedPrograms;
 
 				// Search for this object
-				if (find(connectedPrograms.begin(), connectedPrograms.end(), this) != connectedPrograms.end())
+				if (contains(connectedPrograms, this) != connectedPrograms.end())
 				{
 					auto& command = commandQueue.front();
 

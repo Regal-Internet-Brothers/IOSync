@@ -24,11 +24,6 @@
 	#endif
 #endif
 
-// This is just so endless keyboard loops don't occur:
-#ifndef IOSYNC_FAST_TESTMODE
-	#define IOSYNC_DEVICE_KEYBOARD
-#endif
-
 #define IOSYNC_DEVICE_GAMEPAD
 
 #ifdef IOSYNC_DEVICE_GAMEPAD
@@ -83,6 +78,11 @@
 #if defined(IOSYNC_ALLOW_ASYNC_EXECUTE) || defined(IOSYNC_LIVE_COMMANDS)
 	#include <mutex>
 	#include <thread>
+#endif
+
+// This is just so endless keyboard loops don't occur:
+#if !defined(IOSYNC_FAST_TESTMODE) && defined(KEYBOARD_IMPLEMENTED)
+	#define IOSYNC_DEVICE_KEYBOARD
 #endif
 
 // Windows-specific:

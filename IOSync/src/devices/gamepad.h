@@ -119,7 +119,7 @@ namespace iosync
 				MAX_GAMEPADS = 1, // 0,
 			#endif
 
-			DEFAULT_DEBUG_RUMBLE_TIME = 500,
+			DEFAULT_DEBUG_RUMBLE_TIME = 250, // 500
 
 			#ifdef GAMEPAD_VJOY_ENABLED
 				MAX_VJOY_DEVICES = 16,
@@ -472,10 +472,12 @@ namespace iosync
 					}
 				#endif
 
+				// Platform independent "pluggedIn" command.
 				static inline bool realDeviceConnected(gamepadID identifier)
 				{
 					#ifdef PLATFORM_WINDOWS
-						return (__winnt__realDeviceStateResponse(identifier) == ERROR_SUCCESS);
+						//return (__winnt__realDeviceStateResponse(identifier) == ERROR_SUCCESS);
+						return __winnt__pluggedIn(identifier);
 					#else
 						return false;
 					#endif
@@ -564,7 +566,14 @@ namespace iosync
 
 				inline bool hasRealState() const
 				{
-					return (canDetect() && canSimulate()) || (state.native.dwPacketNumber != __winnt__lastPacketNumber);
+					return
+					(
+						(canDetect() && canSimulate())
+
+						#ifdef PLATFORM_WINDOWS
+							|| (state.native.dwPacketNumber != __winnt__lastPacketNumber)
+						#endif
+					);
 				}
 
 				inline bool hasState() const
