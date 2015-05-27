@@ -15,6 +15,7 @@
 // Includes:
 #include "../platform.h"
 #include "../names.h"
+#include "../exceptions.h"
 
 #include "devices.h"
 
@@ -210,6 +211,16 @@ namespace iosync
 				inline bool operator>(const gamepadState& state) const
 				{
 					return (native.dwPacketNumber > state.native.dwPacketNumber);
+				}
+
+				inline bool operator>=(const gamepadState& state) const
+				{
+					return (operator>(state) || operator==(state));
+				}
+
+				inline bool operator<=(const gamepadState& state) const
+				{
+					return (operator<(state) || operator==(state));
 				}
 			#endif
 
@@ -522,20 +533,18 @@ namespace iosync
 				gamepadID localGamepadNumber;
 				gamepadID remoteGamepadNumber;
 
-				gamepadState state;
-
 				deque<gamepadState> stateLog;
 
 				// Used externally; a pointer to a player/connection which owns this object.
 				networking::player* owner = nullptr;
 
 				#ifdef PLATFORM_WINDOWS
-					DWORD __winnt__lastPacketNumber;
-					DWORD __winnt__state_meta;
+					DWORD __winnt__lastPacketNumber = 0;
+					DWORD __winnt__state_meta = ERROR_SUCCESS;
 
 					#ifdef GAMEPAD_VJOY_ENABLED
 						VjdStat vJoy_status = VJD_STAT_BUSY;
-						UINT local_vJoyID;
+						UINT local_vJoyID; // = 1;
 					#endif
 				#endif
 
@@ -566,14 +575,16 @@ namespace iosync
 
 				inline bool hasRealState() const
 				{
-					return
-					(
-						(canDetect() && canSimulate())
-
-						#ifdef PLATFORM_WINDOWS
-							|| (state.native.dwPacketNumber != __winnt__lastPacketNumber)
-						#endif
-					);
+					#ifdef PLATFORM_WINDOWS
+						if (stateLog.empty())
+						{
+							return false;
+						}
+						
+						return (stateLog.front().native.dwPacketNumber != __winnt__lastPacketNumber);
+					#else
+						return false;
+					#endif
 				}
 
 				inline bool hasState() const
@@ -598,6 +609,36 @@ namespace iosync
 				{
 					return !stateLog.empty();
 				}
+		};
+	}
+	
+	namespace exceptions
+	{
+		// Exceptions:
+		class gamepadException : public iosync_exception
+		{
+			public:
+				// Constructor(s):
+				gamepadException(devices::gamepad* pad, const string& exception_name = "IOSYNC: Gamepad exception.");
+
+				// Methods:
+				virtual const string message() const throw() override = 0;
+
+				// Fields:
+				devices::gamepad* target;
+		};
+
+		class undefinedGamepadOperation : public gamepadException
+		{
+			public:
+				// Constructor(s):
+				undefinedGamepadOperation(devices::gamepad* pad, const string& exception_name = "IOSYNC: Undefined gamepad behavior.");
+
+				// Methods:
+				virtual const string message() const throw() override;
+
+				// Fields:
+				// Nothing so far.
 		};
 	}
 }

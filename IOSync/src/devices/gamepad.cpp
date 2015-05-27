@@ -404,7 +404,12 @@ namespace iosync
 		void gamepad::detect(iosync_application& program)
 		{
 			#ifdef PLATFORM_WINDOWS
-				__winnt__lastPacketNumber = state.native.dwPacketNumber;
+				if (!stateLog.empty())
+				{
+					__winnt__lastPacketNumber = stateLog.front().native.dwPacketNumber;
+				}
+
+				gamepadState state; // = gamepadState();
 
 				// Read the Xinput-device's state.
 				auto result = __winnt__realDeviceState(localGamepadNumber, state.native);
@@ -424,6 +429,13 @@ namespace iosync
 				#endif
 
 				__winnt__state_meta = result;
+
+				if (stateLog.empty())
+				{
+					__winnt__lastPacketNumber = state.native.dwPacketNumber;
+				}
+
+				stateLog.push_back(state);
 			#endif
 
 			return;
@@ -446,11 +458,30 @@ namespace iosync
 			gamepadState state = gamepadState();
 
 			state.readFrom(socket);
-
-			if (!contains(stateLog, state))
+			
+			/*
+			if (state == this->state)
 			{
-				this->state = state;
+				return;
+			}
+			*/
 
+			auto validState = [this, state] ()
+			{
+				for (const auto& s : stateLog)
+				{
+					if (s >= state)
+					{
+						return false;
+					}
+				}
+
+				return true;
+			};
+
+			//if (!contains(stateLog, state))
+			if (validState())
+			{
 				stateLog.push_back(state);
 			}
 
@@ -459,7 +490,16 @@ namespace iosync
 
 		void gamepad::writeTo(QSocket& socket)
 		{
-			state.writeTo(socket);
+			if (!stateLog.empty())
+			{
+				stateLog.front().writeTo(socket);
+				stateLog.pop_front();
+			}
+			else
+			{
+				// Throw an exception, telling the user they incorrectly used this command.
+				throw exceptions::undefinedGamepadOperation(this);
+			}
 
 			return;
 		}
@@ -471,16 +511,12 @@ namespace iosync
 				return false;
 			*/
 
-			if (!stateLog.empty())
-			{
-				state = stateLog.front();
-
-				stateLog.pop_front();
-			}
-			else
-			{
+			if (stateLog.empty())
 				return false;
-			}
+
+			sort(stateLog.begin(), stateLog.end(), [] (const gamepadState& X, const gamepadState& Y) { return (X > Y); });
+
+			gamepadState& state = stateLog.front();
 
 			simulateState(state, localGamepadNumber);
 
@@ -510,6 +546,8 @@ namespace iosync
 				__winnt__lastPacketNumber = state.native.dwPacketNumber;
 			#endif
 
+			stateLog.pop_front();
+
 			// Return the default response.
 			return true;
 		}
@@ -521,5 +559,28 @@ namespace iosync
 				return vJoy_status = vJoy::REAL_VJOY::GetVJDStatus(local_vJoyID);
 			}
 		#endif
+	}
+
+	namespace exceptions
+	{
+		// Exceptions:
+
+		// gamepadException:
+
+		// Constructor(s):
+		gamepadException::gamepadException(devices::gamepad* pad, const string& exception_name)
+			: iosync_exception(exception_name), target(pad) { /* Nothing so far. */ }
+
+		// undefinedGamepadOperation:
+
+		// Constructor(s):
+		undefinedGamepadOperation::undefinedGamepadOperation(devices::gamepad* pad, const string& exception_name)
+			: gamepadException(pad, exception_name) { /* Nothing so far. */ }
+
+		// Methods:
+		const string undefinedGamepadOperation::message() const throw()
+		{
+			return "An invalid gamepad operation occurred.";
+		}
 	}
 }

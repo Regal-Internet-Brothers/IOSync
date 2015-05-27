@@ -17,10 +17,11 @@
 #define IOSYNC_SAFE
 
 #ifdef IOSYNC_TESTMODE
-	//#define IOSYNC_FAST_TESTMODE
+	#define IOSYNC_FAST_TESTMODE
 	
 	#ifdef IOSYNC_FAST_TESTMODE
 		#define IOSYNC_FAST_TESTMODE_SINGLE_INPUT
+		#define IOSYNC_FAST_TESTMODE_DOLPHIN_TEST
 	#endif
 #endif
 
@@ -563,8 +564,10 @@ namespace iosync
 			{
 				for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
 				{
-					if (gamepadConnected(i) && gamepads[i]->canDetect() && gamepads[i]->hasRealState())
+					if (gamepadConnected(i) && gamepads[i]->canDetect() && gamepads[i]->hasState()) // gamepads[i]->canSimulate() || hasRealState()
+					{
 						serializeGamepad(engine, socket, i, gamepads[i]->remoteGamepadNumber);
+					}
 				}
 
 				return;
@@ -695,15 +698,30 @@ namespace iosync
 				return ((keyboard != nullptr) && keyboard->connected());
 			}
 
-			// This will tell you if the local gamepad at the identifier specified is connected.
+			// This will tell you if the local gamepad at the "location" specified is connected.
 			// To check if a gamepad is connected using a remote-identifier, please use 'remoteGamepadConnected'.
 			// This is primarily useful for routines which iterate through the 'gamepads' array.
-			inline bool gamepadConnected(const gamepadID identifier) const
+			inline bool gamepadConnected(const gamepadID gamepadLocation) const
 			{
-				return ((gamepads[identifier] != nullptr) && gamepads[identifier]->connected());
+				return ((gamepads[gamepadLocation] != nullptr) && gamepads[gamepadLocation]->connected());
 			}
 
-			// This will tell you if a connected gamepad has the remote-identifier.
+			// This will tell you if a connected gamepad has the local-identifier specified.
+			inline bool localGamepadConnected(const gamepadID identifier) const
+			{
+				for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
+				{
+					if (gamepadConnected(i) && gamepads[i]->localGamepadNumber == identifier)
+					{
+						return true;
+					}
+				}
+
+				// Return the default response.
+				return false;
+			}
+
+			// This will tell you if a connected gamepad has the remote-identifier specified.
 			inline bool remoteGamepadConnected(const gamepadID identifier) const
 			{
 				for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
