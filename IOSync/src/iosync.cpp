@@ -336,6 +336,8 @@ namespace iosync
 			{
 				if (gamepadConnected(i))
 				{
+					//cout << "gamepads["<<i<<"]->canDetect(): " << gamepads[i]->canDetect() << ", gamepads["<<i<<"]->canSimulate(): " << gamepads[i]->canSimulate() << endl;
+
 					if (!program->multiWayOperations()) // program->network->isHostNode
 					{
 						gamepads[i]->update(*program);
@@ -2778,9 +2780,9 @@ namespace iosync
 			updateNetwork();
 
 			#ifdef IOSYNC_ALLOW_PROCESS_SYNCHRONIZATION
-				if (network != nullptr)
+				//if (network != nullptr)
 				{
-					if (synchronizeApplications() && network->connectedToOthers())
+					if (synchronizeApplications()) // network->connectedToOthers()
 					{
 						updateSynchronizedApplications();
 					}
@@ -2860,7 +2862,7 @@ namespace iosync
 				{
 					if (devices.gamepadConnected(i))
 					{
-						if (!devices.gamepads[i]->hasStates()) //  && (!network->isHostNode || !gamepad::realDeviceConnected(devices.gamepads[i]->localGamepadNumber) // devices.gamepads[i]->connected_real()
+						if (!devices.gamepads[i]->hasStates() || devices.gamepads[i]->stateLog.size() < 20) //  && (!network->isHostNode || !gamepad::realDeviceConnected(devices.gamepads[i]->localGamepadNumber) // devices.gamepads[i]->connected_real()
 						{
 							//cout << "Gamepad[" << i << "] (" << devices.gamepads[i]->localGamepadNumber << ", " << devices.gamepads[i]->remoteGamepadNumber << "): No states found, suspending." << endl;
 
@@ -2876,6 +2878,8 @@ namespace iosync
 
 				if (resumeApplications)
 				{
+					resumeSynchronizedApplications();
+
 					for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
 					{
 						if (devices.gamepadConnected(i))
@@ -2886,8 +2890,6 @@ namespace iosync
 							}
 						}
 					}
-
-					resumeSynchronizedApplications();
 				}
 			}
 

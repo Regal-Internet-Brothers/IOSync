@@ -45,7 +45,7 @@ namespace iosync
 			// Reset the shared representation of memory, if needed:
 			if (shared)
 			{
-				// Reset shared memory.
+				// Reset shared memory; deletes the buffer if needed.
 				shared.reset();
 
 				return true;

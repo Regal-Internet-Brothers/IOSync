@@ -17,7 +17,7 @@
 #define IOSYNC_SAFE
 
 #ifdef IOSYNC_TESTMODE
-	#define IOSYNC_FAST_TESTMODE
+	//#define IOSYNC_FAST_TESTMODE
 	
 	#ifdef IOSYNC_FAST_TESTMODE
 		#define IOSYNC_FAST_TESTMODE_SINGLE_INPUT
@@ -1215,9 +1215,19 @@ namespace iosync
 				return !isRunning;
 			}
 
+			inline bool multiWayHost() const
+			{
+				return (mode == MODE_DIRECT_SERVER);
+			}
+
+			inline bool multiWayClient() const
+			{
+				return (mode == MODE_DIRECT_CLIENT);
+			}
+
 			inline bool multiWayOperations() const
 			{
-				return (mode == MODE_DIRECT_CLIENT || mode == MODE_DIRECT_SERVER);
+				return (multiWayClient() || multiWayHost());
 			}
 
 			inline bool allowDeviceDetection() const

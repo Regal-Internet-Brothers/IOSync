@@ -404,38 +404,46 @@ namespace iosync
 		void gamepad::detect(iosync_application& program)
 		{
 			#ifdef PLATFORM_WINDOWS
-				if (!stateLog.empty())
+				if (program.multiWayHost())
 				{
-					__winnt__lastPacketNumber = stateLog.front().native.dwPacketNumber;
+					if (!stateLog.empty())
+					{
+						__winnt__lastPacketNumber = stateLog.front().native.dwPacketNumber;
+					}
 				}
 
 				gamepadState state; // = gamepadState();
 
 				// Read the Xinput-device's state.
-				auto result = __winnt__realDeviceState(localGamepadNumber, state.native);
+				__winnt__state_meta = __winnt__realDeviceState(localGamepadNumber, state.native);
 
 				#ifdef GAMEPAD_DEBUG
-					if (result != ERROR_SUCCESS)
+					if (__winnt__state_meta != ERROR_SUCCESS)
 					{
-						if (result == ERROR_DEVICE_NOT_CONNECTED)
+						if (__winnt__state_meta == ERROR_DEVICE_NOT_CONNECTED)
 						{
 							deviceInfo << "Attempted to detect device that is not connected: " << localGamepadNumber << endl;
 						}
 						else
 						{
-							deviceInfo << "Unable to detect 'gamepad' state: " << result << endl;
+							deviceInfo << "Unable to detect 'gamepad' state: " << __winnt__state_meta << endl;
 						}
+
+						return;
 					}
 				#endif
 
-				__winnt__state_meta = result;
-
-				if (stateLog.empty())
+				if (program.multiWayHost())
 				{
-					__winnt__lastPacketNumber = state.native.dwPacketNumber;
+					if (stateLog.empty())
+					{
+						__winnt__lastPacketNumber = state.native.dwPacketNumber;
+					}
+
+					stateLog.push_back(state);
 				}
 
-				stateLog.push_back(state);
+				localState = state;
 			#endif
 
 			return;
@@ -480,7 +488,7 @@ namespace iosync
 			};
 
 			//if (!contains(stateLog, state))
-			if (validState())
+			//if (validState())
 			{
 				stateLog.push_back(state);
 			}
@@ -490,6 +498,7 @@ namespace iosync
 
 		void gamepad::writeTo(QSocket& socket)
 		{
+			/*
 			if (!stateLog.empty())
 			{
 				stateLog.front().writeTo(socket);
@@ -500,6 +509,9 @@ namespace iosync
 				// Throw an exception, telling the user they incorrectly used this command.
 				throw exceptions::undefinedGamepadOperation(this);
 			}
+			*/
+
+			localState.writeTo(socket);
 
 			return;
 		}
@@ -511,10 +523,10 @@ namespace iosync
 				return false;
 			*/
 
-			if (stateLog.empty())
+			if (stateLog.empty()) // if (!hasStates())
 				return false;
 
-			sort(stateLog.begin(), stateLog.end(), [] (const gamepadState& X, const gamepadState& Y) { return (X > Y); });
+			//sort(stateLog.begin(), stateLog.end(), [] (const gamepadState& X, const gamepadState& Y) { return (X > Y); });
 
 			gamepadState& state = stateLog.front();
 

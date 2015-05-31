@@ -535,6 +535,10 @@ namespace iosync
 
 				deque<gamepadState> stateLog;
 
+				// The newest state detected from the real device.
+				// Behavior is partially undefined for purely "virtual" devices.
+				gamepadState localState;
+
 				// Used externally; a pointer to a player/connection which owns this object.
 				networking::player* owner = nullptr;
 
@@ -576,21 +580,21 @@ namespace iosync
 				inline bool hasRealState() const
 				{
 					#ifdef PLATFORM_WINDOWS
-						if (stateLog.empty())
-						{
-							return false;
-						}
-						
-						return (stateLog.front().native.dwPacketNumber != __winnt__lastPacketNumber);
+						return (localState.native.dwPacketNumber != __winnt__lastPacketNumber);
 					#else
 						return false;
 					#endif
 				}
 
+				inline bool hasStates() const
+				{
+					return !stateLog.empty();
+				}
+
 				inline bool hasState() const
 				{
 					#ifdef PLATFORM_WINDOWS
-						return hasRealState() || (!stateLog.empty());
+						return (hasRealState() || hasStates());
 					#else
 						return false;
 					#endif
@@ -603,11 +607,6 @@ namespace iosync
 					#else
 						return true;
 					#endif
-				}
-
-				inline bool hasStates() const
-				{
-					return !stateLog.empty();
 				}
 		};
 	}
