@@ -1219,7 +1219,7 @@ namespace iosync
 
 			for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
 			{
-				if (gamepadConnected(i) && gamepads[i]->canDetect() && gamepads[i]->hasState()) // gamepads[i]->canSimulate() || hasRealState()
+				if (gamepadConnected(i) && gamepads[i]->canDetect() && gamepads[i]->hasRealState()) // gamepads[i]->canSimulate() || hasState()
 				{
 					sent += engine.sendMessage(engine, generateGamepadState(engine, engine, i, gamepads[i]->remoteGamepadNumber), destination);
 				}
@@ -1500,6 +1500,7 @@ namespace iosync
 						
 						[this] (const wstring& entry)
 						{
+							/*
 							auto PID = process::resolvePIDW(entry);
 
 							if (PID != 0)
@@ -1507,6 +1508,9 @@ namespace iosync
 								// Add a new process entry into the container.
 								synchronizedApplications.push_back(PID);
 							}
+							*/
+
+							process::resolvePIDsW(entry, [this] (const process::nativeID& PID) { synchronizedApplications.push_back(PID); return; });
 						}
 					);
 				}
@@ -1672,6 +1676,7 @@ namespace iosync
 						
 						[this] (const wstring& entry)
 						{
+							/*
 							auto PID = process::resolvePIDW(entry);
 
 							if (PID != 0)
@@ -1679,6 +1684,10 @@ namespace iosync
 								// Push the current number onto the PID-container.
 								PIDs.push(PID);
 							}
+							*/
+
+							//process::resolvePIDsW(entry, PIDs);
+							process::resolvePIDsW(entry, [this] (const process::nativeID& PID) { PIDs.push(PID); return; });
 						}
 					);
 				}
@@ -2767,7 +2776,7 @@ namespace iosync
 	}
 
 	// Update routines:
-	void iosync_application::update(rate frameNumber)
+	void iosync_application::update(rate localFrame)
 	{
 		#ifdef IOSYNC_LIVE_COMMANDS
 			parseCommands();
@@ -2856,13 +2865,34 @@ namespace iosync
 
 			//if (!network->isHostNode)
 			{
+				static const auto padbuffer = 20;
+
 				bool resumeApplications = true;
 
 				for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
 				{
 					if (devices.gamepadConnected(i))
 					{
-						if (!devices.gamepads[i]->hasStates() || devices.gamepads[i]->stateLog.size() < 20) //  && (!network->isHostNode || !gamepad::realDeviceConnected(devices.gamepads[i]->localGamepadNumber) // devices.gamepads[i]->connected_real()
+						if (devices.gamepads[i]->connected_real())
+						{
+							const bool empty = devices.gamepads[i]->stateLog.empty();
+
+							/*
+							while (devices.gamepads[i]->stateLog.size() < padbuffer)
+							{
+								if (!empty)
+								{
+									devices.gamepads[i]->stateLog.push_back(devices.gamepads[i]->stateLog.back());
+								}
+								else
+								{
+									devices.gamepads[i]->stateLog.push_back(gamepadState());
+								}
+							}
+							*/
+						}
+
+						if (!devices.gamepads[i]->hasStates() || devices.gamepads[i]->stateLog.size() < padbuffer) // 20 //  && (!network->isHostNode || !gamepad::realDeviceConnected(devices.gamepads[i]->localGamepadNumber) // devices.gamepads[i]->connected_real()
 						{
 							//cout << "Gamepad[" << i << "] (" << devices.gamepads[i]->localGamepadNumber << ", " << devices.gamepads[i]->remoteGamepadNumber << "): No states found, suspending." << endl;
 
@@ -2878,8 +2908,6 @@ namespace iosync
 
 				if (resumeApplications)
 				{
-					resumeSynchronizedApplications();
-
 					for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
 					{
 						if (devices.gamepadConnected(i))
@@ -2890,6 +2918,8 @@ namespace iosync
 							}
 						}
 					}
+
+					resumeSynchronizedApplications();
 				}
 			}
 

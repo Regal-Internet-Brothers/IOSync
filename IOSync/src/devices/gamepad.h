@@ -14,8 +14,11 @@
 
 // Includes:
 #include "../platform.h"
+#include "../util.h"
 #include "../names.h"
 #include "../exceptions.h"
+
+#include "../application/application.h"
 
 #include "devices.h"
 
@@ -120,7 +123,7 @@ namespace iosync
 				MAX_GAMEPADS = 1, // 0,
 			#endif
 
-			DEFAULT_DEBUG_RUMBLE_TIME = 250, // 500
+			DEFAULT_DEBUG_RUMBLE_TIME = 500, // 250
 
 			#ifdef GAMEPAD_VJOY_ENABLED
 				MAX_VJOY_DEVICES = 16,
@@ -177,7 +180,7 @@ namespace iosync
 			// Nothing so far.
 
 			// Constructor(s):
-			gamepadState(nativeGamepad rep=nativeGamepad());
+			gamepadState(nativeGamepad rep=nativeGamepad(), application::frameNumber frameNum=0);
 
 			// Destructor(s):
 			// Nothing so far.
@@ -189,6 +192,11 @@ namespace iosync
 			// Operators (Only works per-gamepad; uses native packet IDs):
 			inline bool operator==(const gamepadState& state) const
 			{
+				/*
+				if (frame != state.frame)
+					return false;
+				*/
+
 				#ifdef PLATFORM_WINDOWS
 					return (native.dwPacketNumber == state.native.dwPacketNumber);
 				#else
@@ -225,6 +233,7 @@ namespace iosync
 			#endif
 
 			// Fields:
+			application::frameNumber frame;
 			nativeGamepad native;
 		};
 
@@ -534,6 +543,10 @@ namespace iosync
 				gamepadID remoteGamepadNumber;
 
 				deque<gamepadState> stateLog;
+
+				// The last "frame" we simulated on.
+				application::frameNumber previousFrameIn = 0;
+				application::frameNumber previousFrameOut = 0;
 
 				// The newest state detected from the real device.
 				// Behavior is partially undefined for purely "virtual" devices.

@@ -18,7 +18,8 @@ namespace iosync
 		// gamepadState:
 
 		// Constructor(s):
-		gamepadState::gamepadState(nativeGamepad rep) : native(rep)
+		gamepadState::gamepadState(nativeGamepad rep, application::frameNumber frameNum)
+			: native(rep), frame(frameNum)
 		{
 			// Nothing so far.
 		}
@@ -51,6 +52,9 @@ namespace iosync
 					native.Gamepad.sThumbRY = socket.read<SHORT>();
 				#endif
 			#endif
+
+			// Read the relative frame-number from the input.
+			frame = socket.read<application::frameNumber>();
 
 			#ifdef GAMEPAD_NETWORK_SAFE
 				/*
@@ -92,6 +96,9 @@ namespace iosync
 					socket.write<SHORT>(native.Gamepad.sThumbRY);
 				#endif
 			#endif
+
+			// Write the relative frame-number to the output.
+			socket.write<application::frameNumber>(frame);
 
 			#ifdef GAMEPAD_NETWORK_SAFE
 				/*
@@ -408,7 +415,7 @@ namespace iosync
 				{
 					if (!stateLog.empty())
 					{
-						__winnt__lastPacketNumber = stateLog.front().native.dwPacketNumber;
+						__winnt__lastPacketNumber = stateLog.back().native.dwPacketNumber;
 					}
 				}
 
@@ -439,6 +446,19 @@ namespace iosync
 					{
 						__winnt__lastPacketNumber = state.native.dwPacketNumber;
 					}
+					else
+					{
+						if (__winnt__lastPacketNumber == state.native.dwPacketNumber)
+						{
+							return;
+						}
+					}
+
+					auto currentFrame = program.getFrame();
+
+					state.frame = (currentFrame - previousFrameIn);
+
+					previousFrameIn = currentFrame;
 
 					stateLog.push_back(state);
 				}
@@ -526,9 +546,23 @@ namespace iosync
 			if (stateLog.empty()) // if (!hasStates())
 				return false;
 
-			//sort(stateLog.begin(), stateLog.end(), [] (const gamepadState& X, const gamepadState& Y) { return (X > Y); });
+			sort
+			(
+				stateLog.begin(), stateLog.end(),
+				[] (const gamepadState& X, const gamepadState& Y)
+				{
+					return (X > Y);
+				}
+			);
 
 			gamepadState& state = stateLog.front();
+
+			auto currentFrame = program.getFrame();
+
+			if ((currentFrame-previousFrameOut) < state.frame)
+			{
+				return false;
+			}
 
 			simulateState(state, localGamepadNumber);
 
@@ -557,6 +591,9 @@ namespace iosync
 					
 				__winnt__lastPacketNumber = state.native.dwPacketNumber;
 			#endif
+
+			// Set the previous frame to the current state's frame.
+			previousFrameOut = currentFrame;
 
 			stateLog.pop_front();
 

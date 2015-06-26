@@ -93,25 +93,29 @@ namespace iosync
 	// Methods:
 	int application::execute()
 	{
+		currentFrame = 0;
+
 		// Set the execution-flag to 'true'.
 		isRunning = true;
 
-		rate frameNumber = 0;
+		rate localFrame = 0;
+
 		auto delayAmount = (chrono::milliseconds)(1000/updateRate);
 
 		// This will act as our main loop:
 		while (isRunning)
 		{
 			// Update this application.
-			update(frameNumber);
+			update(localFrame);
 
-			frameNumber += 1;
+			localFrame++;
+			currentFrame++;
 
-			if (frameNumber > updateRate)
+			if (localFrame > updateRate)
 			{
 				//this_thread::sleep_for((chrono::seconds)1);
 
-				frameNumber = 0;
+				localFrame = 0;
 			}
 
 			this_thread::sleep_for(delayAmount);

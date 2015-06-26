@@ -564,7 +564,7 @@ namespace iosync
 			{
 				for (gamepadID i = 0; i < MAX_GAMEPADS; i++)
 				{
-					if (gamepadConnected(i) && gamepads[i]->canDetect() && gamepads[i]->hasState()) // gamepads[i]->canSimulate() || hasRealState()
+					if (gamepadConnected(i) && gamepads[i]->canDetect() && gamepads[i]->hasRealState()) // gamepads[i]->canSimulate() || hasState()
 					{
 						serializeGamepad(engine, socket, i, gamepads[i]->remoteGamepadNumber);
 					}

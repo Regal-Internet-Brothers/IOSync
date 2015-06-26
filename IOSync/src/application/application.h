@@ -78,13 +78,16 @@ namespace iosync
 	// Enumerator(s):
 	enum rates : rate
 	{
-		DEFAULT_UPDATERATE = 60,
+		DEFAULT_UPDATERATE = 60, // 120,
 	};
 
 	// Classes:
 	class application
 	{
 		public:
+			// Typedefs:
+			typedef unsigned long long frameNumber;
+
 			// Global variable(s):
 			static std::wstring path;
 
@@ -212,13 +215,18 @@ namespace iosync
 				// Nothing so far.
 			}
 
-			// Methods:
+			// Methods (Public):
 			virtual int execute();
 
 			// This method is abstract, and must be implemented.
-			virtual void update(rate frameNumber=0) = 0;
+			virtual void update(rate localFrame=0) = 0;
 
 			virtual nativeWindow getWindow() const;
+
+			inline frameNumber getFrame() const
+			{
+				return currentFrame;
+			}
 
 			// Networking related:
 
@@ -250,7 +258,7 @@ namespace iosync
 			// This is called when a network-engine is closed.
 			virtual void onNetworkClosed(networkEngine& engine);
 
-			// Fields:
+			// Fields (Public):
 
 			// This acts as our standard argument container.
 			arguments args;
@@ -263,5 +271,10 @@ namespace iosync
 
 			// Booleans / Flags:
 			bool isRunning;
+		protected:
+			// Fields (Protected):
+
+			// The current "frame number" of this application.
+			frameNumber currentFrame;
 	};
 }

@@ -39,6 +39,7 @@
 #include <string>
 #include <array>
 #include <vector>
+#include <queue>
 
 #ifdef PLATFORM_64
 	// "WOW" stands for "Windows on Windows"; a compatibility layer.
@@ -197,28 +198,114 @@ namespace process
 		return PID;
 	}
 
+	template <typename callback, const size_t max_processes=1024>
+	inline void PIDsFromProcessNameW(const wstring& entry, callback&& predicate)
+	{
+		nativeID aProcesses[max_processes], cbNeeded;
+
+		if (EnumProcesses(aProcesses, sizeof(aProcesses), &cbNeeded))
+		{
+			nativeID cProcesses = (cbNeeded / sizeof(nativeID));
+
+			for (unsigned int i = 0; i < cProcesses; i++)
+			{
+				if (aProcesses[i] != 0) // NULL
+				{
+					HANDLE hProcess = OpenProcess
+					(
+						PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+						FALSE, aProcesses[i]
+					);
+
+					if (hProcess != NULL)
+					{
+						HMODULE hMod;
+						nativeID _cbNeeded;
+
+						if (EnumProcessModules(hProcess, &hMod, sizeof(hMod), &_cbNeeded))
+						{
+							WCHAR processName[MAX_PATH] = L"<unknown>";
+
+							GetModuleBaseNameW(hProcess, hMod, (LPWSTR)processName, sizeof(processName)/sizeof(WCHAR));
+
+							if (entry == processName)
+							{
+								predicate(aProcesses[i]);
+							}
+						}
+
+						CloseHandle(hProcess);
+					}
+				}
+			}
+		}
+
+		return;
+	}
+
+	template <const size_t max_processes=1024>
+	inline vector<nativeID> PIDsFromProcessNameW(const wstring& entry)
+	{
+		auto add = [&PIDs] (const nativeID& PID) { PIDs.push_back(PID); return; };
+
+		vector<nativeID> PIDs;
+
+		PIDsFromProcessNameW<decltype(add), max_processes>(entry, add);
+
+		return PIDs;
+	}
+
 	// This has the same requirements as 'PIDFromProcessNameW'.
 	template <const size_t max_processes=1024>
 	inline nativeID resolvePIDW(const wstring& entry)
 	{
-		// Local variable(s):
-		nativeID PID = 0;
-
 		try
 		{
 			return (nativeID)stoi(entry); // PID;
 		}
 		catch (std::invalid_argument&)
 		{
+			// Local variable(s):
+			nativeID PID = 0;
+
 			GetWindowThreadProcessId(FindWindowW(NULL, (LPCWSTR)entry.c_str()), (LPDWORD)&PID);
 
 			if (PID == 0)
 			{
-				return PIDFromProcessNameW(entry); // PID;
+				return PIDFromProcessNameW<max_processes>(entry); // PID;
+			}
+
+			return PID;
+		}
+
+		return 0;
+	}
+
+	template <typename callback, const size_t max_processes=1024>
+	inline void resolvePIDsW(const wstring& entry, callback&& predicate)
+	{
+		try
+		{
+			predicate((nativeID)stoi(entry)); // PID;
+		}
+		catch (std::invalid_argument&)
+		{
+			// Local variable(s):
+			nativeID PID = 0;
+
+			GetWindowThreadProcessId(FindWindowW(NULL, (LPCWSTR)entry.c_str()), (LPDWORD)&PID);
+
+			if (PID == 0)
+			{
+				PIDsFromProcessNameW<callback&, max_processes>(entry, predicate);
+			}
+			else
+			{
+				predicate(PID);
 			}
 		}
 
-		return PID;
+		return;
 	}
 
 	// Platform-specific (Non-portable):
