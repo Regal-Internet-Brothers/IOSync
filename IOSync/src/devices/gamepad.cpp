@@ -203,7 +203,7 @@ namespace iosync
 				{
 					#ifdef GAMEPAD_VJOY_SAFE
 						auto& device = vJoyInfo.getDevice(vJoyID);
-						auto axisInfo = device.getAxis(axis)->second;
+						const auto axisInfo = device.getAxis(axis)->second;
 
 						LONG axis_mid = ((axisInfo.max - axisInfo.min) / 2);
 
@@ -546,6 +546,7 @@ namespace iosync
 			if (stateLog.empty()) // if (!hasStates())
 				return false;
 
+			/*
 			sort
 			(
 				stateLog.begin(), stateLog.end(),
@@ -554,6 +555,7 @@ namespace iosync
 					return (X > Y);
 				}
 			);
+			*/
 
 			gamepadState& state = stateLog.front();
 

@@ -425,9 +425,6 @@
 
 					return createAndUpdateDevice(deviceID);
 				}
-
-				// Structures:
-
 			}
 		}
 	}

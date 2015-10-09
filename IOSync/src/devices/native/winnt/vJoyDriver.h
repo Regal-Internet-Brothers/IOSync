@@ -20,7 +20,7 @@
 #endif
 
 #ifdef GAMEPAD_VJOY_ENABLED
-	#define GAMEPAD_VJOY_DYNAMIC_LINK	
+	#define GAMEPAD_VJOY_DYNAMIC_LINK
 	
 	#ifdef PLATFORM_X64
 		#define VJOY_INTERFACE_DLL_GLOBAL "vJoy\\x64\\vJoyInterface.dll"

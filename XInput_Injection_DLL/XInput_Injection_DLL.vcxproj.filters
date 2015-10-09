@@ -18,10 +18,10 @@
     <ClCompile Include="Source.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\IOSync\src\native\winnt\processManagement.cpp">
+    <ClCompile Include="..\IOSync\src\devices\native\winnt\Real_XInput_Wrapper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\IOSync\src\devices\native\winnt\Real_XInput_Wrapper.cpp">
+    <ClCompile Include="..\IOSync\src\application\native\winnt\processManagement.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -237,8 +237,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\IOSync\src\application\native\winnt\processManagement.cpp" />
     <ClCompile Include="..\IOSync\src\devices\native\winnt\Real_XInput_Wrapper.cpp" />
-    <ClCompile Include="..\IOSync\src\native\winnt\processManagement.cpp" />
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>

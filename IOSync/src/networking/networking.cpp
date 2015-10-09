@@ -258,12 +258,14 @@ namespace iosync
 				// Used for the sake of reducing boilerplate.
 				auto& packetInTransit = *packetIterator;
 
-				if (packetInTransit.time() > metrics.reliablePruneTime)
-				{
-					packetsInTransit.erase(packetIterator++);
+				/*
+					if (packetInTransit.time() > metrics.reliablePruneTime)
+					{
+						packetsInTransit.erase(packetIterator++);
 
-					continue;
-				}
+						continue;
+					}
+				*/
 
 				if (packetInTransit.resendTime() >= metrics.reliableResendTime)
 				{

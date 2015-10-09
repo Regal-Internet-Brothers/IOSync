@@ -1,6 +1,7 @@
 // Preprocessor related:
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 
-//#define WIN32_LEAN_AND_MEAN
 #define _CRT_SECURE_NO_WARNINGS
 
 // This enables console-output when injected XInput commands are executed (Virtual or real).

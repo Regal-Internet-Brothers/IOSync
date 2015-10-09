@@ -14,7 +14,7 @@
 //#define DLLExport // __declspec( dllexport )
 
 //#define DLL_DEBUG
-//#define DLL_CONFIRMATION_MESSAGE
+#define DLL_CONFIRMATION_MESSAGE
 
 // Includes:
 
@@ -26,4 +26,4 @@
 #include "devices/native/winnt/Real_XInput_Wrapper.h"
 
 // Other:
-#include "native/winnt/processManagement.h"
+#include "application/native/winnt/processManagement.h"

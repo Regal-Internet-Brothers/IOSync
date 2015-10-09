@@ -58,7 +58,7 @@ namespace process
 	// Typedefs:
 
 	// A "segment" of memory dedicated to a jump instruction.
-	typedef array<unsigned char, JUMP_SEGMENT_SIZE> jumpSegment;
+	typedef array<unsigned char, JUMP_SEGMENT_SIZE> jumpSegment; // uint8_t;
 
 	// This platform's native process-identifier.
 	typedef DWORD nativeID;
