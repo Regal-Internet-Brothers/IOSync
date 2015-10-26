@@ -1179,6 +1179,8 @@ namespace iosync
 		{
 			size_t sent = 0;
 
+			keyboardEnabled = true;
+
 			if (hasDeviceConnected())
 			{
 				if (gamepadsEnabled)
@@ -1192,7 +1194,7 @@ namespace iosync
 					}
 				}
 
-				if (keyboardEnabled && keyboardConnected())
+				if (keyboardConnected())
 				{
 					sent += engine.sendMessage(socket, generateConnectMessage(engine, socket, DEVICE_TYPE_KEYBOARD, p, p.vaddr()));
 				}

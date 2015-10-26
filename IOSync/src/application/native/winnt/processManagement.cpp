@@ -427,9 +427,12 @@ namespace process
 		unsigned char data[JUMP_SEGMENT_SIZE];
 
 		// Generate the proper instruction:
+
+		// Assign the op-code.
 		data[0] = 0xE9; // E8; // 9A;
 
-		*(signed int *)(data + 1) = (unsigned int)funcaddress - ((unsigned int)writeaddress + 5);
+		// Write the address (Offset by the instruction size).
+		*(signed int *)(data + 1) = (unsigned int)funcaddress - ((unsigned int)writeaddress + sizeof(data));
 
 		// Write over the targeted binary with our new instruction.
 		WriteProcessMemory(GetCurrentProcess(), writeaddress, data, JUMP_SEGMENT_SIZE, NULL);
