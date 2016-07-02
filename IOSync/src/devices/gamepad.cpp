@@ -354,11 +354,10 @@ namespace iosync
 			#ifdef PLATFORM_WINDOWS
 				if (__winnt__sharedMemoryOpen())
 				{
-					auto buffer = __winnt__map_States_Memory(FILE_MAP_WRITE);
+					auto buffer = __winnt__map_States_Memory(FILE_MAP_WRITE); // FILE_MAP_ALL_ACCESS
+					auto layout = (sharedMemory_layout*)buffer;
 
-					nativeGamepad* statePtr = (((nativeGamepad*)__winnt__sharedMemory_getStatesOffset(buffer)) + localIdentifier); // FILE_MAP_ALL_ACCESS
-
-					*statePtr = state.native;
+					layout->base.states[localIdentifier] = state.native;
 					
 					__winnt__unmapSharedMemory(buffer);
 				}

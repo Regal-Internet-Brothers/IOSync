@@ -36,8 +36,8 @@ using namespace iosync::devices;
 // Shared-memory related:
 LPVOID sharedBuffer = NULL;
 
-XINPUT_STATE* gamepadStates = nullptr;
-bool* pluggedIn = nullptr;
+// This represents the shared memory referenced by 'sharedBuffer'.
+sharedMemory_layout* sharedData = nullptr;
 
 HANDLE gamepad::sharedMemory = NULL;
 
@@ -74,7 +74,7 @@ extern "C"
 
 	DWORD WINAPI XInputGetBatteryInformation(DWORD dwUserIndex, BYTE devType, PXINPUT_BATTERY_INFORMATION battery)
 	{
-		if (!pluggedIn[dwUserIndex])
+		if (!sharedData->base.pluggedIn[dwUserIndex])
 		{
 			return REAL_XINPUT::XInputGetBatteryInformation(dwUserIndex, devType, battery);
 		}
@@ -86,7 +86,7 @@ extern "C"
 
 	DWORD WINAPI XInputGetKeystroke(DWORD dwUserIndex, DWORD dwReserved, PXINPUT_KEYSTROKE pKeyStroke)
 	{
-		if (!pluggedIn[dwUserIndex])
+		if (!sharedData->base.pluggedIn[dwUserIndex])
 		{
 			return REAL_XINPUT::XInputGetKeystroke(dwUserIndex, dwReserved, pKeyStroke);
 		}
@@ -98,7 +98,7 @@ extern "C"
 
 	DWORD WINAPI XInputGetAudioDeviceIds(DWORD dwUserIndex, LPWSTR pRenderDeviceId, PUINT renderCount, LPWSTR captureDeviceId, PUINT captureCount)
 	{
-		if (!pluggedIn[dwUserIndex])
+		if (!sharedData->base.pluggedIn[dwUserIndex])
 		{
 			return REAL_XINPUT::XInputGetAudioDeviceIds(dwUserIndex, pRenderDeviceId, renderCount, captureDeviceId, captureCount);
 		}
@@ -110,7 +110,7 @@ extern "C"
 
 	DWORD WINAPI XInputSetState(DWORD dwUserIndex, PXINPUT_VIBRATION pVibration)
 	{
-		if (!pluggedIn[dwUserIndex])
+		if (!sharedData->base.pluggedIn[dwUserIndex])
 		{
 			return REAL_XINPUT::XInputSetState(dwUserIndex, pVibration);
 		}
@@ -122,9 +122,9 @@ extern "C"
 
 	DWORD WINAPI XInputGetState(DWORD dwUserIndex, PXINPUT_STATE pState)
 	{
-		if (pluggedIn[dwUserIndex])
+		if (sharedData->base.pluggedIn[dwUserIndex])
 		{
-			*pState = gamepadStates[dwUserIndex];
+			*pState = sharedData->base.states[dwUserIndex];
 
 			return ERROR_SUCCESS;
 		}
@@ -134,9 +134,9 @@ extern "C"
 
 	DWORD WINAPI XInputGetStateEx(DWORD dwUserIndex, PXINPUT_STATE pState)
 	{
-		if (pluggedIn[dwUserIndex])
+		if (sharedData->base.pluggedIn[dwUserIndex])
 		{
-			*pState = gamepadStates[dwUserIndex];
+			*pState = sharedData->base.states[dwUserIndex];
 
 			//return ::XInputGetState(dwUserIndex, pState);
 
@@ -148,7 +148,7 @@ extern "C"
 
 	DWORD WINAPI XInputGetCapabilities(DWORD dwUserIndex, DWORD dwFlags, PXINPUT_CAPABILITIES pCapabilities)
 	{
-		if (pluggedIn[dwUserIndex])
+		if (sharedData->base.pluggedIn[dwUserIndex])
 		{
 			ZeroVariable(*pCapabilities);
 
@@ -199,8 +199,7 @@ extern "C"
 						if (sharedBuffer == NULL)
 							return FALSE;
 
-						pluggedIn = (bool*)gamepad::__winnt__sharedMemory_getPluggedInOffset(sharedBuffer);
-						gamepadStates = (nativeGamepad*)gamepad::__winnt__sharedMemory_getStatesOffset(sharedBuffer);
+						sharedData = (sharedMemory_layout*)sharedBuffer;
 
 						bool injected = false;
 						bool shouldInject = true;

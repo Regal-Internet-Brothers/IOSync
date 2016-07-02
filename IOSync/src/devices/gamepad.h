@@ -32,6 +32,7 @@
 #include <chrono>
 #include <deque>
 
+#include <cstdint>
 #include <climits>
 #include <cmath>
 
@@ -137,6 +138,12 @@ namespace iosync
 				SHARED_MEMORY_ALREADY_ALLOCATED,
 				SHARED_MEMORY_ALLOCATED,
 			};
+
+			enum sharedMemoryVersion : uint16_t
+			{
+				SHARED_MEMORY_VER_NOEXT,
+				SHARED_MEMORY_VER_EXTPADBUF,
+			};
 		#endif
 
 		// Constant variable(s):
@@ -145,26 +152,6 @@ namespace iosync
 		#ifdef PLATFORM_WINDOWS
 			const string XINPUT_INJECTION_ARGUMENT = "XI_INJECT";
 			const wstring XINPUT_INJECTION_ARGUMENTW = L"XI_INJECT";
-			
-			static LPCTSTR SHARED_GAMEPAD_MEMORY_NAME = "IOSYNC_GAMEPAD_BUFFER";
-
-			static const size_t SHARED_SIZEOF_PLUGGED_IN_SEGMENT = (sizeof(bool)*MAX_GAMEPADS);
-			static const size_t SHARED_SIZEOF_GAMEPAD_STATES = (sizeof(nativeGamepad)*MAX_GAMEPADS);
-
-			// The position where the "plugged in" segment begins.
-			static const size_t SHARED_GAMEPAD_MEMORY_PLUGGED_IN_OFFSET = 0;
-
-			// The position where the "states" segment begins.
-			static const size_t SHARED_GAMEPAD_MEMORY_STATES_OFFSET = SHARED_SIZEOF_PLUGGED_IN_SEGMENT;
-
-			// The position where the "plugged in" segment ends.
-			static const size_t SHARED_GAMEPAD_MEMORY_PLUGGED_IN_MAX_SCOPE = SHARED_GAMEPAD_MEMORY_PLUGGED_IN_OFFSET+SHARED_SIZEOF_PLUGGED_IN_SEGMENT;
-
-			// The position where the "states" segment ends.
-			static const size_t SHARED_GAMEPAD_MEMORY_STATES_MAX_SCOPE = SHARED_GAMEPAD_MEMORY_STATES_OFFSET+SHARED_SIZEOF_GAMEPAD_STATES;
-
-			// The size of the shared memory area.
-			static const DWORD SHARED_GAMEPAD_MEMORY_SIZE = (SHARED_SIZEOF_PLUGGED_IN_SEGMENT+SHARED_SIZEOF_GAMEPAD_STATES);
 		#endif
 
 		// Structures:
@@ -236,6 +223,46 @@ namespace iosync
 			application::frameNumber frame;
 			nativeGamepad native;
 		};
+
+		#ifdef PLATFORM_WINDOWS
+			// Memory layout definitions:
+			
+			// This represents the base layout of the shared memory segment.
+			struct sharedMemory_baseLayout
+			{
+				// Fields:
+				uint16_t ext_version = sharedMemoryVersion::SHARED_MEMORY_VER_NOEXT;
+
+				bool pluggedIn[MAX_GAMEPADS] = {};
+				nativeGamepad states[MAX_GAMEPADS] = {};
+			};
+
+			// This represents the base layout, and the first
+			// extension's layout in the shared memory segment.
+			struct sharedMemory_ext_1 : public sharedMemory_baseLayout
+			{
+				// Fields:
+				// Nothing so far.
+			};
+
+			// This represents the full layout of the shared memory segment.
+			// This may or may not be safe to use, depending on the context.
+			typedef struct sharedMemory_ext_1 sharedMemory_fullLayout;
+
+			// This union covers all functionality of the shared memory layout.
+			union sharedMemory_layout
+			{
+				sharedMemory_baseLayout base;
+				sharedMemory_ext_1 ext1;
+			};
+
+			// Shared memory specifications:
+			//static LPCTSTR SHARED_GAMEPAD_MEMORY_LEGACY_NAME = "IOSYNC_GAMEPAD_BUFFER";
+			static LPCTSTR SHARED_GAMEPAD_MEMORY_NAME = "IOSYNC_SHARED_MEMORY"; // SHARED_GAMEPAD_MEMORY_LEGACY_NAME
+
+			// The size of the shared memory area.
+			static const DWORD SHARED_GAMEPAD_MEMORY_SIZE = sizeof(sharedMemory_layout);
+		#endif
 
 		// Classes:
 		class gamepad : public IODevice
@@ -411,16 +438,16 @@ namespace iosync
 					// shared-buffer, up to the end of the "plugged in" segment.
 					// This will not offset the buffer, as it needs to be "unmapped".
 					// This can be done using the '__winnt__unmapSharedMemory' command.
-					static inline LPVOID __winnt__map_PluggedIn_Memory(DWORD desiredAccess=FILE_MAP_READ)
+					static inline LPVOID __winnt__map_PluggedIn_Memory(DWORD desiredAccess)
 					{
-						return __winnt__mapSharedMemory(desiredAccess, SHARED_GAMEPAD_MEMORY_PLUGGED_IN_MAX_SCOPE);
+						return __winnt__mapSharedMemory(desiredAccess);
 					}
 
 					// This is the same as '__winnt__map_PluggedIn_Memory', only for the "states" segment.
 					// Please follow the documentation for that command, barring the "scope" differences.
-					static inline LPVOID __winnt__map_States_Memory(DWORD desiredAccess=FILE_MAP_READ)
+					static inline LPVOID __winnt__map_States_Memory(DWORD desiredAccess)
 					{
-						return __winnt__mapSharedMemory(desiredAccess, SHARED_GAMEPAD_MEMORY_STATES_MAX_SCOPE);
+						return __winnt__mapSharedMemory(desiredAccess);
 					}
 
 					static inline bool __winnt__setGamepadConnected(gamepadID identifier, bool value)
@@ -429,11 +456,10 @@ namespace iosync
 							return false;
 
 						// Get direct buffer access.
-						auto buffer = __winnt__mapSharedMemory(FILE_MAP_WRITE, SHARED_GAMEPAD_MEMORY_PLUGGED_IN_MAX_SCOPE);
+						auto buffer = __winnt__map_PluggedIn_Memory(FILE_MAP_WRITE);
+						auto layout = (sharedMemory_layout*)buffer;
 
-						bool* pluggedIn = (bool*)__winnt__sharedMemory_getPluggedInOffset(buffer);
-
-						pluggedIn[identifier] = value;
+						layout->base.pluggedIn[identifier] = value;
 
 						// Release usage of the buffer.
 						__winnt__unmapSharedMemory(buffer);
@@ -449,10 +475,9 @@ namespace iosync
 
 						// Get direct buffer access.
 						auto buffer = __winnt__map_PluggedIn_Memory(FILE_MAP_READ);
+						auto layout = (sharedMemory_layout*)buffer;
 
-						bool* pluggedIn = (bool*)__winnt__sharedMemory_getPluggedInOffset(buffer);
-
-						auto value = pluggedIn[identifier];
+						auto value = layout->base.pluggedIn[identifier];;
 
 						// Release usage of the buffer.
 						__winnt__unmapSharedMemory(buffer);
@@ -469,26 +494,6 @@ namespace iosync
 					static inline bool __winnt__deactivateGamepad(gamepadID identifier)
 					{
 						return __winnt__setGamepadConnected(identifier, false);
-					}
-
-					static inline size_t __winnt__sharedMemory_getStatesOffset()
-					{
-						return SHARED_GAMEPAD_MEMORY_STATES_OFFSET;
-					}
-
-					static inline size_t __winnt__sharedMemory_getPluggedInOffset()
-					{
-						return SHARED_GAMEPAD_MEMORY_PLUGGED_IN_OFFSET;
-					}
-
-					static inline LPVOID __winnt__sharedMemory_getStatesOffset(LPVOID memory)
-					{
-						return (LPVOID)(((unsigned char*)memory)+__winnt__sharedMemory_getStatesOffset());
-					}
-
-					static inline LPVOID __winnt__sharedMemory_getPluggedInOffset(LPVOID memory)
-					{
-						return (LPVOID)(((unsigned char*)memory)+__winnt__sharedMemory_getPluggedInOffset());
 					}
 				#endif
 
